@@ -1,175 +1,210 @@
-# Personal Context Protocol
+# Personal Context Protocol (PCP)
 
-Personal Context Protocol (PCP) is a local-first prototype for a **Human Context Protocol / Human Data Access Protocol** controller.
+**Route B:** Vercel + Neon Postgres web app for scoped AI session recording.
 
-The core idea from the conversation that motivated this repository is simple:
+## Overview
 
-- a note application is not the long-term moat
-- a giant personal RAG is still too weak as a security boundary
-- the durable layer is a **local policy controller** that decides what data an external or less-trusted AI agent may see, in what form, for how long, and under what write constraints
+Personal Context Protocol is a minimal web app where:
 
-This repository prototypes a system in which:
+1. **Human** creates topics and AI recording sessions
+2. Each session gets a scoped token
+3. **External AI agents** receive only `domain + session_id + session_token`
+4. AI agents record conversation messages through API routes
+5. **Human** previews sessions in a read-only ChatGPT-like UI
 
-- **Human** owns the data and the final authority
-- **Local AI A** acts as a local orchestrator / policy assistant
-- **Remote or unknown AI B** is treated as useful but not fully trusted
-- credentials are never handed out directly when a scoped lease or mediated access can be used instead
-- the system attempts to maximize task completion while minimizing raw data exposure
+### Core principles
 
-## Design target
+- **No external auth** (v0.1): UI access via single instance token
+- **Scoped AI tokens**: Per-session, append-only, no topic management
+- **Immutable messages**: Corrections are new messages/events
+- **Local-first setup**: One-click Vercel deploy, UI-driven DB init
+- **Minimal exposure**: AI sees only its session context
 
-The target is **not** a better note app.
+## Quick start (one-click deploy)
 
-The target is a local controller that:
+### 1. Deploy to Vercel
 
-1. stores or indexes canonical personal data locally
-2. classifies sensitivity
-3. constructs task-scoped context bundles
-4. mediates credential use
-5. requires approval for high-risk reads or any writeback
-6. keeps an audit trail
+Click [Deploy to Vercel](https://vercel.com/new) and import this repo.
 
-In short:
+### 2. Connect Neon Postgres
 
-> maximize task utility under least-privilege, minimum-data, auditable access control.
+During Vercel setup:
+1. Create new Neon project (free tier works)
+2. Copy connection string
+3. Add to Vercel env vars as `DATABASE_URL`
 
-## Threat model
+### 3. Set required env vars
 
-This repository assumes the following are true:
-
-- prompt injection is a persistent risk
-- remote models can be useful without being fully trusted
-- local models are safer than remote models only in a **relative** sense
-- no single model should be trusted as a perfect security oracle
-- enforcement must rely on deterministic policy, validation, and approval paths rather than on language-model judgment alone
-
-## Prototype overview
-
-The prototype in `src/pcp/protocol.py` models:
-
-- `DataAsset` with sensitivity labels
-- `TaskRequest` from a remote agent
-- `PolicyEngine` that creates minimal context bundles
-- `ApprovalQueue` for asynchronous human review
-- `CredentialVault` that issues scoped leases instead of exposing raw credentials
-- `PersonalContextController` that separates read, propose, approve, and commit
-
-### Current behavior
-
-- low-risk requests can receive redacted or summary data automatically
-- secret / intimate data is queued for approval
-- write operations are never auto-committed
-- credential requests return a **lease handle**, not the credential itself
-- the controller logs what it did and why
-
-## Why asynchronous human-agent collaboration matters
-
-A realistic system should not force all decisions into synchronous chat approval.
-
-Instead, PCP should support:
-
-- queued requests
-- delayed approvals
-- expiration windows
-- policy presets by requester / task type / data sensitivity
-- reversible proposals instead of direct writes
-
-This allows a human and multiple AI agents to collaborate without requiring raw, continuous, unrestricted access.
-
-## Security concerns, especially for local AI A
-
-A local model is **not** automatically safe just because it runs locally.
-
-Important concerns include:
-
-1. **Prompt injection via local content**
-   - a local model can still read malicious notes, repo files, emails, or web captures
-   - locality does not eliminate injection
-
-2. **Credential overreach**
-   - if the local controller can directly read and emit raw credentials, compromise of that controller becomes catastrophic
-   - the safer pattern is lease issuance, capability scoping, and mediated execution
-
-3. **Policy confusion**
-   - if the model itself interprets policy text instead of a deterministic engine enforcing it, boundary violations become likely
-
-4. **Provenance collapse**
-   - without clear distinction between raw user data, model summaries, external content, and derived conclusions, the system cannot defend against context poisoning
-
-5. **Silent writeback risk**
-   - the most dangerous failure mode is not reading too much once, but gradually modifying memory, credentials, repos, or automation policies with insufficient review
-
-For that reason, this repo treats the local model as a **policy assistant**, not a root-of-trust.
-
-## Suggested system architecture
-
-```text
-Human
-  ↓
-Local canonical data store / event log / sensitivity labels
-  ↓
-Deterministic policy engine + audit log + credential vault
-  ↓
-Local AI A (planner / summarizer / broker)
-  ↓
-Task-scoped context bundle + capability leases
-  ↓
-Remote AI B / external agent
-  ↓
-Proposal only (no implicit commit)
-  ↓
-Validation / human approval / commit
+```
+DATABASE_URL=postgresql://...
+PCP_INSTANCE_SECRET=generate-a-random-secret-here
+PCP_APP_URL=https://your-app.vercel.app
 ```
 
-## Research references
+### 4. Initialize database
 
-The prototype and security notes are aligned with several recent research directions on LLM agent security, privilege control, and prompt-injection resistance:
+After first deploy:
+1. Visit `https://your-app.vercel.app`
+2. Click "Initialize Database"
+3. Save the UI admin token (shown once!)
+4. App is ready
 
-1. **Progent: Programmable Privilege Control for LLM Agents** (2025)  
-   https://www.semanticscholar.org/paper/fa4cb03e73a53f67386775c2cab44da0afbe91eb
+### 5. Create your first session
 
-2. **Prompt Flow Integrity to Prevent Privilege Escalation in LLM Agents** (2025)  
-   https://www.semanticscholar.org/paper/f1db7984b7ca19fd22e74f14ca4f9a5da74ba407
+1. Create a topic (e.g., "work-notes")
+2. Create a session within that topic
+3. Copy the AI session token
+4. Give AI agent: domain, session_id, session_token
 
-3. **Imprompter: Tricking LLM Agents into Improper Tool Use** (2024)  
-   https://www.semanticscholar.org/paper/7c834a7ba43a2b5067817426939c362eb06fdb2a
+## Architecture
 
-4. **MiniScope: A Least Privilege Framework for Authorizing Tool Calling Agents** (2025)  
-   https://www.semanticscholar.org/paper/6d4eb9782c6707c9e66229532f451e5ee0facd7e
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Human     │────▶│  Next.js App │────▶│ Neon PG     │
+│   (UI)      │     │  (Vercel)    │     │  (PG)       │
+└─────────────┘     └──────────────┘     └─────────────┘
+                            │
+                            │ Bearer token
+                            ▼
+                     ┌──────────────┐
+                     │ External AI  │
+                     │  (append-    │
+                     │  only)       │
+                     └──────────────┘
+```
 
-5. **Agent Security Bench (ASB): Formalizing and Benchmarking Attacks and Defenses in LLM-based Agents** (2024)  
-   https://www.semanticscholar.org/paper/5f4efbe3aae1d8f44ceab1da257ae685d6beb00b
+### Tech stack
 
-These works support the same general conclusion reached in the conversation:
+- **Frontend**: Next.js 14 App Router, TypeScript, React
+- **Backend**: Next.js API routes, Drizzle ORM
+- **Database**: Neon Postgres (serverless PG)
+- **Validation**: Zod
+- **Testing**: Vitest
+- **Deploy**: Vercel
 
-- do not rely on one model to be perfectly robust
-- separate policy from model cognition
-- prefer least privilege
-- control tool use and writeback explicitly
-- benchmark attacks and defenses continuously
+## Token model
 
-## Quick start
+### UI/admin token
+- Generated at setup
+- Hash stored (salted)
+- Unlocks admin UI
+- Shown **once** on creation
+- Can: create topics, manage sessions, view all data
+
+### AI session token
+- Generated per session
+- Hash stored (salted)
+- Scoped to single session
+- Can: append messages, optionally read session context, optionally rename session
+- Cannot: manage topics, delete/rewrite messages, access other sessions
+
+## API endpoints
+
+### Public/health
+- `GET /api/v1/health` - Health check
+- `GET /api/v1/protocol` - Protocol spec
+- `GET /api/v1/setup/status` - Setup progress
+
+### Setup
+- `POST /api/v1/setup/init` - Initialize DB + UI token
+- `POST /api/v1/auth/unlock` - Unlock UI with admin token
+- `POST /api/v1/auth/rotate-ui-token` - Rotate admin token
+
+### Topics (admin only)
+- `GET /api/v1/topics` - List topics
+- `POST /api/v1/topics` - Create topic
+- `GET /api/v1/topics/:id` - Get topic
+- `POST /api/v1/topics/:id/rename` - Rename topic
+- `POST /api/v1/topics/:id/archive` - Archive topic
+
+### Sessions
+- `GET /api/v1/sessions/:id` - Get session
+- `GET /api/v1/sessions/:id/review` - Review session (admin)
+- `POST /api/v1/topics/:topicId/sessions` - Create session
+- `POST /api/v1/sessions/:id/rename` - Rename session
+- `POST /api/v1/sessions/:id/archive` - Archive session
+
+### Tokens
+- `POST /api/v1/sessions/:id/tokens` - Generate session token
+- `POST /api/v1/session-tokens/:id/revoke` - Revoke token
+
+### Messages (AI write)
+- `POST /api/v1/sessions/:sessionId/messages` - Append messages (AI)
+- `GET /api/v1/sessions/:id/messages` - Read messages (admin)
+
+### Events
+- `GET /api/v1/sessions/:id/events` - Audit events
+
+### Import/Export (admin)
+- `GET /api/v1/export` - Export all data
+- `POST /api/v1/import/pcp-json` - Import PCP JSON
+- `POST /api/v1/import/pcp-jsonl` - Import PCP JSONL
+- `POST /api/v1/import/generic-transcript` - Import generic transcript
+
+## Local development
 
 ```bash
-python -m unittest discover -s tests -v
-python -m src.pcp.demo
+# Install dependencies
+npm install
+
+# Set up env (copy .env.example to .env.local)
+cp .env.example .env.local
+# Edit .env.local with your values
+
+# Generate DB migrations
+npm run db:generate
+
+# Run migrations locally (if you have PG)
+npm run db:migrate
+
+# Start dev server
+npm run dev
+
+# Run tests
+npm run test
+
+# Type check
+npm run typecheck
+
+# Build
+npm run build
 ```
 
-## Roadmap
+## Data model
 
-- add explicit provenance / taint labels
-- add signed approval records
-- add context-expiry and revocation
-- add structured connector adapters for repo, diary, chat, and filesystem data
-- add MCP-facing tool endpoints for PCP bundles and proposal queues
-- add HCP schemas for sensitivity, trust tier, and data purpose
+See [`docs/data-model.md`](docs/data-model.md).
 
-## Repository naming note
+Key tables:
+- `app_instance` - Single instance metadata
+- `ui_auth` - UI admin token hash
+- `topics` - Human-managed categories
+- `sessions` - AI recording sessions
+- `session_tokens` - Scoped AI tokens
+- `messages` - Immutable conversation messages
+- `events` - Audit trail
 
-GitHub repository slugs cannot contain spaces, so the repo is created as:
+## Security
 
-- `personal-context-protocol`
+See [`docs/security.md`](docs/security.md).
 
-while the project title remains:
+Key points:
+- No plaintext tokens stored
+- Token validation on every AI request
+- Immutable messages (corrections = new messages)
+- AI tokens cannot manage topics
+- CORS configured for app domain only
 
-- **Personal Context Protocol**
+## Documentation
+
+- [`docs/protocol.md`](docs/protocol.md) - Full API spec
+- [`docs/deployment-vercel-neon.md`](docs/deployment-vercel-neon.md) - Deploy guide
+- [`docs/security.md`](docs/security.md) - Security model
+- [`docs/data-model.md`](docs/data-model.md) - Database schema
+- [`docs/agent-instructions.md`](docs/agent-instructions.md) - AI agent instructions
+- [`docs/migrations.md`](docs/migrations.md) - DB migrations
+- [`docs/export-format.md`](docs/export-format.md) - Export format spec
+- [`docs/limitations.md`](docs/limitations.md) - v0.1 limitations
+
+## License
+
+MIT
