@@ -2,6 +2,10 @@
 
 **Route B:** Vercel + Neon Postgres web app for scoped AI session recording.
 
+[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNesbitt-bot%2Fpersonal-context-protocol&env=DATABASE_URL,PCP_INSTANCE_SECRET,PCP_APP_URL&envDescription=Set%20up%20your%20environment%20variables%20after%20deployment)
+
+[Documentation](https://nesbitt-bot.github.io/personal-context-protocol/) | [API Spec](https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/protocol.md) | [Deploy Guide](https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/deployment-vercel-neon.md)
+
 ## Overview
 
 Personal Context Protocol is a minimal web app where:
