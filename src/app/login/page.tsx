@@ -13,6 +13,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
+  const [errorDocsUrl, setErrorDocsUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const nextPath = searchParams.get('next') || '/dashboard';
 
@@ -25,11 +26,13 @@ function LoginForm() {
     const candidate = token.trim();
     if (!candidate) {
       setError('Unable to log in: user authentication / admin token form - admin token is required');
+      setErrorDocsUrl('');
       return;
     }
 
     setLoading(true);
     setError('');
+    setErrorDocsUrl('');
     try {
       const response = await fetch('/api/v1/auth/check', {
         headers: { Authorization: `Bearer ${candidate}` },
@@ -42,6 +45,7 @@ function LoginForm() {
 
       if (!response.ok || data.error) {
         setError(data.error || 'Unable to log in: user authentication / admin token check request - token was not accepted');
+        setErrorDocsUrl(data.docs_url || '');
         return;
       }
 
@@ -53,6 +57,7 @@ function LoginForm() {
         moduleProcess: 'user authentication / admin token check request',
         cause: `browser could not reach /api/v1/auth/check or parse its response; ${errorCause(err)}`,
       }));
+      setErrorDocsUrl('');
     } finally {
       setLoading(false);
     }
@@ -76,7 +81,12 @@ function LoginForm() {
 
       {error && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
-          {error}
+          <p>{error}</p>
+          {errorDocsUrl && (
+            <a className="mt-2 inline-flex font-medium underline" href={errorDocsUrl} rel="noreferrer" target="_blank">
+              Open deployment guide
+            </a>
+          )}
         </div>
       )}
 

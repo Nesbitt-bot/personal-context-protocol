@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { logError } from '@/lib/logging';
+import { DEPLOYMENT_GUIDE_URL, configuredAdminToken } from '@/lib/admin-token';
 
 /**
  * Verify UI token and return session info
@@ -27,10 +28,20 @@ export async function verifyUiToken(request: NextRequest) {
     const [stored] = await db.select().from(uiAuth);
     
     if (!stored) {
+      if (configuredAdminToken()) {
+        return {
+          error: `Unable to log in: deployment credential setup / PCP_ADMIN_TOKEN reconciliation - PCP_ADMIN_TOKEN is configured, but the admin credential was not initialized in the database. Open the app home page to run setup again, or follow the deployment guide: ${DEPLOYMENT_GUIDE_URL}`,
+          code: 'ADMIN_CREDENTIAL_NOT_INITIALIZED',
+          status: 409,
+          docsUrl: DEPLOYMENT_GUIDE_URL,
+        } as const;
+      }
+
       return {
-        error: 'Unable to access: system configuration / UI auth lookup - UI auth not initialized',
-        code: 'INTERNAL_ERROR',
-        status: 500,
+        error: 'Unable to log in: first-run admin credential / generated token setup - no admin credential exists yet. Open the app home page and click Initialize Database to generate a first-login token; PCP will show it once and print it once in deployment logs.',
+        code: 'SETUP_REQUIRED',
+        status: 409,
+        docsUrl: DEPLOYMENT_GUIDE_URL,
       } as const;
     }
 

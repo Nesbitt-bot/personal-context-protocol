@@ -100,4 +100,12 @@ If `*.bark.env` exists, send silent pushes at:
 - Checkpoints (> 1 hour)
 - Completion / failure
 
+Use:
+
+```bash
+npm run notify:bark -- "message body"
+```
+
+The notifier prefixes every message with the app name and version, for example
+`personal-context-protocol v0.1.1: message body`, and forces passive delivery.
 Never echo config values in logs.

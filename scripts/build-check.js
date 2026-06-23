@@ -1,7 +1,8 @@
-﻿const crypto = require('crypto');
+const crypto = require('crypto');
+const { readProjectVersion } = require('./project-version');
 
 const PROJECT = 'personal-context-protocol';
-const VERSION = '0.1.0';
+const VERSION = readProjectVersion();
 const requiredEnvVars = ['DATABASE_URL', 'PCP_INSTANCE_SECRET', 'PCP_APP_URL'];
 
 function printHeader(title) {
@@ -39,7 +40,11 @@ console.log(`DATABASE_URL: ${summarizeSecret(process.env.DATABASE_URL)}`);
 console.log(`PCP_INSTANCE_SECRET: ${summarizeSecret(process.env.PCP_INSTANCE_SECRET)}`);
 console.log(`PCP_APP_URL: ${process.env.PCP_APP_URL ? 'set' : 'missing'}`);
 console.log(`PCP_ADMIN_TOKEN: ${process.env.PCP_ADMIN_TOKEN ? 'configured' : 'not configured'}`);
-console.log('\nAdmin UI token policy: token is never printed in build logs. For recovery, set PCP_ADMIN_TOKEN in Vercel and redeploy.');
+if (process.env.PCP_ADMIN_TOKEN) {
+  console.log('\nAdmin UI token policy: user-supplied PCP_ADMIN_TOKEN is never printed in logs.');
+} else {
+  console.log('\nAdmin UI token policy: PCP_ADMIN_TOKEN is not configured. First-run setup will generate a temporary admin token, show it in the browser, and print it once in deployment function logs. Change it immediately in Settings after first login.');
+}
 console.log('Database schema policy: setup/status and setup/init create the schema automatically when DATABASE_URL is configured.');
 console.log(`\n${'='.repeat(70)}\n`);
 

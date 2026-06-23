@@ -1,4 +1,4 @@
-﻿# API Reference
+# API Reference
 
 Base path: `/api/v1`
 
@@ -31,7 +31,7 @@ Ensures the database schema exists when `DATABASE_URL` is configured, then retur
 
 ### POST `/setup/init`
 
-Ensures the database schema exists, initializes the app, and returns the UI token once. If `PCP_ADMIN_TOKEN` is configured, setup stores that token hash and returns no plaintext token. If the app is initialized but the `ui_auth` credential row is missing, setup creates and returns one replacement token.
+Ensures the database schema exists, initializes the app, and returns the UI token once. If `PCP_ADMIN_TOKEN` is configured, setup stores that token hash and returns no plaintext token. If `PCP_ADMIN_TOKEN` is not configured, setup generates a temporary first-login token, returns it once, and prints it once in deployment function logs so zero-config deployments can log in. If the app is initialized but the `ui_auth` credential row is missing, setup creates and returns one replacement token.
 
 Response:
 
@@ -41,13 +41,13 @@ Response:
   "initialized": true,
   "ui_token": "<shown once or null when PCP_ADMIN_TOKEN is configured>",
   "env_admin_token_configured": false,
-  "message": "Store this token securely. It will not be shown again."
+  "message": "No PCP_ADMIN_TOKEN was configured, so PCP generated a first-login admin token. It is shown once here and printed once in deployment logs. Log in with it, then change it immediately in Settings so the real credential is never visible in logs."
 }
 ```
 
 ### GET `/auth/check`
 
-Validates a UI/admin bearer token before opening the dashboard. If `PCP_ADMIN_TOKEN` is configured, the deployment token is reconciled into `ui_auth` before validation.
+Validates a UI/admin bearer token before opening the dashboard. If `PCP_ADMIN_TOKEN` is configured, the deployment token is reconciled into `ui_auth` before validation. Missing generated credentials return `SETUP_REQUIRED`; configured-but-unusable deployment credentials return `INVALID_ADMIN_TOKEN` or `ADMIN_CREDENTIAL_NOT_INITIALIZED` with a deployment guide URL.
 
 ### PATCH `/auth/token`
 

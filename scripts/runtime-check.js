@@ -1,7 +1,8 @@
-﻿const crypto = require('crypto');
+const crypto = require('crypto');
+const { readProjectVersion } = require('./project-version');
 
 const PROJECT = 'personal-context-protocol';
-const VERSION = '0.1.0';
+const VERSION = readProjectVersion();
 const requiredEnvVars = ['DATABASE_URL', 'PCP_INSTANCE_SECRET', 'PCP_APP_URL'];
 
 function printHeader(title) {
@@ -38,7 +39,11 @@ console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 console.log(`Vercel URL: ${process.env.VERCEL_URL || 'localhost:3000'}`);
 console.log(`Vercel Env: ${process.env.VERCEL_ENV || 'unknown'}`);
 console.log(`Instance: ${process.env.VERCEL_DEPLOYMENT_ID || 'unknown'}`);
-console.log('\nAdmin UI token policy: token is never printed on service restart. For recovery, set PCP_ADMIN_TOKEN in Vercel and redeploy.');
+if (process.env.PCP_ADMIN_TOKEN) {
+  console.log('\nAdmin UI token policy: user-supplied PCP_ADMIN_TOKEN is never printed on service restart.');
+} else {
+  console.log('\nAdmin UI token policy: PCP_ADMIN_TOKEN is not configured. First-run setup will generate a temporary admin token, show it in the browser, and print it once in deployment function logs. Change it immediately in Settings after first login.');
+}
 console.log(`\n${'='.repeat(70)}\n`);
 
 

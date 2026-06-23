@@ -1,4 +1,4 @@
-﻿# End-of-round checklist
+# End-of-round checklist
 
 Run this checklist before declaring any modification round complete.
 
@@ -19,6 +19,7 @@ Run this checklist before declaring any modification round complete.
 - [ ] All tests pass: `npm run test`
 - [ ] Type check passes: `npm run typecheck`
 - [ ] Build succeeds: `npm run build`
+- [ ] Patch version bumped for this change round across release metadata
 - [ ] If DB changes: migrations generated and tested locally
 - [ ] If API changes: tested with curl/POSTMAN
 - [ ] If token flows changed: verified token hashing + validation
@@ -33,6 +34,7 @@ Run this checklist before declaring any modification round complete.
 - [ ] `docs/data-model.md` updated if schema changed
 - [ ] `docs/deployment-vercel-neon.md` updated if deploy steps changed
 - [ ] Error messages include consequence + module + cause (per AGENTS.md)
+- [ ] Bark notification text includes app name and version if notifications are sent
 
 ### Security audit
 
@@ -41,6 +43,7 @@ Run this checklist before declaring any modification round complete.
 - [ ] Session tokens are properly scoped
 - [ ] CORS configured correctly
 - [ ] No real secrets in repo
+- [ ] No `*.bark.env` values or URL templates echoed in logs, docs, commits, or summaries
 
 ### Git hygiene
 
@@ -108,7 +111,15 @@ Append what this round actually did below:
   - Updated build/runtime diagnostics to show whether `PCP_ADMIN_TOKEN` is configured without revealing its value
   - Added setup/init repair for initialized databases missing the `ui_auth` credential row
 - 2026-06-23 - Added Docker Compose deployment path
-  - Added versioned Dockerfile and docker-compose.yml with image tag default personal-context-protocol:0.1.0`r
+  - Added versioned Dockerfile and docker-compose.yml with image tag default personal-context-protocol:0.1.1
   - Added root VERSION consistency checks for package, Dockerfile, Compose, and runtime fallback
-  - Updated deployment docs for admin token reset through PCP_ADMIN_TOKEN`r
+  - Updated deployment docs for admin token reset through PCP_ADMIN_TOKEN
+- 2026-06-23 - Added zero-config first-login admin token flow
+  - Generated and logged first-login admin tokens only when PCP_ADMIN_TOKEN is absent
+  - Added credential-state-specific setup/login errors and deployment guide links
+  - Updated deployment, security, and protocol docs for the generated-token exception
+- 2026-06-23 - Bumped app version and added Bark notification helper
+  - Bumped release metadata to 0.1.1 for the current change round
+  - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
+  - Added a Bark env example and checklist rules for version bumps and notification secrecy
 

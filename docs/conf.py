@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath('..'))
 project = 'Personal Context Protocol'
 copyright = '2026, Nesbitt-bot'
 author = 'Nesbitt-bot'
-release = '0.1.0'
+release = '0.1.1'
 
 # Extensions
 extensions = [

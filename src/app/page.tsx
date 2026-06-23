@@ -24,6 +24,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [uiToken, setUiToken] = useState('');
   const [error, setError] = useState('');
+  const [errorDocsUrl, setErrorDocsUrl] = useState('');
+  const [setupMessage, setSetupMessage] = useState('');
 
   useEffect(() => {
     checkStatus();
@@ -40,6 +42,7 @@ export default function HomePage() {
       setInitialized(data.initialized);
       if (data.error) {
         setError(data.error);
+        setErrorDocsUrl(data.docs_url || '');
       }
     } catch (err) {
       setError(diagnosticMessage({
@@ -47,6 +50,7 @@ export default function HomePage() {
         moduleProcess: 'app setup / status request',
         cause: `browser could not read /api/v1/setup/status; ${errorCause(err)}`,
       }));
+      setErrorDocsUrl('');
     } finally {
       setLoading(false);
     }
@@ -71,6 +75,8 @@ export default function HomePage() {
         setUiToken('');
         setInitialized(true);
         setError('');
+        setErrorDocsUrl('');
+        setSetupMessage(data.message || 'Admin token loaded from PCP_ADMIN_TOKEN. Use that value to log in.');
         return;
       }
 
@@ -79,12 +85,15 @@ export default function HomePage() {
         setUiToken(data.ui_token);
         setInitialized(true);
         setError('');
+        setErrorDocsUrl('');
+        setSetupMessage(data.message || '');
       } else {
         setError(data.error || diagnosticMessage({
           consequence: 'Unable to initialize database',
           moduleProcess: 'app setup / initialize database request',
           cause: 'API response did not include a UI token or structured error',
         }));
+        setErrorDocsUrl(data.docs_url || '');
       }
     } catch (err) {
       setError(diagnosticMessage({
@@ -92,6 +101,7 @@ export default function HomePage() {
         moduleProcess: 'app setup / initialize database request',
         cause: `browser could not reach /api/v1/setup/init or parse its response; ${errorCause(err)}`,
       }));
+      setErrorDocsUrl('');
     }
   }
 
@@ -139,7 +149,12 @@ export default function HomePage() {
 
           {error && (
             <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
-              {error}
+              <p>{error}</p>
+              {errorDocsUrl && (
+                <a className="mt-2 inline-flex font-medium underline" href={errorDocsUrl} rel="noreferrer" target="_blank">
+                  Open deployment guide
+                </a>
+              )}
             </div>
           )}
 
@@ -154,7 +169,7 @@ export default function HomePage() {
                   <Check size={18} />
                   App initialized
                 </div>
-                <p className="mt-2 text-sm">Open the dashboard. If the UI token is not saved in this browser, paste it there.</p>
+                <p className="mt-2 text-sm">{setupMessage || 'Open the dashboard. If the UI token is not saved in this browser, paste it there.'}</p>
               </div>
               <Link
                 href="/login"
@@ -170,7 +185,7 @@ export default function HomePage() {
                   <KeyRound size={18} />
                   Save this UI token now
                 </div>
-                <p className="mt-2 text-sm">The token is shown once and has been saved in this browser for the dashboard.</p>
+                <p className="mt-2 text-sm">{setupMessage || 'The token is shown once and has been saved in this browser for the dashboard. Change it immediately in Settings after first login.'}</p>
               </div>
 
               <pre className="max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">{uiToken}</pre>

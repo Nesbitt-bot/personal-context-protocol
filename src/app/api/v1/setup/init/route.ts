@@ -1,9 +1,17 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { appInstance } from '@/lib/schema';
 import { ensureDatabaseSchema } from '@/lib/setup-schema';
 import { generateToken } from '@/lib/auth';
-import { adminCredentialExists, configuredAdminToken, storeAdminToken, validateAdminToken } from '@/lib/admin-token';
+import {
+  DEPLOYMENT_GUIDE_URL,
+  adminCredentialExists,
+  configuredAdminToken,
+  generatedAdminTokenMessage,
+  logGeneratedAdminToken,
+  storeAdminToken,
+  validateAdminToken,
+} from '@/lib/admin-token';
 import { logError } from '@/lib/logging';
 import { APP_VERSION } from '@/lib/version';
 
@@ -18,8 +26,9 @@ export async function POST() {
     if (validationError) {
       return NextResponse.json(
         {
-          error: `Unable to initialize database: app setup / configured admin token validation - ${validationError}`,
+          error: `Unable to initialize database: deployment credential setup / PCP_ADMIN_TOKEN validation - ${validationError}. Open the deployment guide and update PCP_ADMIN_TOKEN, or remove it to let PCP generate a first-login token.`,
           code: 'INVALID_ADMIN_TOKEN',
+          docs_url: DEPLOYMENT_GUIDE_URL,
         },
         { status: 400 },
       );
@@ -42,13 +51,14 @@ export async function POST() {
       if (!hasCredential) {
         const recoveryToken = generateToken();
         await storeAdminToken(recoveryToken);
+        logGeneratedAdminToken(recoveryToken, 'The database was initialized, but the admin credential row was missing.');
         return NextResponse.json({
           success: true,
           initialized: true,
           ui_token: recoveryToken,
           credential_recovered: true,
           env_admin_token_configured: false,
-          message: 'Admin credential was missing. Store this replacement token securely; it will not be shown again.',
+          message: `Admin credential was missing. ${generatedAdminTokenMessage()}`,
         });
       }
 
@@ -63,6 +73,9 @@ export async function POST() {
 
     const uiToken = deployToken || generateToken();
     await storeAdminToken(uiToken);
+    if (!deployToken) {
+      logGeneratedAdminToken(uiToken, 'PCP_ADMIN_TOKEN was not configured during first-run setup.');
+    }
     await db.insert(appInstance).values({
       id: 'instance_1',
       initializedAt: new Date(),
@@ -76,7 +89,7 @@ export async function POST() {
       env_admin_token_configured: Boolean(deployToken),
       message: deployToken
         ? 'Admin token loaded from PCP_ADMIN_TOKEN. Use that value to log in.'
-        : 'Store this token securely. It will not be shown again.',
+        : generatedAdminTokenMessage(),
     });
   } catch (error) {
     logError({

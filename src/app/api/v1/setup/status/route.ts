@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { appInstance } from '@/lib/schema';
 import { ensureDatabaseSchema } from '@/lib/setup-schema';
-import { reconcileConfiguredAdminToken } from '@/lib/admin-token';
+import { AdminTokenConfigurationError, reconcileConfiguredAdminToken } from '@/lib/admin-token';
 import { logError } from '@/lib/logging';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +30,20 @@ export async function GET() {
       env_admin_token_configured: tokenState.configured,
     });
   } catch (error) {
+    if (error instanceof AdminTokenConfigurationError) {
+      return NextResponse.json(
+        {
+          initialized: false,
+          needs_migration: true,
+          env_admin_token_configured: true,
+          error: `Unable to check setup status: deployment credential setup / PCP_ADMIN_TOKEN validation - ${error.message}. Open the deployment guide and update PCP_ADMIN_TOKEN, or remove it to let PCP generate a first-login token.`,
+          code: error.code,
+          docs_url: error.docsUrl,
+        },
+        { status: 400 },
+      );
+    }
+
     logError({
       consequence: 'Unable to check setup status',
       moduleProcess: 'app setup / initialization status database probe',

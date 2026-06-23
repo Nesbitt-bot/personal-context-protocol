@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUiToken } from '@/lib/middleware';
 import { ensureDatabaseSchema } from '@/lib/setup-schema';
-import { reconcileConfiguredAdminToken } from '@/lib/admin-token';
+import { AdminTokenConfigurationError, reconcileConfiguredAdminToken } from '@/lib/admin-token';
 import { logError } from '@/lib/logging';
 
 export const dynamic = 'force-dynamic';
@@ -14,13 +14,24 @@ export async function GET(request: NextRequest) {
 
     if ('error' in authResult) {
       return NextResponse.json(
-        { error: authResult.error, code: authResult.code },
+        { error: authResult.error, code: authResult.code, docs_url: 'docsUrl' in authResult ? authResult.docsUrl : undefined },
         { status: authResult.status },
       );
     }
 
     return NextResponse.json({ success: true, user_id: authResult.userId, env_admin_token_configured: tokenState.configured });
   } catch (error) {
+    if (error instanceof AdminTokenConfigurationError) {
+      return NextResponse.json(
+        {
+          error: `Unable to log in: deployment credential setup / PCP_ADMIN_TOKEN validation - ${error.message}. Open the deployment guide and update PCP_ADMIN_TOKEN, or remove it to let PCP generate a first-login token.`,
+          code: error.code,
+          docs_url: error.docsUrl,
+        },
+        { status: 400 },
+      );
+    }
+
     logError({
       consequence: 'Unable to verify admin token',
       moduleProcess: 'user authentication / login token check',
