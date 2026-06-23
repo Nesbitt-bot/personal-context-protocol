@@ -6,6 +6,11 @@
 
 [Documentation](https://nesbitt-bot.github.io/personal-context-protocol/) | [API Spec](https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/protocol.md) | [Deploy Guide](https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/deployment-vercel-neon.md)
 
+## Contributors
+
+- **Nesbitt-bot**: Project author and implementation
+- **Trance-0**: Agent guidelines and architectural guidance (see [`AGENTS.md`](AGENTS.md))
+
 ## 🚀 Quick Deploy (3 steps)
 
 ### 1. Deploy to Vercel
