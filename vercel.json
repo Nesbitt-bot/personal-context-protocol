@@ -6,9 +6,5 @@
   "installCommand": "npm install",
   "env": {
     "PCP_APP_URL": "${VERCEL_URL}"
-  },
-  "functions": {
-    "maxDuration": 10
-  },
-  "crons": []
+  }
 }
