@@ -200,6 +200,7 @@ Key points:
 
 ## Documentation
 
+- **Live docs**: https://nesbitt-bot.github.io/personal-context-protocol/ (auto-deployed from `main`)
 - [`docs/protocol.md`](docs/protocol.md) - Full API spec
 - [`docs/deployment-vercel-neon.md`](docs/deployment-vercel-neon.md) - Deploy guide
 - [`docs/security.md`](docs/security.md) - Security model
@@ -208,6 +209,15 @@ Key points:
 - [`docs/migrations.md`](docs/migrations.md) - DB migrations
 - [`docs/export-format.md`](docs/export-format.md) - Export format spec
 - [`docs/limitations.md`](docs/limitations.md) - v0.1 limitations
+
+## GitHub Pages Setup
+
+Documentation auto-deploys to GitHub Pages when you:
+1. Enable GitHub Pages in repo settings → Pages → Source: "Deploy from a branch" → Branch: "gh-pages"
+2. The workflow (`.github/workflows/docs.yml`) will create the `gh-pages` branch automatically
+3. Visit `https://<username>.github.io/<repo>/` to view docs
+
+Follows the same pattern as [training-manager](https://github.com/Nesbitt-bot/training-manager).
 
 ## License
 
