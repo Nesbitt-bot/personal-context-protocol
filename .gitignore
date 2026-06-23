@@ -15,13 +15,16 @@ build/
 .env.test.local
 .env.production.local
 *.env
+*.bark.env
+*.env.example
 
-# Logs
+# Logs (per AGENTS.md guidelines)
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 logs/
+~/.pcp-logs/
 
 # Testing
 coverage/
@@ -45,3 +48,4 @@ Thumbs.db
 
 # Misc
 .turbo/
+docs/_build/
