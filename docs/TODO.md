@@ -8,7 +8,6 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
 - Add an explicit migration/bootstrap command that creates the schema before `/api/v1/setup/init` inserts the app instance and UI token records.
 - Add integration tests for setup failure surfaces, including missing `DATABASE_URL`, unreachable Neon, missing tables, and duplicate initialization.
 - Resolve current `npm audit` findings, including the Next.js 14.2.5 security warning reported by `npm ci`.
-- Replace inline dashboard/session styles with shared UI components while preserving current workflows and scoped-token rules.
 - Add automated checks for the INVALID LOG constraint so new error, warning, info, and debug strings must include consequence, module/process, and cause.
 - Keep API docs generated or checked against `src/api/v1` so non-existent routes do not drift back into README or protocol docs.
 
@@ -18,7 +17,6 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
 - Add UI token rotation flow that invalidates previous UI tokens and shows the new token exactly once.
 - Add admin unlock/session management endpoints if browser-local token storage is replaced.
 - Add direct topic detail and session message read endpoints if the UI needs them.
-- Add session rename endpoint for admin-driven renames outside AI title suggestions.
 - Add export download controls in the admin UI for the existing `/api/v1/export` endpoint.
 - Add import endpoints for PCP JSON, PCP JSONL, and generic transcript formats.
 - Add pagination and search for topics, sessions, messages, and event logs.

@@ -63,8 +63,10 @@ Admin:
 - `POST /api/v1/topics`
 - `POST /api/v1/topics/:id/rename`
 - `POST /api/v1/topics/:id/archive`
+- `GET /api/v1/topics/:topicId/sessions`
 - `POST /api/v1/topics/:topicId/sessions`
 - `GET /api/v1/sessions/:id`
+- `PATCH /api/v1/sessions/:id`
 - `GET /api/v1/sessions/:id/review`
 - `GET /api/v1/sessions/:id/events`
 - `POST /api/v1/sessions/:id/archive`

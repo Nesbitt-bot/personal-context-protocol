@@ -5,7 +5,58 @@ import { topics, sessions, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
 import { createSessionSchema } from '@/lib/validations';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { topicId: string } }
+) {
+  try {
+    const authResult = await verifyUiToken(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
+    }
+
+    const [topic] = await db.select().from(topics).where(eq(topics.id, params.topicId));
+
+    if (!topic) {
+      return NextResponse.json(
+        {
+          error: 'Unable to list sessions: session administration / topic lookup - topic not found',
+          code: 'NOT_FOUND',
+        },
+        { status: 404 },
+      );
+    }
+
+    const topicSessions = await db
+      .select({
+        id: sessions.id,
+        topic_id: sessions.topicId,
+        title: sessions.title,
+        archived: sessions.archived,
+        created_at: sessions.createdAt,
+        updated_at: sessions.updatedAt,
+        last_message_at: sessions.lastMessageAt,
+      })
+      .from(sessions)
+      .where(eq(sessions.topicId, params.topicId))
+      .orderBy(desc(sessions.lastMessageAt), desc(sessions.createdAt));
+
+    return NextResponse.json({ sessions: topicSessions });
+  } catch (error) {
+    logError({
+      consequence: 'Unable to list sessions',
+      moduleProcess: 'session administration / list sessions query',
+      cause: 'topic lookup or session list query failed',
+      error,
+    });
+    return NextResponse.json(
+      { error: 'Unable to list sessions: session administration / list sessions query - topic lookup or session list query failed', code: 'INTERNAL_ERROR' },
+      { status: 500 },
+    );
+  }
+}
 
 export async function POST(
   request: NextRequest,

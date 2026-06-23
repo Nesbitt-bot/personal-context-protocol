@@ -15,9 +15,10 @@ PCP is a small Vercel + Neon Postgres app for recording AI sessions with least-p
 
 1. Human initializes the app and saves the one-time UI token.
 2. Human creates topics and sessions.
-3. Human generates a session token for one AI agent/session.
-4. AI appends messages through `POST /api/v1/sessions/:sessionId/messages`.
-5. Human reviews messages and events in the admin UI.
+3. Human edits, moves, archives, or restores sessions from the dashboard.
+4. Human generates a session token for one AI agent/session.
+5. AI appends messages through `POST /api/v1/sessions/:sessionId/messages`.
+6. Human reviews messages and events in the admin UI.
 
 ## Invariants
 

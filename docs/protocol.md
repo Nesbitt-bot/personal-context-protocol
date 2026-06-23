@@ -80,6 +80,10 @@ Archives a topic.
 
 ## Admin Sessions
 
+### GET `/topics/:topicId/sessions`
+
+Lists sessions inside a topic.
+
 ### POST `/topics/:topicId/sessions`
 
 Creates a session inside a topic.
@@ -95,6 +99,22 @@ Body:
 ### GET `/sessions/:id`
 
 Returns session details with topic title.
+
+### PATCH `/sessions/:id`
+
+Updates session metadata.
+
+Body:
+
+```json
+{
+  "title": "New title",
+  "topic_id": "topic_123",
+  "archived": false
+}
+```
+
+At least one field is required. `archived: true` removes the session from the active list; `archived: false` restores it.
 
 ### GET `/sessions/:id/review`
 

@@ -74,3 +74,8 @@ Append what this round actually did below:
   - Removed route labels from README and docs
   - Replaced stale API docs with implemented endpoints only
   - Moved roadmap, hardening, and non-current feature notes into `docs/TODO.md`
+- 2026-06-23 - Added Tailwind session workspace
+  - Added Tailwind CSS and lucide icons
+  - Added session listing and session metadata update APIs
+  - Replaced inline dashboard/setup/session UI with a chat-style workspace
+  - Updated docs for implemented session edit/archive routes

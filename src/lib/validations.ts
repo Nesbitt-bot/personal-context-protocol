@@ -33,6 +33,14 @@ export const renameSessionSchema = z.object({
   title: z.string().min(1).max(200),
 });
 
+export const updateSessionSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  topic_id: z.string().min(1).optional(),
+  archived: z.boolean().optional(),
+}).refine((value) => (
+  value.title !== undefined || value.topic_id !== undefined || value.archived !== undefined
+), 'At least one session field is required');
+
 // Token schemas
 export const createTokenSchema = z.object({
   name: z.string().min(1).max(100),
