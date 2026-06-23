@@ -1,17 +1,15 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { logError } from '@/lib/logging';
+import { APP_VERSION } from '@/lib/version';
 
 export const dynamic = 'force-dynamic';
 
-
-
-
 export async function GET() {
   try {
-    // Basic health check - will be enhanced with DB check
+    // Basic health check; database health is kept separate from process health.
     return NextResponse.json({
       status: 'ok',
-      version: '0.1.0',
+      version: APP_VERSION,
       database: 'pending',
     });
   } catch (error) {

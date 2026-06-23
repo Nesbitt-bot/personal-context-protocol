@@ -1,10 +1,10 @@
-{
+﻿{
   "name": "personal-context-protocol",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/build-check.js && next build",
+    "build": "node scripts/version-check.js && node scripts/build-check.js && next build",
     "start": "node scripts/runtime-check.js && next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -43,3 +43,4 @@
     "node": ">=18.0.0"
   }
 }
+

@@ -66,6 +66,14 @@ export default function HomePage() {
         fallbackCause: 'setup init endpoint did not return JSON',
       });
 
+      if (data.env_admin_token_configured) {
+        localStorage.removeItem('ui_token');
+        setUiToken('');
+        setInitialized(true);
+        setError('');
+        return;
+      }
+
       if (data.ui_token) {
         localStorage.setItem('ui_token', data.ui_token);
         setUiToken(data.ui_token);

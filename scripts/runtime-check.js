@@ -1,60 +1,45 @@
-import fs from 'fs';
-import path from 'path';
+﻿const crypto = require('crypto');
+
+const PROJECT = 'personal-context-protocol';
+const VERSION = '0.1.0';
+const requiredEnvVars = ['DATABASE_URL', 'PCP_INSTANCE_SECRET', 'PCP_APP_URL'];
+
+function printHeader(title) {
+  console.log(`\n${'='.repeat(70)}`);
+  console.log(`  ${PROJECT} v${VERSION} - ${title}`);
+  console.log(`${'='.repeat(70)}\n`);
+}
+
+function summarizeSecret(value) {
+  if (!value) return 'missing';
+  return `set sha256:${crypto.createHash('sha256').update(value).digest('hex').slice(0, 12)}`;
+}
 
 /**
- * Runtime pre-check for Personal Context Protocol
- * 
- * This script runs before the Next.js server starts and:
- * 1. Validates required environment variables
- * 2. Displays UI token if available (for recovery/debugging)
- * 3. Logs current service state
+ * Runtime diagnostics for Vercel service starts. It reports configuration and
+ * deployment identity while keeping admin tokens and database credentials out
+ * of logs.
  */
+printHeader('runtime startup');
 
-console.log('\n' + '='.repeat(70));
-console.log('  PERSONAL CONTEXT PROTOCOL - RUNTIME STARTUP');
-console.log('='.repeat(70) + '\n');
-
-// Check required environment variables
-const requiredEnvVars = ['DATABASE_URL', 'PCP_INSTANCE_SECRET', 'PCP_APP_URL'];
-const missing = requiredEnvVars.filter(env => !process.env[env]);
-
+const missing = requiredEnvVars.filter((name) => !process.env[name]);
 if (missing.length > 0) {
-  console.error('❌ MISSING REQUIRED ENVIRONMENT VARIABLES:');
-  missing.forEach(env => console.error(`   - ${env}`));
-  console.error('\n⚠️  App will fail at runtime.\n');
+  console.log('Unable to validate runtime configuration: deployment configuration / required environment variables - missing keys:');
+  missing.forEach((name) => console.log(`   - ${name}`));
 } else {
-  console.log('✅ All required environment variables present');
+  console.log('Runtime configuration / required environment variables - all required keys are present.');
 }
 
-// Display UI token from build-time generation
-const uiTokenPath = path.join(process.cwd(), '.next', 'UI_TOKEN.txt');
+console.log(`DATABASE_URL: ${summarizeSecret(process.env.DATABASE_URL)}`);
+console.log(`PCP_INSTANCE_SECRET: ${summarizeSecret(process.env.PCP_INSTANCE_SECRET)}`);
+console.log(`PCP_APP_URL: ${process.env.PCP_APP_URL ? 'set' : 'missing'}`);
+console.log(`PCP_ADMIN_TOKEN: ${process.env.PCP_ADMIN_TOKEN ? 'configured' : 'not configured'}`);
+console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`Vercel URL: ${process.env.VERCEL_URL || 'localhost:3000'}`);
+console.log(`Vercel Env: ${process.env.VERCEL_ENV || 'unknown'}`);
+console.log(`Instance: ${process.env.VERCEL_DEPLOYMENT_ID || 'unknown'}`);
+console.log('\nAdmin UI token policy: token is never printed on service restart. For recovery, set PCP_ADMIN_TOKEN in Vercel and redeploy.');
+console.log(`\n${'='.repeat(70)}\n`);
 
-if (fs.existsSync(uiTokenPath)) {
-  const uiToken = fs.readFileSync(uiTokenPath, 'utf8');
-  
-  console.log('\n' + '='.repeat(70));
-  console.log('  📋 UI TOKEN (from .next/UI_TOKEN.txt)');
-  console.log('='.repeat(70));
-  console.log('\n');
-  console.log(`  ${uiToken}`);
-  console.log('\n');
-  console.log('   This token is shown on EVERY service restart.');
-  console.log('   Store it securely for future reference.\n');
-  console.log('='.repeat(70) + '\n');
-} else {
-  console.log('ℹ️  No UI token found (may need to run setup/init)');
-}
 
-// Display service information
-console.log('\n' + '='.repeat(70));
-console.log('  SERVICE INFORMATION');
-console.log('='.repeat(70));
-console.log('\n');
-console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-console.log(`   Vercel URL:  ${process.env.VERCEL_URL || 'localhost:3000'}`);
-console.log(`   Vercel Env:  ${process.env.VERCEL_ENV || 'production'}`);
-console.log(`   Instance:    ${process.env.VERCEL_DEPLOYMENT_ID || 'unknown'}`);
-console.log('\n');
-console.log('='.repeat(70) + '\n');
 
-console.log('ℹ️  Starting Next.js server...\n');

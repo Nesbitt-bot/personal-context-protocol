@@ -1,123 +1,111 @@
-# TODO
+﻿# TODO
 
 Owner-visible future work for Personal Context Protocol. Keep this list focused on versioned product work, not per-round scratch notes.
 
-## ✅ v0.1 Hardening (Completed)
+## v0.1 Completed
 
-- [x] **Initial schema and API implementation**
-  - [x] 7-table database schema (app_instance, ui_auth, topics, sessions, session_tokens, messages, events)
-  - [x] 14 API endpoints (setup, auth, topics, sessions, tokens, messages, events, export)
-  - [x] Next.js App Router structure with TypeScript
-  - [x] Tailwind CSS integration for UI styling
-  - [x] Drizzle ORM for type-safe database operations
+- [x] **Core schema and API**
+  - [x] App instance and UI auth tables
+  - [x] Topic, session, session token, message, event, and migration tables
+  - [x] Setup, auth check, topic, session, token, message, event, and export routes
+  - [x] API route handlers served from `src/app/api/v1`
+  - [x] API routes marked dynamic so builds do not execute runtime database handlers
 
-- [x] **Admin UI**
-  - [x] Setup wizard with UI token generation
-  - [x] Dashboard with topic/session management
-  - [x] Session detail page with message viewing
-  - [x] Token generation with copy-to-clipboard
-  - [x] Login/authentication page
+- [x] **Setup and authentication**
+  - [x] One-time setup token returned in the browser setup response
+  - [x] Admin login page prompts for the UI token before dashboard access
+  - [x] `/api/v1/auth/check` validates the UI token before saving it in browser storage
+  - [x] Direct `/dashboard` access without `ui_token` redirects to `/login?next=/dashboard`
+  - [x] Automatic Postgres schema bootstrap when setup status/init runs with `DATABASE_URL`
 
-- [x] **Documentation**
-  - [x] Sphinx/ReadTheDocs documentation structure
-  - [x] GitHub Pages auto-deployment workflow
-  - [x] All 11 docs files (protocol, data-model, deployment, security, etc.)
-  - [x] Readme with clear deployment instructions
-  - [x] Contributors section with Trance-0 credit
+- [x] **Session workspace UI**
+  - [x] Topic creation and selection
+  - [x] Session creation, editing, moving, archiving, and restoring
+  - [x] Session token generation with copy-to-clipboard
+  - [x] Message and event review views
+  - [x] Dashboard split into focused topic, session, and workspace components
 
-- [x] **Security and compliance**
-  - [x] AGENTS.md as submodule (Trance-0/AGENTS.md)
-  - [x] Token hashing with Argon2
-  - [x] Scoped session tokens
-  - [x] Immutable messages (append-only)
-  - [x] Audit event logging
-  - [x] Logging guidelines per AGENTS.md §1.4.1
+- [x] **Frontend shell**
+  - [x] Public introduction page
+  - [x] Light, dark, and system theme toggle
+  - [x] Published documentation links use GitHub Pages
+  - [x] Footer links for documentation, API reference, deployment, and future work
 
-- [x] **Deployment**
-  - [x] Vercel configuration (vercel.json)
-  - [x] Free tier compatibility (no maxDuration limits)
-  - [x] Environment variable setup helper (deploy-setup.py)
-  - [x] One-click deploy button
-  - [x] Automated tests (7/7 passing)
-  - [x] Type checking and build passing
+- [x] **Diagnostics and docs**
+  - [x] Error messages include consequence, module/process, and cause
+  - [x] Build/runtime diagnostics identify missing required env vars without printing secrets
+  - [x] Sphinx documentation build root fixed
+  - [x] README and protocol docs updated for implemented routes
 
-## 🚧 v0.1 Hardening (Remaining)
+## v0.1 Remaining Hardening
 
 - [ ] **Startup validation**
-  - [ ] Add configuration validator for DATABASE_URL, PCP_INSTANCE_SECRET, PCP_APP_URL
-  - [ ] Validate env vars before database connection attempts
-  - [ ] Clear error messages for missing/malformed variables
+  - [ ] Add shared configuration validator for `DATABASE_URL`, `PCP_INSTANCE_SECRET`, and `PCP_APP_URL`
+  - [ ] Validate malformed values, not only missing values
+  - [ ] Surface deployment configuration errors in the setup UI without exposing secrets
 
-- [ ] **Migration bootstrap**
-  - [ ] Explicit migration script for schema creation
-  - [ ] Pre-check schema before /api/v1/setup/init
-  - [ ] Handle duplicate initialization attempts
-
-- [ ] **Integration tests**
-  - [ ] Test missing DATABASE_URL
-  - [ ] Test unreachable Neon database
-  - [ ] Test missing tables
-  - [ ] Test duplicate initialization
+- [ ] **Setup integration tests**
+  - [ ] Missing `DATABASE_URL`
+  - [ ] Unreachable Neon database
+  - [ ] Empty database schema bootstrap
+  - [ ] Duplicate initialization
+  - [ ] Invalid admin token login attempt
 
 - [ ] **Security audit**
-  - [ ] Resolve npm audit findings (Next.js 14.2.5 warning)
-  - [ ] Update dependencies to patched versions
-  - [ ] Add security scanning to CI
-
-- [ ] **Error logging compliance**
-  - [ ] Validate all error messages include consequence + module + cause
-  - [ ] Add linting rule for INVALID LOG constraint
-  - [ ] Audit existing error strings
+  - [ ] Resolve current `npm audit` findings, including the Next.js 14.2.5 warning
+  - [ ] Add CI security scanning
+  - [ ] Add automated checks that logs never include plaintext admin or session tokens
 
 - [ ] **API docs sync**
-  - [ ] Auto-generate docs from src/app/api/v1 routes
-  - [ ] Add CI check for route existence vs docs
-  - [ ] Prevent docs drift
+  - [ ] Generate or validate docs against `src/app/api/v1`
+  - [ ] Add CI route/doc drift check
+  - [ ] Keep README endpoint list in sync with protocol docs
 
-## 🚀 v0.2 Protocol features
+## v0.2 Protocol Features
 
 - [ ] **Token management**
   - [ ] Token revocation UI
   - [ ] Token revocation API flow
-  - [ ] Audit events for revocation
-  - [ ] UI token rotation flow
-  - [ ] Show new token exactly once on rotation
+  - [ ] Audit events for token revocation
+  - [x] Manual custom admin token from the settings page
+  - [x] Recovery path for lost UI token through `PCP_ADMIN_TOKEN` without printing tokens to logs
+  - [x] Missing admin credential repair during setup/init
+  - [ ] Full UI token rotation flow with audit event history
 
 - [ ] **Admin features**
-  - [ ] Browser-local token storage replacement
-  - [ ] Session management endpoints
-  - [ ] Direct topic detail endpoints
-  - [ ] Direct message read endpoints
+  - [ ] Replace browser-local token storage if stronger admin unlock semantics are needed
+  - [ ] Direct topic detail endpoint
+  - [ ] Direct message read endpoint
+  - [ ] Export download controls in the admin UI
 
-- [ ] **Import/Export**
-  - [ ] Export download controls in UI
+- [ ] **Import/export**
   - [ ] Import endpoint for PCP JSON
   - [ ] Import endpoint for PCP JSONL
   - [ ] Import endpoint for generic transcripts
+  - [ ] Richer transcript export formats
 
 - [ ] **Query improvements**
   - [ ] Pagination for topics
   - [ ] Pagination for sessions
   - [ ] Pagination for messages
   - [ ] Pagination for event logs
-  - [ ] Search functionality
+  - [ ] Cross-session search
 
-- [ ] **Advanced features**
+- [ ] **Advanced context features**
   - [ ] Bulk operations
   - [ ] Attachment support
-  - [ ] Richer transcript export formats
-  - [ ] Semantic search (after core workflow stable)
+  - [ ] Semantic search after the core append-only workflow is stable
   - [ ] Summaries and context compression
   - [ ] Auto-tagging
 
-## 🛠 v0.3 Operations
+## v0.3 Operations
 
-- [ ] **Diagnostics**
-  - [ ] Deployment diagnostics for Vercel
-  - [ ] Deployment diagnostics for Neon
+- [ ] **Deployment diagnostics**
+  - [ ] Vercel diagnostics page
+  - [ ] Neon diagnostics page
   - [ ] Schema version reporting
   - [ ] Migration state checks
-  - [ ] Connection health checks (no secrets exposed)
+  - [ ] Connection health checks without exposing secrets
 
 - [ ] **Audit logging**
   - [ ] Structured audit-log views
@@ -127,19 +115,15 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
   - [ ] Session rename events
   - [ ] Archive events
 
-- [ ] **Backup/Restore**
+- [ ] **Backup and restore**
   - [ ] Neon branch backup documentation
   - [ ] JSON export restore process
   - [ ] Automated backup scripts
 
-- [ ] **Rate limiting**
+- [ ] **Rate limiting and observability**
   - [ ] AI-facing append endpoint rate limiting
   - [ ] Admin token creation rate limiting
-  - [ ] Configurable limits per deployment
-
-- [ ] **Observability**
-  - [ ] Production log guidance
-  - [ ] Secret redaction requirements
+  - [ ] Production log guidance with secret redaction requirements
   - [ ] Metrics collection setup
   - [ ] Alerting configuration
 
@@ -147,41 +131,27 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
   - [ ] Custom domain documentation
   - [ ] Preview environment setup
   - [ ] Monitoring setup guide
-  - [ ] Backup/DR procedures
+  - [ ] Backup and disaster recovery procedures
   - [ ] Horizontal scaling guide
 
-## 🔮 Later candidates
+## Later Candidates
 
-- [ ] **Multi-user support**
-  - [ ] Multiple admin users without external auth
-  - [ ] Per-user data isolation
-  - [ ] Role-based access control
-
-- [ ] **Authentication**
-  - [ ] OAuth/SSO integration (after single-admin model insufficient)
-  - [ ] MFA support
-  - [ ] IP allowlisting
-  - [ ] App-level encryption
-
-- [ ] **Enhanced workflows**
-  - [ ] Read-only session sharing (hide topic fields from AI)
-  - [ ] Import prior AI conversations
-  - [ ] Preserve immutable message ordinals
-  - [ ] Richer correction workflows (link to original IDs)
-  - [ ] Local SQLite development profile
-
-- [ ] **Security enhancements**
-  - [ ] Signed messages
-  - [ ] Automated security scanning
-  - [ ] Advanced threat detection
-
----
+- [ ] Multiple admin users without external auth
+- [ ] Per-user data isolation
+- [ ] Role-based access control
+- [ ] OAuth/SSO after the single-admin model is no longer sufficient
+- [ ] MFA support
+- [ ] IP allowlisting
+- [ ] Optional app-level encryption
+- [ ] Read-only session sharing with topic fields hidden from AI-facing surfaces
+- [ ] Import prior AI conversations while preserving immutable message ordinals
+- [ ] Richer correction workflows that link correction messages to original message IDs
+- [ ] Local SQLite development profile
+- [ ] Signed messages
+- [ ] Advanced threat detection
 
 ## Status Legend
 
-- [x] **Completed**: Fully implemented and tested
-- [ ] **Planned**: Defined but not started
-- 🚧 **In Progress**: Currently being worked on
-- 🚀 **v0.2**: Scheduled for next release
-- 🛠 **v0.3**: Planned for future operations focus
-- 🔮 **Later**: Candidates for future versions
+- [x] Completed and tested
+- [ ] Planned or not started
+

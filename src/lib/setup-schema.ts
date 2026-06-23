@@ -1,12 +1,15 @@
-import { db } from '@/lib/db';
+﻿import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
+import { APP_VERSION } from '@/lib/version';
+
+const appVersionSql = APP_VERSION.replace(/'/g, "''");
 
 const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS app_instance (
     id text PRIMARY KEY DEFAULT 'instance_1',
     created_at timestamptz NOT NULL DEFAULT now(),
     initialized_at timestamptz,
-    version text NOT NULL DEFAULT '0.1.0'
+    version text NOT NULL DEFAULT '${appVersionSql}'
   )`,
   `CREATE TABLE IF NOT EXISTS ui_auth (
     id text PRIMARY KEY DEFAULT 'ui_1',

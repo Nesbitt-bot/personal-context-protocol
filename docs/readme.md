@@ -1,6 +1,6 @@
-# Personal Context Protocol
+﻿# Personal Context Protocol
 
-PCP is a small Vercel + Neon Postgres app for recording AI sessions with least-privilege tokens.
+PCP is a small Next.js + Postgres app for recording AI sessions with least-privilege tokens. It can run on Vercel + Neon or locally with Docker Compose.
 
 ## Runtime Shape
 
@@ -35,7 +35,7 @@ PCP is a small Vercel + Neon Postgres app for recording AI sessions with least-p
 3. Set `DATABASE_URL`, `PCP_INSTANCE_SECRET`, and `PCP_APP_URL`.
 4. Redeploy and initialize from the app homepage.
 
-See [deployment-vercel-neon.md](deployment-vercel-neon.md) for the exact commands.
+See [deployment-vercel-neon.md](deployment-vercel-neon.md) or [deployment-docker-compose.md](deployment-docker-compose.md) for exact deployment commands.
 
 ## References
 
@@ -43,4 +43,6 @@ See [deployment-vercel-neon.md](deployment-vercel-neon.md) for the exact command
 - [Data model](data-model.md)
 - [Security model](security.md)
 - [AI agent instructions](agent-instructions.md)
+- [Docker Compose deployment](deployment-docker-compose.md)
 - [Future work](TODO.md)
+

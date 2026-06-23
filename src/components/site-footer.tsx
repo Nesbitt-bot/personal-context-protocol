@@ -1,13 +1,15 @@
+const docsBaseUrl = 'https://nesbitt-bot.github.io/personal-context-protocol/';
+
 const links = [
-  { label: 'Documentation', href: 'https://nesbitt-bot.github.io/personal-context-protocol/' },
-  { label: 'API reference', href: 'https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/protocol.md' },
-  { label: 'Deployment guide', href: 'https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/deployment-vercel-neon.md' },
-  { label: 'Future work', href: 'https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/TODO.md' },
+  { label: 'Documentation', href: docsBaseUrl },
+  { label: 'API reference', href: `${docsBaseUrl}protocol.html` },
+  { label: 'Deployment guide', href: `${docsBaseUrl}deployment-vercel-neon.html` },
+  { label: 'Future work', href: `${docsBaseUrl}TODO.html` },
 ];
 
 /**
- * Footer links keep the deployed app connected to the root open-source project
- * and explain the mission without duplicating the full docs.
+ * Footer links keep the deployed app connected to the published GitHub Pages
+ * documentation and explain the mission without duplicating the full docs.
  */
 export function SiteFooter() {
   return (

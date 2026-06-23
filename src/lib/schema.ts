@@ -1,12 +1,13 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb } from 'drizzle-orm/pg-core';
+﻿import { pgTable, text, timestamp, boolean, integer, jsonb } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import { APP_VERSION } from './version';
 
 // App instance (single row)
 export const appInstance = pgTable('app_instance', {
   id: text('id').primaryKey().$default(() => 'instance_1'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   initializedAt: timestamp('initialized_at', { withTimezone: true }),
-  version: text('version').notNull().default('0.1.0'),
+  version: text('version').notNull().default(APP_VERSION),
 });
 
 // UI admin token

@@ -1,0 +1,45 @@
+﻿services:
+  app:
+    image: personal-context-protocol:${PCP_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: "${PCP_VERSION:-0.1.0}"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://pcp:pcp_local_password@db:5432/pcp?sslmode=disable
+      PCP_INSTANCE_SECRET: ${PCP_INSTANCE_SECRET:-local-compose-secret-change-me-32chars}
+      PCP_APP_URL: ${PCP_APP_URL:-http://localhost:3000}
+      PCP_ADMIN_TOKEN: ${PCP_ADMIN_TOKEN:-}
+      NODE_ENV: production
+    ports:
+      - "${PCP_PORT:-3000}:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: pcp
+      POSTGRES_USER: pcp
+      POSTGRES_PASSWORD: pcp_local_password
+    volumes:
+      - pcp-postgres-0-1-0:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pcp -d pcp"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  pcp-postgres-0-1-0:

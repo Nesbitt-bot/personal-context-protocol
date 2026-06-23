@@ -1,133 +1,95 @@
-# Personal Context Protocol (PCP)
+﻿# Personal Context Protocol (PCP)
 
-**Route B:** Vercel + Neon Postgres web app for scoped AI session recording.
+Vercel + Neon Postgres web app for scoped AI session recording.
 
 [![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNesbitt-bot%2Fpersonal-context-protocol&envDescription=Add%20Neon%20database%20and%20environment%20variables%20after%20deployment)
 
-[📚 Documentation](https://nesbitt-bot.github.io/personal-context-protocol/) | [API Spec](docs/protocol.md) | [Deploy Guide](docs/deployment-vercel-neon.md)
+[Documentation](https://nesbitt-bot.github.io/personal-context-protocol/) | [API Spec](docs/protocol.md) | [Vercel Deploy](docs/deployment-vercel-neon.md) | [Docker Compose](docs/deployment-docker-compose.md)
 
-## Contributors
+## What It Does
 
-- **Nesbitt-bot**: Project author and implementation
-- **Trance-0**: Agent guidelines and architectural guidance (see [`AGENTS.md`](AGENTS.md))
+Personal Context Protocol stores AI conversation context in user-managed topics and sessions.
 
----
+- Admin users create topics and recording sessions in the web UI.
+- Each session gets a scoped API token for an external AI agent.
+- Agents append messages to their assigned session only.
+- The admin dashboard previews sessions, events, and exports.
 
-## 🚀 Quick Deploy (3 steps)
+## Quick Deploy
 
-### 1. Deploy to Vercel
-Click **Deploy to Vercel** above and fork/import this repo.  
-*Don't worry about env vars yet - you'll add them after.*
-
-### 2. Connect Neon Database
-1. Go to [neon.tech](https://neon.tech) → Create project
-2. Copy the **connection string** (includes password)
-
-### 3. Set Environment Variables
-In your Vercel project **Settings → Environment Variables**:
+1. Click **Deploy to Vercel** and import this repo.
+2. Create a Neon project and copy the Postgres connection string.
+3. Set Vercel environment variables:
 
 | Variable | Value |
-|---|--|
-| `DATABASE_URL` | Paste your Neon connection string |
-| `PCP_INSTANCE_SECRET` | Run `python scripts/deploy-setup.py` or generate random 32-char hex |
-| `PCP_APP_URL` | Your Vercel URL (auto-set as `VERCEL_URL` variable) |
+|---|---|
+| `DATABASE_URL` | Neon Postgres connection string |
+| `PCP_INSTANCE_SECRET` | Random secret, 32+ characters |
+| `PCP_APP_URL` | Your Vercel URL |
+| `PCP_ADMIN_TOKEN` | Optional 32+ character admin/reset token |
 
-After adding env vars, click **Redeploy**.
+4. Redeploy the Vercel project.
+5. Open the app and click **Initialize Database**.
+6. Log in with `PCP_ADMIN_TOKEN` if configured. Otherwise, save the one-time UI token shown by setup.
 
-### 4. Initialize (First Run)
-1. Visit your deployed app
-2. Click **"Initialize Database"**
-3. **COPY THE UI TOKEN** (shown once, then gone forever)
-4. Start creating topics and sessions!
+## Admin Token Recovery
 
----
+If the database is already initialized and the UI token is lost, set `PCP_ADMIN_TOKEN` in Vercel or Docker Compose, redeploy/recreate the app, and log in with that value. The app reconciles that token into the `ui_auth` table. Build and runtime logs show whether `PCP_ADMIN_TOKEN` is configured, but they do not print plaintext tokens.
 
-## Overview
+After login, use **Settings** to set a custom admin token. Settings rotation is disabled while `PCP_ADMIN_TOKEN` remains configured because the environment variable owns the credential.
 
-Personal Context Protocol is a minimal web app where:
+## Docker Compose Deployment
 
-1. **Human** creates topics and AI recording sessions
-2. Each session gets a scoped token
-3. **External AI agents** receive only `domain + session_id + session_token`
-4. AI agents record conversation messages through API routes
-5. **Human** previews sessions in a read-only ChatGPT-like UI
+Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.0; set PCP_VERSION from the root VERSION file before building a new release tag. See [Docker Compose deployment](docs/deployment-docker-compose.md).
 
-### Core principles
+## Local Development
 
-- **No external auth** (v0.1): UI access via single instance token
-- **Scoped AI tokens**: Per-session, append-only, no topic management
-- **Immutable messages**: Corrections are new messages/events
-- **Local-first setup**: Vercel + Neon, UI-driven DB init
-- **Minimal exposure**: AI sees only its session context
-
----
-
-## Architecture
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Human     │────▶│  Next.js App │────▶│ Neon PG     │
-│   (UI)      │     │  (Vercel)    │     │  (PG)       │
-└─────────────┘     └──────────────┘     └─────────────┘
-                            │
-                            │ Bearer token
-                            ▼
-                     ┌──────────────┐
-                     │ External AI  │
-                     │  (append-    │
-                     │  only)       │
-                     └──────────────┘
+```bash
+npm install
+cp .env.example .env.local
+npm run db:migrate
+npm run dev
 ```
 
-### Tech stack
+Run checks:
 
-- **Frontend**: Next.js 14 App Router, TypeScript, React, Tailwind CSS
-- **Backend**: Next.js API routes, Drizzle ORM
-- **Database**: Neon Postgres (serverless)
-- **Validation**: Zod
-- **Testing**: Vitest
-- **Deploy**: Vercel
+```bash
+npm run typecheck
+npm run test:run
+npm run build
+```
 
----
-
-## Token model
+## Token Model
 
 ### UI/admin token
-- Generated at setup
-- Hash stored (salted)
-- Unlocks admin UI
-- Shown **once** on creation
-- Can: create topics, manage sessions, view all data
+
+- Unlocks the admin UI and protected admin API routes.
+- Stored as a salted hash in Postgres.
+- Generated once during setup unless `PCP_ADMIN_TOKEN` is configured.
+- Can be rotated from the Settings page after login.
 
 ### AI session token
-- Generated per session
-- Hash stored (salted)
-- Scoped to single session
-- Can: append messages, optionally read session context, optionally rename session
-- Cannot: manage topics, delete/rewrite messages, access other sessions
 
----
+- Generated per session and shown once.
+- Stored as a salted hash with a token prefix for lookup.
+- Scoped to one session.
+- Can append messages and optionally rename its session.
 
 ## Documentation
 
-All documentation is hosted on GitHub Pages:  
-👉 **https://nesbitt-bot.github.io/personal-context-protocol/**
+Published docs: https://nesbitt-bot.github.io/personal-context-protocol/
 
-### Available docs
+Key local docs:
 
-- **[Protocol Spec](docs/protocol.md)** - Full API documentation
-- **[Data Model](docs/data-model.md)** - Database schema and relationships
-- **[Deployment Guide](docs/deployment-vercel-neon.md)** - Step-by-step Vercel + Neon setup
-- **[Security Model](docs/security.md)** - Threat model and mitigations
-- **[AI Agent Instructions](docs/agent-instructions.md)** - How AI agents should use the API
-- **[Migrations](docs/migrations.md)** - Database migration workflow
-- **[Export Format](docs/export-format.md)** - Import/export specifications
-- **[Limitations](docs/limitations.md)** - v0.1 constraints and future plans
-- **[Logging Guidelines](docs/logging.md)** - AGENTS.md-compliant logging
-- **[Agent Guidelines](docs/AGENTS.md)** - Canonical owner rules (submodule)
-- **[LLM_CHECK](docs/LLM_CHECK.md)** - End-of-round checklist
+- [Protocol Spec](docs/protocol.md)
+- [Data Model](docs/data-model.md)
+- [Vercel Deployment Guide](docs/deployment-vercel-neon.md)
+- [Docker Compose Deployment](docs/deployment-docker-compose.md)
+- [Security Model](docs/security.md)
+- [AI Agent Instructions](docs/agent-instructions.md)
+- [TODO](docs/TODO.md)
 
-### Local docs build
+Local docs build:
 
 ```bash
 cd docs
@@ -135,10 +97,13 @@ pip install -r requirements.txt
 sphinx-build -b html . _build/html
 ```
 
-Then open `_build/html/index.html` in your browser.
+## Contributors
 
----
+- **Nesbitt-bot**: Project author and implementation
+- **Trance-0**: Agent guidelines and architectural guidance
 
 ## License
 
 MIT
+
+

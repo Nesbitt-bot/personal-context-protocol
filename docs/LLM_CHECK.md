@@ -1,4 +1,4 @@
-# End-of-round checklist
+﻿# End-of-round checklist
 
 Run this checklist before declaring any modification round complete.
 
@@ -96,3 +96,19 @@ Append what this round actually did below:
   - Added `/api/v1/auth/check` for validating UI tokens before storing them in browser local storage
   - Redirected direct dashboard access without `ui_token` to `/login?next=/dashboard`
   - Added automatic Postgres schema creation when setup status or init runs with `DATABASE_URL` configured
+- 2026-06-23 - Updated docs links, TODO tracking, and safe startup diagnostics
+  - Pointed frontend documentation footer links at the published GitHub Pages docs
+  - Rewrote `docs/TODO.md` as a checked versioned tracker with completed subitems
+  - Replaced build/runtime token-printing scripts with secret-safe configuration diagnostics
+  - Preserved setup/login token display in the browser instead of exposing admin tokens in Vercel logs
+- 2026-06-23 - Added safe admin token recovery and settings rotation
+  - Added `PCP_ADMIN_TOKEN` reconciliation so a lost admin token can be replaced through Vercel env without printing secrets in logs
+  - Added `/api/v1/auth/token` for logged-in admins to set a custom token from settings
+  - Added `/settings` with token confirmation and local storage update after successful rotation
+  - Updated build/runtime diagnostics to show whether `PCP_ADMIN_TOKEN` is configured without revealing its value
+  - Added setup/init repair for initialized databases missing the `ui_auth` credential row
+- 2026-06-23 - Added Docker Compose deployment path
+  - Added versioned Dockerfile and docker-compose.yml with image tag default personal-context-protocol:0.1.0`r
+  - Added root VERSION consistency checks for package, Dockerfile, Compose, and runtime fallback
+  - Updated deployment docs for admin token reset through PCP_ADMIN_TOKEN`r
+

@@ -1,19 +1,57 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { appInstance, uiAuth } from '@/lib/schema';
+import { appInstance } from '@/lib/schema';
 import { ensureDatabaseSchema } from '@/lib/setup-schema';
-import { generateToken, generateSalt, hashToken } from '@/lib/auth';
+import { generateToken } from '@/lib/auth';
+import { adminCredentialExists, configuredAdminToken, storeAdminToken, validateAdminToken } from '@/lib/admin-token';
 import { logError } from '@/lib/logging';
+import { APP_VERSION } from '@/lib/version';
 
 export const dynamic = 'force-dynamic';
-
 
 export async function POST() {
   try {
     await ensureDatabaseSchema();
-    // Check if already initialized
+
+    const deployToken = configuredAdminToken();
+    const validationError = deployToken ? validateAdminToken(deployToken) : '';
+    if (validationError) {
+      return NextResponse.json(
+        {
+          error: `Unable to initialize database: app setup / configured admin token validation - ${validationError}`,
+          code: 'INVALID_ADMIN_TOKEN',
+        },
+        { status: 400 },
+      );
+    }
+
     const [existing] = await db.select().from(appInstance);
     if (existing) {
+      if (deployToken) {
+        await storeAdminToken(deployToken);
+        return NextResponse.json({
+          success: true,
+          initialized: true,
+          ui_token: null,
+          env_admin_token_configured: true,
+          message: 'Admin token loaded from PCP_ADMIN_TOKEN. Use that value to log in.',
+        });
+      }
+
+      const hasCredential = await adminCredentialExists();
+      if (!hasCredential) {
+        const recoveryToken = generateToken();
+        await storeAdminToken(recoveryToken);
+        return NextResponse.json({
+          success: true,
+          initialized: true,
+          ui_token: recoveryToken,
+          credential_recovered: true,
+          env_admin_token_configured: false,
+          message: 'Admin credential was missing. Store this replacement token securely; it will not be shown again.',
+        });
+      }
+
       return NextResponse.json(
         {
           error: 'Setup already completed: app setup / initialization guard - database is already initialized',
@@ -23,47 +61,33 @@ export async function POST() {
       );
     }
 
-    // Generate UI token
-    const uiToken = generateToken();
-    const salt = generateSalt();
-    const tokenHash = await hashToken(uiToken, salt);
-
-    // Create app instance and UI auth in transaction
-    await db.transaction(async (tx) => {
-      // Insert app instance
-      await tx.insert(appInstance).values({
-        id: 'instance_1',
-        initializedAt: new Date(),
-        version: '0.1.0',
-      });
-
-      // Insert UI auth
-      await tx.insert(uiAuth).values({
-        id: 'ui_1',
-        tokenHash,
-        salt,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
+    const uiToken = deployToken || generateToken();
+    await storeAdminToken(uiToken);
+    await db.insert(appInstance).values({
+      id: 'instance_1',
+      initializedAt: new Date(),
+      version: APP_VERSION,
     });
 
-    // Return token ONLY in this response
     return NextResponse.json({
       success: true,
-      ui_token: uiToken,
-      message: 'Store this token securely. It will not be shown again.',
+      initialized: true,
+      ui_token: deployToken ? null : uiToken,
+      env_admin_token_configured: Boolean(deployToken),
+      message: deployToken
+        ? 'Admin token loaded from PCP_ADMIN_TOKEN. Use that value to log in.'
+        : 'Store this token securely. It will not be shown again.',
     });
   } catch (error) {
     logError({
       consequence: 'Unable to initialize database',
       moduleProcess: 'app setup / database initialization transaction',
-      cause: 'schema bootstrap, app instance insert, or UI auth insert failed',
+      cause: 'schema bootstrap, admin token storage, or app instance insert failed',
       error,
     });
     return NextResponse.json(
       {
-        error: 'Unable to initialize database: app setup / database initialization transaction - schema bootstrap, app instance insert, or UI auth insert failed',
+        error: 'Unable to initialize database: app setup / database initialization transaction - schema bootstrap, admin token storage, or app instance insert failed',
         code: 'INTERNAL_ERROR',
       },
       { status: 500 },

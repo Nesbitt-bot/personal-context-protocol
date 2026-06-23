@@ -1,4 +1,4 @@
-Personal Context Protocol Documentation
+﻿Personal Context Protocol Documentation
 =======================================
 
 .. toctree::
@@ -40,3 +40,4 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+

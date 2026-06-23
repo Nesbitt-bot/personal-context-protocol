@@ -1,4 +1,4 @@
-# API Reference
+﻿# API Reference
 
 Base path: `/api/v1`
 
@@ -31,21 +31,27 @@ Ensures the database schema exists when `DATABASE_URL` is configured, then retur
 
 ### POST `/setup/init`
 
-Ensures the database schema exists, initializes the app, and returns the UI token once.
+Ensures the database schema exists, initializes the app, and returns the UI token once. If `PCP_ADMIN_TOKEN` is configured, setup stores that token hash and returns no plaintext token. If the app is initialized but the `ui_auth` credential row is missing, setup creates and returns one replacement token.
 
 Response:
 
 ```json
 {
   "success": true,
-  "ui_token": "<shown once>",
+  "initialized": true,
+  "ui_token": "<shown once or null when PCP_ADMIN_TOKEN is configured>",
+  "env_admin_token_configured": false,
   "message": "Store this token securely. It will not be shown again."
 }
 ```
 
 ### GET `/auth/check`
 
-Validates a UI/admin bearer token before opening the dashboard.
+Validates a UI/admin bearer token before opening the dashboard. If `PCP_ADMIN_TOKEN` is configured, the deployment token is reconciled into `ui_auth` before validation.
+
+### PATCH `/auth/token`
+
+Updates the UI/admin token after the caller authenticates with the current valid UI token. This endpoint is disabled while `PCP_ADMIN_TOKEN` is configured because the environment variable owns the credential.
 
 ## Admin Topics
 
@@ -190,3 +196,4 @@ Rules:
 Exports app data as JSON for the UI token holder.
 
 The export omits plaintext tokens.
+

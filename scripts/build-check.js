@@ -1,77 +1,47 @@
-import { execSync } from 'child_process';
-import crypto from 'crypto';
+﻿const crypto = require('crypto');
+
+const PROJECT = 'personal-context-protocol';
+const VERSION = '0.1.0';
+const requiredEnvVars = ['DATABASE_URL', 'PCP_INSTANCE_SECRET', 'PCP_APP_URL'];
+
+function printHeader(title) {
+  console.log(`\n${'='.repeat(70)}`);
+  console.log(`  ${PROJECT} v${VERSION} - ${title}`);
+  console.log(`${'='.repeat(70)}\n`);
+}
+
+function summarizeSecret(value) {
+  if (!value) return 'missing';
+  return `set sha256:${crypto.createHash('sha256').update(value).digest('hex').slice(0, 12)}`;
+}
 
 /**
- * Build-time pre-check for Personal Context Protocol
- * 
- * This script runs before Next.js build and:
- * 1. Validates required environment variables
- * 2. Generates UI token if not provided (for new deployments)
- * 3. Logs token for user to capture (ONE TIME ONLY)
+ * Build-time diagnostics for Vercel. This validates deployment configuration
+ * without printing generated admin tokens or any other secret material.
  */
+printHeader('build pre-check');
 
-console.log('\n' + '='.repeat(70));
-console.log('  PERSONAL CONTEXT PROTOCOL - BUILD PRE-CHECK');
-console.log('='.repeat(70) + '\n');
-
-// Check required environment variables
-const requiredEnvVars = ['DATABASE_URL', 'PCP_INSTANCE_SECRET', 'PCP_APP_URL'];
-const missing = requiredEnvVars.filter(env => !process.env[env]);
-
+const missing = requiredEnvVars.filter((name) => !process.env[name]);
 if (missing.length > 0) {
-  console.error('❌ MISSING REQUIRED ENVIRONMENT VARIABLES:');
-  missing.forEach(env => console.error(`   - ${env}`));
-  console.error('\n⚠️  Build will continue but app will fail at runtime.');
-  console.error('   Add these variables in Vercel project settings.\n');
+  console.log('Unable to validate build configuration: deployment configuration / required environment variables - missing keys:');
+  missing.forEach((name) => console.log(`   - ${name}`));
+  console.log('Build will continue, but setup cannot complete until these variables are configured.');
 } else {
-  console.log('✅ All required environment variables present');
+  console.log('Build configuration / required environment variables - all required keys are present.');
 }
 
-// Check if this is a fresh deployment (no database initialized yet)
-// We'll generate a token if PCP_INSTANCE_SECRET is missing or empty
-if (!process.env.PCP_INSTANCE_SECRET || process.env.PCP_INSTANCE_SECRET.length < 32) {
-  console.log('\n⚠️  WARNING: PCP_INSTANCE_SECRET not set or too short');
-  console.log('   App will work but authentication will be insecure.\n');
-  console.log('   Generate a secure secret with:');
-  console.log('   $ openssl rand -hex 32\n');
+const secret = process.env.PCP_INSTANCE_SECRET || '';
+if (secret && secret.length < 32) {
+  console.log('Unable to validate instance secret strength: deployment configuration / PCP_INSTANCE_SECRET - value is shorter than 32 characters.');
 }
 
-// Generate and display UI token for NEW deployments only
-// This is a ONE-TIME display - store it safely!
-const uiTokenPath = '.next/UI_TOKEN.txt';
-const fs = require('fs');
+console.log(`DATABASE_URL: ${summarizeSecret(process.env.DATABASE_URL)}`);
+console.log(`PCP_INSTANCE_SECRET: ${summarizeSecret(process.env.PCP_INSTANCE_SECRET)}`);
+console.log(`PCP_APP_URL: ${process.env.PCP_APP_URL ? 'set' : 'missing'}`);
+console.log(`PCP_ADMIN_TOKEN: ${process.env.PCP_ADMIN_TOKEN ? 'configured' : 'not configured'}`);
+console.log('\nAdmin UI token policy: token is never printed in build logs. For recovery, set PCP_ADMIN_TOKEN in Vercel and redeploy.');
+console.log('Database schema policy: setup/status and setup/init create the schema automatically when DATABASE_URL is configured.');
+console.log(`\n${'='.repeat(70)}\n`);
 
-if (!fs.existsSync(uiTokenPath)) {
-  const uiToken = crypto.randomBytes(32).toString('hex');
-  
-  console.log('='.repeat(70));
-  console.log('  ⚠️  CRITICAL: ONE-TIME UI TOKEN GENERATED ⚠️');
-  console.log('='.repeat(70));
-  console.log('\nThis token will ONLY be shown now. Save it securely!\n');
-  console.log(`  UI_TOKEN: ${uiToken}`);
-  console.log('\nStore this in a password manager or secure location.');
-  console.log('Without it, you cannot access the admin UI after initialization.');
-  console.log('\n' + '='.repeat(70) + '\n');
-  
-  // Save token to file for runtime access
-  fs.writeFileSync(uiTokenPath, uiToken);
-  console.log(`Token saved to: ${uiTokenPath}\n`);
-} else {
-  // Read existing token
-  const uiToken = fs.readFileSync(uiTokenPath, 'utf8');
-  const partialToken = uiToken.substring(0, 16) + '...' + uiToken.substring(uiToken.length - 8);
-  
-  console.log('ℹ️  UI Token already initialized (not re-displayed for security)');
-  console.log(`   Partial: ${partialToken}`);
-  console.log('   To view full token, check: .next/UI_TOKEN.txt\n');
-}
 
-// Run database migration check if DATABASE_URL is set
-if (process.env.DATABASE_URL) {
-  console.log('ℹ️  Database connection string detected');
-  console.log('   Migration will run on first /api/v1/setup/init request\n');
-}
 
-console.log('='.repeat(70));
-console.log('  Build proceeding...');
-console.log('='.repeat(70) + '\n\n');
