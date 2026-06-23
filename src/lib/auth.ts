@@ -1,7 +1,8 @@
 import crypto from 'crypto';
-import * as argon2 from '@node-rs/argon2';
+import { promisify } from 'util';
 
 export const INSTANCE_SECRET = process.env.PCP_INSTANCE_SECRET || '';
+const scryptAsync = promisify(crypto.scrypt);
 
 /**
  * Generate a random 32-byte hex token
@@ -18,16 +19,11 @@ export function generateSalt(): string {
 }
 
 /**
- * Hash a token with salt using Argon2
+ * Hash a token with salt using Node's built-in scrypt.
  */
 export async function hashToken(token: string, salt: string): Promise<string> {
-  const hash = await argon2.hash(token + salt, {
-    memoryCost: 19456,
-    timeCost: 2,
-    outputLen: 32,
-    parallelism: 1,
-  });
-  return hash;
+  const hash = await scryptAsync(token, salt, 32) as Buffer;
+  return `scrypt:${hash.toString('hex')}`;
 }
 
 /**
@@ -35,8 +31,8 @@ export async function hashToken(token: string, salt: string): Promise<string> {
  */
 export async function verifyToken(token: string, hash: string, salt: string): Promise<boolean> {
   try {
-    const result = await argon2.verify(hash, token + salt);
-    return result;
+    const expected = await hashToken(token, salt);
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hash));
   } catch {
     return false;
   }

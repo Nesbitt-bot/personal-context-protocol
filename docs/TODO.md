@@ -9,7 +9,7 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
 - Add integration tests for setup failure surfaces, including missing `DATABASE_URL`, unreachable Neon, missing tables, and duplicate initialization.
 - Resolve current `npm audit` findings, including the Next.js 14.2.5 security warning reported by `npm ci`.
 - Add automated checks for the INVALID LOG constraint so new error, warning, info, and debug strings must include consequence, module/process, and cause.
-- Keep API docs generated or checked against `src/api/v1` so non-existent routes do not drift back into README or protocol docs.
+- Keep API docs generated or checked against `src/app/api/v1` so non-existent routes do not drift back into README or protocol docs.
 
 ## v0.2 protocol features
 

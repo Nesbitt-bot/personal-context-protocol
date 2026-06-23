@@ -59,9 +59,6 @@ export const sessionTokens = pgTable('session_tokens', {
   tokenPrefix: text('token_prefix'), // First 16 chars for quick lookup
 });
 
-// Index for token prefix lookup
-export const sessionTokensPrefixIndex = index('session_tokens_prefix_idx').on(sessionTokens.tokenPrefix);
-
 // Messages
 export const messages = pgTable('messages', {
   id: text('id').primaryKey(),
@@ -101,14 +98,3 @@ export const schemaMigrations = pgTable('schema_migrations', {
   appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
   checksum: text('checksum'),
 });
-
-// Indexes
-import { index } from 'drizzle-orm/pg-core';
-
-export const messagesSessionIndex = index('messages_session_id_idx').on(messages.sessionId);
-export const messagesTopicIndex = index('messages_topic_id_idx').on(messages.topicId);
-export const sessionsTopicIndex = index('sessions_topic_id_idx').on(sessions.topicId);
-export const sessionTokensHashIndex = index('session_tokens_hash_idx').on(sessionTokens.tokenHash);
-export const sessionTokensSessionIndex = index('session_tokens_session_id_idx').on(sessionTokens.sessionId);
-export const eventsSessionIndex = index('events_session_id_idx').on(events.sessionId);
-export const eventsCreatedAtIndex = index('events_created_at_idx').on(events.createdAt);

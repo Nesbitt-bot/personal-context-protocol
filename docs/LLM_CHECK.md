@@ -79,3 +79,15 @@ Append what this round actually did below:
   - Added session listing and session metadata update APIs
   - Replaced inline dashboard/setup/session UI with a chat-style workspace
   - Updated docs for implemented session edit/archive routes
+- 2026-06-23 - Fixed setup API routing and non-JSON setup errors
+  - Moved API route handlers under `src/app/api/v1` so Next.js serves them
+  - Made database client initialization return structured handler errors when `DATABASE_URL` is missing
+  - Added setup-page handling for non-JSON API responses
+  - Replaced the native Argon2 package with built-in scrypt hashing so App Router routes bundle cleanly
+  - Removed runtime Drizzle index exports while keeping SQL migration indexes intact
+  - Marked API routes dynamic so production builds do not execute runtime database handlers
+- 2026-06-23 - Added themed intro page and split dashboard UI
+  - Added light, dark, and system theme modes with a reusable toggle
+  - Replaced the setup-only landing screen with a project introduction, login portal, and documentation/footer links
+  - Split dashboard topic, session, and workspace rendering into focused components with JSDoc comments
+  - Added dark-mode-aware dashboard and landing page colors

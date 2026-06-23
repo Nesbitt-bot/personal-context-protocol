@@ -6,14 +6,31 @@
   color-scheme: light;
 }
 
+:root.dark {
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
+}
+
+html {
+  background: #f8fafc;
+}
+
+html.dark {
+  background: #020617;
 }
 
 body {
   margin: 0;
   background: #f8fafc;
   color: #111827;
+}
+
+.dark body {
+  background: #020617;
+  color: #f8fafc;
 }
 
 button,

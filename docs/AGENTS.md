@@ -195,7 +195,7 @@ ALTER TABLE messages ADD COLUMN metadata_json JSONB DEFAULT '{}';
 
 - **Setup wizard**: `src/app/setup/*`
 - **Admin UI**: `src/app/(admin)/*`
-- **API routes**: `src/api/v1/*`
+- **API routes**: `src/app/api/v1/*`
 - **DB schema**: `drizzle/schema.ts`
 - **Migrations**: `drizzle/000*.sql`
 - **Tests**: `tests/`
