@@ -2,9 +2,36 @@
 
 **Route B:** Vercel + Neon Postgres web app for scoped AI session recording.
 
-[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNesbitt-bot%2Fpersonal-context-protocol&env=DATABASE_URL,PCP_INSTANCE_SECRET,PCP_APP_URL&envDescription=Set%20up%20your%20environment%20variables%20after%20deployment)
+[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNesbitt-bot%2Fpersonal-context-protocol&envDescription=You%20%27ll%20be%20asked%20to%20add%20Neon%20database%20and%20environment%20variables%20after%20deployment)
 
 [Documentation](https://nesbitt-bot.github.io/personal-context-protocol/) | [API Spec](https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/protocol.md) | [Deploy Guide](https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/deployment-vercel-neon.md)
+
+## 🚀 Quick Deploy (3 steps)
+
+### 1. Deploy to Vercel
+Click **Deploy to Vercel** above and import this repo.  
+*Don't worry about env vars yet - you'll add them after.*
+
+### 2. Connect Neon Database
+1. Go to [neon.tech](https://neon.tech) → Create project
+2. Copy the **connection string** (includes password)
+
+### 3. Set Environment Variables
+In your Vercel project **Settings → Environment Variables**:
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | Paste your Neon connection string |
+| `PCP_INSTANCE_SECRET` | Run `python scripts/deploy-setup.py` or generate random 32-char hex |
+| `PCP_APP_URL` | Your Vercel URL (auto-set as `VERCEL_URL` variable) |
+
+After adding env vars, click **Redeploy**.
+
+### 4. Initialize (First Run)
+1. Visit your deployed app
+2. Click **"Initialize Database"**
+3. **COPY THE UI TOKEN** (shown once, then gone forever)
+4. Start creating topics and sessions!
 
 ## Overview
 
@@ -21,44 +48,8 @@ Personal Context Protocol is a minimal web app where:
 - **No external auth** (v0.1): UI access via single instance token
 - **Scoped AI tokens**: Per-session, append-only, no topic management
 - **Immutable messages**: Corrections are new messages/events
-- **Local-first setup**: One-click Vercel deploy, UI-driven DB init
+- **Local-first setup**: Vercel + Neon, UI-driven DB init
 - **Minimal exposure**: AI sees only its session context
-
-## Quick start (one-click deploy)
-
-### 1. Deploy to Vercel
-
-Click [Deploy to Vercel](https://vercel.com/new) and import this repo.
-
-### 2. Connect Neon Postgres
-
-During Vercel setup:
-1. Create new Neon project (free tier works)
-2. Copy connection string
-3. Add to Vercel env vars as `DATABASE_URL`
-
-### 3. Set required env vars
-
-```
-DATABASE_URL=postgresql://...
-PCP_INSTANCE_SECRET=generate-a-random-secret-here
-PCP_APP_URL=https://your-app.vercel.app
-```
-
-### 4. Initialize database
-
-After first deploy:
-1. Visit `https://your-app.vercel.app`
-2. Click "Initialize Database"
-3. Save the UI admin token (shown once!)
-4. App is ready
-
-### 5. Create your first session
-
-1. Create a topic (e.g., "work-notes")
-2. Create a session within that topic
-3. Copy the AI session token
-4. Give AI agent: domain, session_id, session_token
 
 ## Architecture
 

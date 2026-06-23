@@ -1,0 +1,14 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "env": {
+    "PCP_APP_URL": "${VERCEL_URL}"
+  },
+  "functions": {
+    "maxDuration": 10
+  },
+  "crons": []
+}
