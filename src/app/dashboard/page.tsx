@@ -38,7 +38,17 @@ export default function Dashboard() {
 
   async function loadTopics() {
     try {
-      const res = await fetch('/api/v1/topics');
+      const uiToken = localStorage.getItem('ui_token');
+      if (!uiToken) {
+        setError('Not authenticated. Please go to setup page first.');
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch('/api/v1/topics', {
+        headers: { 'Authorization': `Bearer ${uiToken}` }
+      });
+      
       const data = await res.json();
       if (data.topics) {
         setTopics(data.topics);
@@ -52,7 +62,11 @@ export default function Dashboard() {
 
   async function loadSessions(topicId: string) {
     try {
-      const res = await fetch(`/api/v1/topics/${topicId}/sessions`);
+      const uiToken = localStorage.getItem('ui_token');
+      const res = await fetch(`/api/v1/topics/${topicId}/sessions`, {
+        headers: { 'Authorization': `Bearer ${uiToken}` }
+      });
+      
       const data = await res.json();
       if (data.sessions) {
         setSessions(data.sessions);
@@ -66,9 +80,13 @@ export default function Dashboard() {
     if (!newTopicTitle.trim()) return;
     
     try {
+      const uiToken = localStorage.getItem('ui_token');
       const res = await fetch('/api/v1/topics', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${uiToken}`
+        },
         body: JSON.stringify({ title: newTopicTitle.trim() }),
       });
       
@@ -81,6 +99,34 @@ export default function Dashboard() {
       }
     } catch (err) {
       setError('Unable to create topic');
+    }
+  }
+
+  async function createSession() {
+    if (!selectedTopic) return;
+    
+    const title = prompt('Session title:');
+    if (!title) return;
+    
+    try {
+      const uiToken = localStorage.getItem('ui_token');
+      const res = await fetch(`/api/v1/topics/${selectedTopic.id}/sessions`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${uiToken}`
+        },
+        body: JSON.stringify({ title }),
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        loadSessions(selectedTopic.id);
+      } else {
+        setError(data.error || 'Failed to create session');
+      }
+    } catch (err) {
+      setError('Unable to create session');
     }
   }
 
@@ -139,7 +185,7 @@ export default function Dashboard() {
             <p>Loading...</p>
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {topics.map((topic) => (
+              {topics.filter(t => !t.archived).map((topic) => (
                 <li
                   key={topic.id}
                   onClick={() => setSelectedTopic(topic)}
@@ -169,26 +215,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2>{selectedTopic.title}</h2>
                 <button
-                  onClick={async () => {
-                    const title = prompt('Session title:');
-                    if (!title) return;
-                    
-                    try {
-                      const res = await fetch(`/api/v1/topics/${selectedTopic.id}/sessions`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title }),
-                      });
-                      const data = await res.json();
-                      if (data.success) {
-                        loadSessions(selectedTopic.id);
-                      } else {
-                        setError(data.error);
-                      }
-                    } catch (err) {
-                      setError('Unable to create session');
-                    }
-                  }}
+                  onClick={createSession}
                   style={{ 
                     padding: '10px 20px', 
                     backgroundColor: '#22c55e', 
@@ -231,11 +258,12 @@ export default function Dashboard() {
                             const canRename = confirm('Allow AI to suggest session titles? Click OK for yes, Cancel for no.');
                             
                             try {
+                              const uiToken = localStorage.getItem('ui_token');
                               const res = await fetch(`/api/v1/sessions/${session.id}/tokens`, {
                                 method: 'POST',
                                 headers: { 
                                   'Content-Type': 'application/json',
-                                  'Authorization': `Bearer ${localStorage.getItem('ui_token') || ''}`
+                                  'Authorization': `Bearer ${uiToken}`
                                 },
                                 body: JSON.stringify({ 
                                   name: tokenName,
@@ -247,8 +275,6 @@ export default function Dashboard() {
                               if (data.token) {
                                 const instructions = `
 AI Session Token Created!
-
-Copy these details for your AI agent:
 
 APP_URL: ${window.location.origin}
 SESSION_ID: ${session.id}
@@ -282,11 +308,8 @@ Instructions for AI:
                         >
                           Generate Token
                         </button>
-                        <button
-                          onClick={() => {
-                            // Navigate to session detail
-                            window.location.href = `/sessions/${session.id}`;
-                          }}
+                        <a
+                          href={`/sessions/${session.id}`}
                           style={{
                             padding: '8px 16px',
                             backgroundColor: '#6b7280',
@@ -294,11 +317,12 @@ Instructions for AI:
                             border: 'none',
                             borderRadius: '4px',
                             cursor: 'pointer',
-                            fontSize: '12px'
+                            fontSize: '12px',
+                            textDecoration: 'none'
                           }}
                         >
                           View
-                        </button>
+                        </a>
                       </div>
                     </li>
                   ))}
