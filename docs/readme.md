@@ -1,108 +1,45 @@
-# Personal Context Protocol (PCP)
+# Personal Context Protocol
 
-**Route B:** Vercel + Neon Postgres web app for scoped AI session recording.
+PCP is a small Vercel + Neon Postgres app for recording AI sessions with least-privilege tokens.
 
-[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNesbitt-bot%2Fpersonal-context-protocol)
+## Runtime Shape
 
-[API Spec](protocol.md) | [Deploy Guide](deployment-vercel-neon.md) | [Security](security.md) | [AI Agent Guide](agent-instructions.md)
+- Next.js 14 App Router, React, TypeScript
+- Next.js API routes
+- Drizzle ORM
+- Neon Postgres
+- Zod request validation
+- Vitest tests
 
-## Quick Deploy (3 steps)
+## Workflow
 
-### 1. Deploy to Vercel
-Click **Deploy to Vercel** above and fork/import this repo.
+1. Human initializes the app and saves the one-time UI token.
+2. Human creates topics and sessions.
+3. Human generates a session token for one AI agent/session.
+4. AI appends messages through `POST /api/v1/sessions/:sessionId/messages`.
+5. Human reviews messages and events in the admin UI.
 
-### 2. Connect Neon Database
-1. Go to [neon.tech](https://neon.tech) → Create project
-2. Copy the **connection string** (includes password)
+## Invariants
 
-### 3. Set Environment Variables
-In your Vercel project **Settings → Environment Variables**:
+- AI tokens are scoped to exactly one session.
+- AI requests cannot include topic fields.
+- Messages are append-only.
+- Tokens are stored as salted hashes.
+- Admin-only routes require the UI token.
 
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | Paste your Neon connection string |
-| `PCP_INSTANCE_SECRET` | Run `python scripts/deploy-setup.py` or generate random 32-char hex |
-| `PCP_APP_URL` | Your Vercel URL (auto-set as `VERCEL_URL` variable) |
+## Deploy
 
-After adding env vars, click **Redeploy**.
+1. Deploy the repo to Vercel.
+2. Create a Neon database.
+3. Set `DATABASE_URL`, `PCP_INSTANCE_SECRET`, and `PCP_APP_URL`.
+4. Redeploy and initialize from the app homepage.
 
-### 4. Initialize (First Run)
-1. Visit your deployed app
-2. Click **"Initialize Database"**
-3. **COPY THE UI TOKEN** (shown once, then gone forever)
-4. Start creating topics and sessions!
+See [deployment-vercel-neon.md](deployment-vercel-neon.md) for the exact commands.
 
-## Overview
+## References
 
-Personal Context Protocol is a minimal web app where:
-
-1. **Human** creates topics and AI recording sessions
-2. Each session gets a scoped token
-3. **External AI agents** receive only `domain + session_id + session_token`
-4. AI agents record conversation messages through API routes
-5. **Human** previews sessions in a read-only ChatGPT-like UI
-
-### Core principles
-
-- **No external auth** (v0.1): UI access via single instance token
-- **Scoped AI tokens**: Per-session, append-only, no topic management
-- **Immutable messages**: Corrections are new messages/events
-- **Local-first setup**: Vercel + Neon, UI-driven DB init
-- **Minimal exposure**: AI sees only its session context
-
-## Architecture
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Human     │────▶│  Next.js App │────▶│ Neon PG     │
-│   (UI)      │     │  (Vercel)    │     │  (PG)       │
-└─────────────┘     └──────────────┘     └─────────────┘
-                            │
-                            │ Bearer token
-                            ▼
-                     ┌──────────────┐
-                     │ External AI  │
-                     │  (append-    │
-                     │  only)       │
-                     └──────────────┘
-```
-
-### Tech stack
-
-- **Frontend**: Next.js 14 App Router, TypeScript, React
-- **Backend**: Next.js API routes, Drizzle ORM
-- **Database**: Neon Postgres (serverless PG)
-- **Validation**: Zod
-- **Testing**: Vitest
-- **Deploy**: Vercel
-
-## Token model
-
-### UI/admin token
-- Generated at setup
-- Hash stored (salted)
-- Unlocks admin UI
-- Shown **once** on creation
-- Can: create topics, manage sessions, view all data
-
-### AI session token
-- Generated per session
-- Hash stored (salted)
-- Scoped to single session
-- Can: append messages, optionally read session context, optionally rename session
-- Cannot: manage topics, delete/rewrite messages, access other sessions
-
-## Documentation
-
-- **[Protocol Spec](protocol.md)** - Full API documentation
-- **[Data Model](data-model.md)** - Database schema and relationships
-- **[Deployment Guide](deployment-vercel-neon.md)** - Step-by-step Vercel + Neon setup
-- **[Security Model](security.md)** - Threat model and mitigations
-- **[AI Agent Instructions](agent-instructions.md)** - How AI agents should use the API
-- **[Migrations](migrations.md)** - Database migration workflow
-- **[Export Format](export-format.md)** - Import/export specifications
-- **[Limitations](limitations.md)** - v0.1 constraints and future plans
-
-## License
-
-MIT
+- [API reference](protocol.md)
+- [Data model](data-model.md)
+- [Security model](security.md)
+- [AI agent instructions](agent-instructions.md)
+- [Future work](TODO.md)

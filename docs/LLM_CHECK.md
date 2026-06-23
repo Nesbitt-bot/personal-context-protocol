@@ -53,7 +53,7 @@ Run this checklist before declaring any modification round complete.
 
 Append what this round actually did below:
 
-- [Round date] - Initial rewrite to Next.js + Neon (Route B)
+- [Round date] - Initial rewrite to Next.js + Neon
   - Created project structure
   - Set up AGENTS.md, CLAUDE.md, CODEX.md
   - Created documentation skeleton
@@ -70,3 +70,7 @@ Append what this round actually did below:
   - Updated Python logging examples and startup log text to follow the same diagnostic format
   - Added missing Python and TypeScript generated-file ignore rules
   - Added `docs/TODO.md` for future implementation work
+- 2026-06-23 - Compacted user-facing docs and removed route terminology
+  - Removed route labels from README and docs
+  - Replaced stale API docs with implemented endpoints only
+  - Moved roadmap, hardening, and non-current feature notes into `docs/TODO.md`

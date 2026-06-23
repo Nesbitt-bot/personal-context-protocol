@@ -1,220 +1,91 @@
 # Personal Context Protocol (PCP)
 
-**Route B:** Vercel + Neon Postgres web app for scoped AI session recording.
+Vercel + Neon Postgres app for scoped AI session recording.
 
-[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNesbitt-bot%2Fpersonal-context-protocol&envDescription=You%20%27ll%20be%20asked%20to%20add%20Neon%20database%20and%20environment%20variables%20after%20deployment)
+[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNesbitt-bot%2Fpersonal-context-protocol)
 
-[Documentation](https://nesbitt-bot.github.io/personal-context-protocol/) | [API Spec](https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/protocol.md) | [Deploy Guide](https://github.com/Nesbitt-bot/personal-context-protocol/blob/main/docs/deployment-vercel-neon.md)
+[Docs](https://nesbitt-bot.github.io/personal-context-protocol/) | [API](docs/protocol.md) | [Deploy](docs/deployment-vercel-neon.md) | [TODO](docs/TODO.md)
+
+## What It Does
+
+PCP lets a human create topics and sessions, generate a scoped token for one AI session, and let an external AI append conversation messages without seeing or managing topics.
+
+Core rules:
+
+- UI/admin access uses a setup token shown once.
+- AI tokens are scoped to one session.
+- AI can append messages, not edit or delete them.
+- Topic management is admin-only.
+- Tokens are stored as salted hashes.
+
+## Quick Deploy
+
+1. Deploy this repo to Vercel.
+2. Create a Neon Postgres database.
+3. Add Vercel env vars:
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | Neon connection string |
+| `PCP_INSTANCE_SECRET` | Random secret, 32+ chars |
+| `PCP_APP_URL` | Deployed app URL |
+
+4. Redeploy, open the app, click **Initialize Database**, and save the UI token shown once.
+
+## Local Development
+
+```bash
+npm install
+cp .env.example .env.local
+npm run db:migrate
+npm run dev
+```
+
+Useful checks:
+
+```bash
+npm run typecheck
+npm run test:run
+npm run build
+```
+
+## Implemented API Surface
+
+Public/setup:
+
+- `GET /api/v1/health`
+- `GET /api/v1/setup/status`
+- `POST /api/v1/setup/init`
+
+Admin:
+
+- `GET /api/v1/topics`
+- `POST /api/v1/topics`
+- `POST /api/v1/topics/:id/rename`
+- `POST /api/v1/topics/:id/archive`
+- `POST /api/v1/topics/:topicId/sessions`
+- `GET /api/v1/sessions/:id`
+- `GET /api/v1/sessions/:id/review`
+- `GET /api/v1/sessions/:id/events`
+- `POST /api/v1/sessions/:id/archive`
+- `POST /api/v1/sessions/:sessionId/tokens`
+- `GET /api/v1/export`
+
+AI:
+
+- `POST /api/v1/sessions/:sessionId/messages`
+
+## Docs
+
+- [Project overview](docs/readme.md)
+- [API reference](docs/protocol.md)
+- [Data model](docs/data-model.md)
+- [Deployment](docs/deployment-vercel-neon.md)
+- [Security model](docs/security.md)
+- [AI agent instructions](docs/agent-instructions.md)
+- [Future work](docs/TODO.md)
 
 ## Contributors
 
 - **Nesbitt-bot**: Project author and implementation
-- **Trance-0**: Agent guidelines and architectural guidance (see [`AGENTS.md`](AGENTS.md))
-
-## 🚀 Quick Deploy (3 steps)
-
-### 1. Deploy to Vercel
-Click **Deploy to Vercel** above and import this repo.  
-*Don't worry about env vars yet - you'll add them after.*
-
-### 2. Connect Neon Database
-1. Go to [neon.tech](https://neon.tech) → Create project
-2. Copy the **connection string** (includes password)
-
-### 3. Set Environment Variables
-In your Vercel project **Settings → Environment Variables**:
-
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | Paste your Neon connection string |
-| `PCP_INSTANCE_SECRET` | Run `python scripts/deploy-setup.py` or generate random 32-char hex |
-| `PCP_APP_URL` | Your Vercel URL (auto-set as `VERCEL_URL` variable) |
-
-After adding env vars, click **Redeploy**.
-
-### 4. Initialize (First Run)
-1. Visit your deployed app
-2. Click **"Initialize Database"**
-3. **COPY THE UI TOKEN** (shown once, then gone forever)
-4. Start creating topics and sessions!
-
-## Overview
-
-Personal Context Protocol is a minimal web app where:
-
-1. **Human** creates topics and AI recording sessions
-2. Each session gets a scoped token
-3. **External AI agents** receive only `domain + session_id + session_token`
-4. AI agents record conversation messages through API routes
-5. **Human** previews sessions in a read-only ChatGPT-like UI
-
-### Core principles
-
-- **No external auth** (v0.1): UI access via single instance token
-- **Scoped AI tokens**: Per-session, append-only, no topic management
-- **Immutable messages**: Corrections are new messages/events
-- **Local-first setup**: Vercel + Neon, UI-driven DB init
-- **Minimal exposure**: AI sees only its session context
-
-## Architecture
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Human     │────▶│  Next.js App │────▶│ Neon PG     │
-│   (UI)      │     │  (Vercel)    │     │  (PG)       │
-└─────────────┘     └──────────────┘     └─────────────┘
-                            │
-                            │ Bearer token
-                            ▼
-                     ┌──────────────┐
-                     │ External AI  │
-                     │  (append-    │
-                     │  only)       │
-                     └──────────────┘
-```
-
-### Tech stack
-
-- **Frontend**: Next.js 14 App Router, TypeScript, React
-- **Backend**: Next.js API routes, Drizzle ORM
-- **Database**: Neon Postgres (serverless PG)
-- **Validation**: Zod
-- **Testing**: Vitest
-- **Deploy**: Vercel
-
-## Token model
-
-### UI/admin token
-- Generated at setup
-- Hash stored (salted)
-- Unlocks admin UI
-- Shown **once** on creation
-- Can: create topics, manage sessions, view all data
-
-### AI session token
-- Generated per session
-- Hash stored (salted)
-- Scoped to single session
-- Can: append messages, optionally read session context, optionally rename session
-- Cannot: manage topics, delete/rewrite messages, access other sessions
-
-## API endpoints
-
-### Public/health
-- `GET /api/v1/health` - Health check
-- `GET /api/v1/protocol` - Protocol spec
-- `GET /api/v1/setup/status` - Setup progress
-
-### Setup
-- `POST /api/v1/setup/init` - Initialize DB + UI token
-- `POST /api/v1/auth/unlock` - Unlock UI with admin token
-- `POST /api/v1/auth/rotate-ui-token` - Rotate admin token
-
-### Topics (admin only)
-- `GET /api/v1/topics` - List topics
-- `POST /api/v1/topics` - Create topic
-- `GET /api/v1/topics/:id` - Get topic
-- `POST /api/v1/topics/:id/rename` - Rename topic
-- `POST /api/v1/topics/:id/archive` - Archive topic
-
-### Sessions
-- `GET /api/v1/sessions/:id` - Get session
-- `GET /api/v1/sessions/:id/review` - Review session (admin)
-- `POST /api/v1/topics/:topicId/sessions` - Create session
-- `POST /api/v1/sessions/:id/rename` - Rename session
-- `POST /api/v1/sessions/:id/archive` - Archive session
-
-### Tokens
-- `POST /api/v1/sessions/:id/tokens` - Generate session token
-- `POST /api/v1/session-tokens/:id/revoke` - Revoke token
-
-### Messages (AI write)
-- `POST /api/v1/sessions/:sessionId/messages` - Append messages (AI)
-- `GET /api/v1/sessions/:id/messages` - Read messages (admin)
-
-### Events
-- `GET /api/v1/sessions/:id/events` - Audit events
-
-### Import/Export (admin)
-- `GET /api/v1/export` - Export all data
-- `POST /api/v1/import/pcp-json` - Import PCP JSON
-- `POST /api/v1/import/pcp-jsonl` - Import PCP JSONL
-- `POST /api/v1/import/generic-transcript` - Import generic transcript
-
-## Local development
-
-```bash
-# Install dependencies
-npm install
-
-# Set up env (copy .env.example to .env.local)
-cp .env.example .env.local
-# Edit .env.local with your values
-
-# Generate DB migrations
-npm run db:generate
-
-# Run migrations locally (if you have PG)
-npm run db:migrate
-
-# Start dev server
-npm run dev
-
-# Run tests
-npm run test
-
-# Type check
-npm run typecheck
-
-# Build
-npm run build
-```
-
-## Data model
-
-See [`docs/data-model.md`](docs/data-model.md).
-
-Key tables:
-- `app_instance` - Single instance metadata
-- `ui_auth` - UI admin token hash
-- `topics` - Human-managed categories
-- `sessions` - AI recording sessions
-- `session_tokens` - Scoped AI tokens
-- `messages` - Immutable conversation messages
-- `events` - Audit trail
-
-## Security
-
-See [`docs/security.md`](docs/security.md).
-
-Key points:
-- No plaintext tokens stored
-- Token validation on every AI request
-- Immutable messages (corrections = new messages)
-- AI tokens cannot manage topics
-- CORS configured for app domain only
-
-## Documentation
-
-- **Live docs**: https://nesbitt-bot.github.io/personal-context-protocol/ (auto-deployed from `main`)
-- [`docs/protocol.md`](docs/protocol.md) - Full API spec
-- [`docs/deployment-vercel-neon.md`](docs/deployment-vercel-neon.md) - Deploy guide
-- [`docs/security.md`](docs/security.md) - Security model
-- [`docs/data-model.md`](docs/data-model.md) - Database schema
-- [`docs/agent-instructions.md`](docs/agent-instructions.md) - AI agent instructions
-- [`docs/migrations.md`](docs/migrations.md) - DB migrations
-- [`docs/export-format.md`](docs/export-format.md) - Export format spec
-- [`docs/limitations.md`](docs/limitations.md) - v0.1 limitations
-
-## GitHub Pages Setup
-
-Documentation auto-deploys to GitHub Pages when you:
-1. Enable GitHub Pages in repo settings → Pages → Source: "Deploy from a branch" → Branch: "gh-pages"
-2. The workflow (`.github/workflows/docs.yml`) will create the `gh-pages` branch automatically
-3. Visit `https://<username>.github.io/<repo>/` to view docs
-
-Follows the same pattern as [training-manager](https://github.com/Nesbitt-bot/training-manager).
-
-## License
-
-MIT
+- **Trance-0**: Agent guidelines and architectural guidance

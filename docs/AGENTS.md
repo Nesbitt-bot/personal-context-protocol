@@ -4,7 +4,7 @@ These rules extend the canonical [Trance-0/AGENTS.md](https://github.com/Trance-
 
 ## Project context
 
-**Personal Context Protocol (Route B)** - Vercel + Neon Postgres web app for scoped AI session recording.
+**Personal Context Protocol** - Vercel + Neon Postgres web app for scoped AI session recording.
 
 ## Critical invariants
 
