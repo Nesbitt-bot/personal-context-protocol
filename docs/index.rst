@@ -1,20 +1,37 @@
 Personal Context Protocol Documentation
-=======================================
+==============>=====================
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: User Guide
 
    readme
+   deployment-vercel-neon
+   agent-instructions
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference
+
    protocol
    data-model
-   deployment-vercel-neon
-   security
-   agent-instructions
-   migrations
    export-format
-   limitations
    logging
+   migrations
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Security
+
+   security
+   limitations
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Agent Guidelines
+
+   AGENTS
+   LLM_CHECK
 
 Indices and tables
 ==================
