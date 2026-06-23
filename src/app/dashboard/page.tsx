@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SiteNav } from '@/components/site-nav';
 import { SessionSidebar } from '@/components/dashboard/session-sidebar';
 import { SessionWorkspace } from '@/components/dashboard/session-workspace';
@@ -19,6 +20,7 @@ function getUiToken() {
  * session, and workspace components.
  */
 export default function Dashboard() {
+  const router = useRouter();
   const [topics, setTopics] = useState<Topic[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -88,7 +90,7 @@ export default function Dashboard() {
       const uiToken = getUiToken();
       if (!uiToken) {
         setHasUiToken(false);
-        setError('Unable to load dashboard: user authentication / local UI token lookup - ui_token missing from browser storage. Paste the setup token.');
+        router.replace('/login?next=/dashboard');
         return;
       }
 

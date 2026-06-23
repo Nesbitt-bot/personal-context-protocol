@@ -103,7 +103,7 @@ export default function HomePage() {
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
-              href="/dashboard"
+              href="/login"
             >
               Open login portal <ArrowRight size={16} />
             </Link>
@@ -149,10 +149,10 @@ export default function HomePage() {
                 <p className="mt-2 text-sm">Open the dashboard. If the UI token is not saved in this browser, paste it there.</p>
               </div>
               <Link
-                href="/dashboard"
+                href="/login"
                 className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
               >
-                Open dashboard <ArrowRight size={16} />
+                Open login portal <ArrowRight size={16} />
               </Link>
             </div>
           ) : initialized ? (
@@ -176,10 +176,10 @@ export default function HomePage() {
                   <Clipboard size={16} /> Copy token
                 </button>
                 <Link
-                  href="/dashboard"
+                  href="/login"
                   className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
                 >
-                  Open dashboard <ArrowRight size={16} />
+                  Open login portal <ArrowRight size={16} />
                 </Link>
               </div>
             </div>

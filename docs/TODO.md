@@ -20,7 +20,7 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
 - Add export download controls in the admin UI for the existing `/api/v1/export` endpoint.
 - Add import endpoints for PCP JSON, PCP JSONL, and generic transcript formats.
 - Add pagination and search for topics, sessions, messages, and event logs.
-- Add dark mode, bulk operations, attachments, and richer transcript export formats.
+- Add bulk operations, attachments, and richer transcript export formats.
 - Add semantic search, summaries, context compression, and auto-tagging only after the core append-only workflow is stable.
 
 ## v0.3 operations

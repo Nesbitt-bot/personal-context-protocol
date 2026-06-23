@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { appInstance } from '@/lib/schema';
+import { ensureDatabaseSchema } from '@/lib/setup-schema';
 import { logError } from '@/lib/logging';
-import { sql } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
 
-
-
 export async function GET() {
   try {
+    await ensureDatabaseSchema();
     // Check if app is initialized
     const [instance] = await db.select().from(appInstance);
     
@@ -30,13 +29,13 @@ export async function GET() {
     logError({
       consequence: 'Unable to check setup status',
       moduleProcess: 'app setup / initialization status database probe',
-      cause: 'app_instance lookup failed because the database is unavailable or the schema is missing',
+      cause: 'schema bootstrap or app_instance lookup failed because the database is unavailable',
       error,
     });
     return NextResponse.json({
       initialized: false,
       needs_migration: true,
-      error: 'Unable to check setup status: app setup / initialization status database probe - database unavailable or app_instance schema missing',
+      error: 'Unable to check setup status: app setup / initialization status database probe - database unavailable or schema bootstrap failed',
       code: 'SETUP_STATUS_PROBE_FAILED',
     });
   }

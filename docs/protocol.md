@@ -27,11 +27,11 @@ Returns service status.
 
 ### GET `/setup/status`
 
-Returns whether the app has been initialized.
+Ensures the database schema exists when `DATABASE_URL` is configured, then returns whether the app has been initialized.
 
 ### POST `/setup/init`
 
-Initializes the app and returns the UI token once.
+Ensures the database schema exists, initializes the app, and returns the UI token once.
 
 Response:
 
@@ -42,6 +42,10 @@ Response:
   "message": "Store this token securely. It will not be shown again."
 }
 ```
+
+### GET `/auth/check`
+
+Validates a UI/admin bearer token before opening the dashboard.
 
 ## Admin Topics
 

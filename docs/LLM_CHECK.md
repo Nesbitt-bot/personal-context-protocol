@@ -91,3 +91,8 @@ Append what this round actually did below:
   - Replaced the setup-only landing screen with a project introduction, login portal, and documentation/footer links
   - Split dashboard topic, session, and workspace rendering into focused components with JSDoc comments
   - Added dark-mode-aware dashboard and landing page colors
+- 2026-06-23 - Added admin login gate and automatic schema bootstrap
+  - Added `/login` so the login portal prompts for the admin token before opening the dashboard
+  - Added `/api/v1/auth/check` for validating UI tokens before storing them in browser local storage
+  - Redirected direct dashboard access without `ui_token` to `/login?next=/dashboard`
+  - Added automatic Postgres schema creation when setup status or init runs with `DATABASE_URL` configured

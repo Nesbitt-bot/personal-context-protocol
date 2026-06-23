@@ -30,7 +30,7 @@ Core rules:
 | `PCP_INSTANCE_SECRET` | Random secret, 32+ chars |
 | `PCP_APP_URL` | Deployed app URL |
 
-4. Redeploy, open the app, click **Initialize Database**, and save the UI token shown once.
+4. Redeploy, open the app, click **Initialize Database**, and save the UI token shown once. The setup flow creates the Postgres schema automatically when `DATABASE_URL` is available.
 
 ## Local Development
 
@@ -56,6 +56,7 @@ Public/setup:
 - `GET /api/v1/health`
 - `GET /api/v1/setup/status`
 - `POST /api/v1/setup/init`
+- `GET /api/v1/auth/check`
 
 Admin:
 

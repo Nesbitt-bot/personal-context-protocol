@@ -28,7 +28,7 @@ export function SiteNav() {
           <ThemeToggle />
           <Link
             className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
-            href="/dashboard"
+            href="/login"
           >
             Login portal
           </Link>

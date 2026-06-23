@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { appInstance, uiAuth } from '@/lib/schema';
-import { generateToken, generateSalt, hashToken, createId } from '@/lib/auth';
+import { ensureDatabaseSchema } from '@/lib/setup-schema';
+import { generateToken, generateSalt, hashToken } from '@/lib/auth';
 import { logError } from '@/lib/logging';
-import { sql } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
 
-
-
-export async function POST(request: Request) {
+export async function POST() {
   try {
+    await ensureDatabaseSchema();
     // Check if already initialized
     const [existing] = await db.select().from(appInstance);
     if (existing) {
@@ -47,13 +46,6 @@ export async function POST(request: Request) {
         updatedAt: new Date(),
       });
 
-      // Create initial migration record
-      const { schemaMigrations } = await import('@/lib/schema');
-      await tx.insert(schemaMigrations).values({
-        version: '001_initial',
-        appliedAt: new Date(),
-        checksum: 'initial_schema',
-      });
     });
 
     // Return token ONLY in this response
@@ -66,12 +58,12 @@ export async function POST(request: Request) {
     logError({
       consequence: 'Unable to initialize database',
       moduleProcess: 'app setup / database initialization transaction',
-      cause: 'app instance, UI auth, or migration record insert failed',
+      cause: 'schema bootstrap, app instance insert, or UI auth insert failed',
       error,
     });
     return NextResponse.json(
       {
-        error: 'Unable to initialize database: app setup / database initialization transaction - app instance, UI auth, or migration record insert failed',
+        error: 'Unable to initialize database: app setup / database initialization transaction - schema bootstrap, app instance insert, or UI auth insert failed',
         code: 'INTERNAL_ERROR',
       },
       { status: 500 },
