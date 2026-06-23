@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { verifyUiToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { sessions, topics } from '@/lib/schema';
+import { logError } from '@/lib/logging';
 import { eq } from 'drizzle-orm';
 
 export async function GET(
@@ -33,7 +34,7 @@ export async function GET(
     if (!session) {
       return NextResponse.json(
         {
-          error: 'Unable to get session: resource lookup — session not found',
+          error: 'Unable to get session: session review / session lookup - session not found',
           code: 'NOT_FOUND'
         },
         { status: 404 }
@@ -42,9 +43,14 @@ export async function GET(
 
     return NextResponse.json(session);
   } catch (error) {
-    console.error('Get session error:', error);
+    logError({
+      consequence: 'Unable to get session',
+      moduleProcess: 'session review / session detail query',
+      cause: 'session and topic join query failed',
+      error,
+    });
     return NextResponse.json(
-      { error: 'Unable to get session: database query — internal error occurred', code: 'INTERNAL_ERROR' },
+      { error: 'Unable to get session: session review / session detail query - session and topic join query failed', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }

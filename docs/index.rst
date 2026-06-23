@@ -32,6 +32,7 @@ Personal Context Protocol Documentation
 
    AGENTS
    LLM_CHECK
+   TODO
 
 Indices and tables
 ==================

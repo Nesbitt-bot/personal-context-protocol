@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { diagnosticMessage, errorCause } from '@/lib/logging';
 
 interface Message {
   id: string;
@@ -33,7 +34,7 @@ export default function SessionDetail() {
     try {
       const uiToken = localStorage.getItem('ui_token');
       if (!uiToken) {
-        setError('Not authenticated. Please go to setup page first.');
+        setError('Unable to load session data: user authentication / local UI token lookup - ui_token missing from browser storage. Return to setup first.');
         setLoading(false);
         return;
       }
@@ -68,7 +69,11 @@ export default function SessionDetail() {
         setEvents(eventsData.events || []);
       }
     } catch (err) {
-      setError('Unable to load session data');
+      setError(diagnosticMessage({
+        consequence: 'Unable to load session data',
+        moduleProcess: 'session review / load session detail requests',
+        cause: `browser could not reach a session detail endpoint or parse its response; ${errorCause(err)}`,
+      }));
     } finally {
       setLoading(false);
     }
@@ -114,16 +119,20 @@ Rules:
         alert(instructions);
         navigator.clipboard.writeText(instructions);
       } else {
-        setError(data.error || 'Failed to create token');
+        setError(data.error || 'Unable to create token: session token administration / create token request - API response did not include token or structured error');
       }
     } catch (err) {
-      setError('Unable to create token');
+      setError(diagnosticMessage({
+        consequence: 'Unable to create token',
+        moduleProcess: 'session token administration / create token request',
+        cause: `browser could not reach /api/v1/sessions/${sessionId}/tokens or parse its response; ${errorCause(err)}`,
+      }));
     }
   }
 
   if (loading) return <div style={{ padding: '40px' }}>Loading session...</div>;
   if (error) return <div style={{ padding: '40px', color: 'red' }}>{error}</div>;
-  if (!session) return <div style={{ padding: '40px' }}>Session not found</div>;
+  if (!session) return <div style={{ padding: '40px' }}>Unable to show session: session review / session lookup - session response was empty or session was not found.</div>;
 
   return (
     <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>

@@ -3,6 +3,7 @@ import { verifyUiToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { sessionTokens, sessions, events } from '@/lib/schema';
 import { generateToken, generateSalt, hashToken, createId } from '@/lib/auth';
+import { logError } from '@/lib/logging';
 import { createTokenSchema } from '@/lib/validations';
 import { eq } from 'drizzle-orm';
 
@@ -23,7 +24,7 @@ export async function POST(
     if (!validation.success) {
       return NextResponse.json(
         {
-          error: 'Unable to create token: request validation — invalid request body',
+          error: 'Unable to create token: session token administration / request validation - invalid request body',
           code: 'VALIDATION_ERROR',
           details: validation.error.errors,
         },
@@ -42,7 +43,7 @@ export async function POST(
     if (!session) {
       return NextResponse.json(
         {
-          error: 'Unable to create token: resource lookup — session not found',
+          error: 'Unable to create token: session token administration / session lookup - session not found',
           code: 'NOT_FOUND',
         },
         { status: 404 },
@@ -87,10 +88,15 @@ export async function POST(
       created_at: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Token creation error:', error);
+    logError({
+      consequence: 'Unable to create token',
+      moduleProcess: 'session token administration / create scoped token transaction',
+      cause: 'session lookup, token hash, token insert, or audit event insert failed',
+      error,
+    });
     return NextResponse.json(
       {
-        error: 'Unable to create token: database transaction — internal error occurred',
+        error: 'Unable to create token: session token administration / create scoped token transaction - session lookup, token hash, token insert, or audit event insert failed',
         code: 'INTERNAL_ERROR',
       },
       { status: 500 },

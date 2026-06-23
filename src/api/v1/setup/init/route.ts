@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { appInstance, uiAuth } from '@/lib/schema';
 import { generateToken, generateSalt, hashToken, createId } from '@/lib/auth';
+import { logError } from '@/lib/logging';
 import { sql } from 'drizzle-orm';
 
 export async function POST(request: Request) {
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
     if (existing) {
       return NextResponse.json(
         {
-          error: 'Setup already completed: app initialization — database is already initialized',
+          error: 'Setup already completed: app setup / initialization guard - database is already initialized',
           code: 'ALREADY_INITIALIZED',
         },
         { status: 400 },
@@ -57,10 +58,15 @@ export async function POST(request: Request) {
       message: 'Store this token securely. It will not be shown again.',
     });
   } catch (error) {
-    console.error('Setup init error:', error);
+    logError({
+      consequence: 'Unable to initialize database',
+      moduleProcess: 'app setup / database initialization transaction',
+      cause: 'app instance, UI auth, or migration record insert failed',
+      error,
+    });
     return NextResponse.json(
       {
-        error: 'Unable to initialize: app setup — database transaction failed',
+        error: 'Unable to initialize database: app setup / database initialization transaction - app instance, UI auth, or migration record insert failed',
         code: 'INTERNAL_ERROR',
       },
       { status: 500 },

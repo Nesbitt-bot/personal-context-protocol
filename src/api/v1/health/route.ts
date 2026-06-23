@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/logging';
 
 export async function GET() {
   try {
@@ -9,9 +10,15 @@ export async function GET() {
       database: 'pending',
     });
   } catch (error) {
+    logError({
+      consequence: 'Unable to report health status',
+      moduleProcess: 'system health / health endpoint response',
+      cause: 'health response construction failed',
+      error,
+    });
     return NextResponse.json(
       {
-        error: 'Health check failed: internal server — unknown error occurred',
+        error: 'Unable to report health status: system health / health endpoint response - health response construction failed',
         code: 'INTERNAL_ERROR',
       },
       { status: 500 },

@@ -3,6 +3,7 @@ import { verifyUiToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { topics } from '@/lib/schema';
 import { createId } from '@/lib/auth';
+import { logError } from '@/lib/logging';
 import { eq } from 'drizzle-orm';
 
 export async function POST(
@@ -19,7 +20,7 @@ export async function POST(
     
     if (!existing) {
       return NextResponse.json(
-        { error: 'Unable to archive topic: resource lookup — topic not found', code: 'NOT_FOUND' },
+        { error: 'Unable to archive topic: topic administration / topic lookup - topic not found', code: 'NOT_FOUND' },
         { status: 404 }
       );
     }
@@ -38,9 +39,14 @@ export async function POST(
 
     return NextResponse.json({ success: true, id: params.id, archived: true });
   } catch (error) {
-    console.error('Archive topic error:', error);
+    logError({
+      consequence: 'Unable to archive topic',
+      moduleProcess: 'topic administration / archive topic update',
+      cause: 'topic lookup, archive update, or audit event insert failed',
+      error,
+    });
     return NextResponse.json(
-      { error: 'Unable to archive topic: database update — internal error occurred', code: 'INTERNAL_ERROR' },
+      { error: 'Unable to archive topic: topic administration / archive topic update - topic lookup, archive update, or audit event insert failed', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }

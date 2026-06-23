@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { verifyUiToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { sessions, topics, messages, sessionTokens, events, uiAuth, appInstance } from '@/lib/schema';
+import { logError } from '@/lib/logging';
 import { eq } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
@@ -39,9 +40,14 @@ export async function GET(request: NextRequest) {
       events: allEvents
     });
   } catch (error) {
-    console.error('Export error:', error);
+    logError({
+      consequence: 'Unable to export data',
+      moduleProcess: 'data export / full database export query',
+      cause: 'one or more export table queries failed',
+      error,
+    });
     return NextResponse.json(
-      { error: 'Unable to export data: database query — internal error occurred', code: 'INTERNAL_ERROR' },
+      { error: 'Unable to export data: data export / full database export query - one or more export table queries failed', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }

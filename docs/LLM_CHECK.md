@@ -63,3 +63,10 @@ Append what this round actually did below:
   - Repaired the `docs/index.rst` heading underline
   - Added root `VERSION` with the current project version
   - Allowed placeholder `.env.example` files to remain trackable
+- 2026-06-23 - Revised diagnostic logs and frontend setup error context
+  - Added shared TypeScript diagnostic logging helpers with secret redaction
+  - Replaced vague frontend fallback errors with consequence, module/process, and cause
+  - Replaced vague API `console.error` labels with structured diagnostic log messages
+  - Updated Python logging examples and startup log text to follow the same diagnostic format
+  - Added missing Python and TypeScript generated-file ignore rules
+  - Added `docs/TODO.md` for future implementation work

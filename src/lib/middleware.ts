@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
+import { logError } from '@/lib/logging';
 
 /**
  * Verify UI token and return session info
@@ -9,7 +10,7 @@ export async function verifyUiToken(request: NextRequest) {
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return {
-      error: 'Unable to access: authentication — missing or invalid authorization header',
+      error: 'Unable to access: user authentication / bearer header validation - missing or invalid authorization header',
       code: 'UNAUTHORIZED',
       status: 401,
     } as const;
@@ -27,7 +28,7 @@ export async function verifyUiToken(request: NextRequest) {
     
     if (!stored) {
       return {
-        error: 'Unable to access: system configuration — UI auth not initialized',
+        error: 'Unable to access: system configuration / UI auth lookup - UI auth not initialized',
         code: 'INTERNAL_ERROR',
         status: 500,
       } as const;
@@ -37,7 +38,7 @@ export async function verifyUiToken(request: NextRequest) {
     
     if (!isValid) {
       return {
-        error: 'Unable to log in: user authentication — invalid UI token',
+        error: 'Unable to log in: user authentication / UI token verification - invalid UI token',
         code: 'UNAUTHORIZED',
         status: 401,
       } as const;
@@ -54,9 +55,14 @@ export async function verifyUiToken(request: NextRequest) {
       userId: 'admin',
     } as const;
   } catch (error) {
-    console.error('UI token verification error:', error);
+    logError({
+      consequence: 'Unable to verify token',
+      moduleProcess: 'user authentication / UI token verification',
+      cause: 'database lookup, token hash verification, or last-used update failed',
+      error,
+    });
     return {
-      error: 'Unable to verify token: authentication — internal error occurred',
+      error: 'Unable to verify token: user authentication / UI token verification - internal error occurred',
       code: 'INTERNAL_ERROR',
       status: 500,
     } as const;
@@ -71,7 +77,7 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return {
-      error: 'Unable to authenticate: session token validation — missing or invalid authorization header',
+      error: 'Unable to authenticate: session token validation / bearer header validation - missing or invalid authorization header',
       code: 'UNAUTHORIZED',
       status: 401,
     } as const;
@@ -94,7 +100,7 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
 
     if (candidates.length === 0) {
       return {
-        error: 'Unable to authenticate: session token validation — invalid token',
+        error: 'Unable to authenticate: session token validation / token prefix lookup - invalid token prefix',
         code: 'UNAUTHORIZED',
         status: 401,
       } as const;
@@ -112,7 +118,7 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
 
     if (!stored) {
       return {
-        error: 'Unable to authenticate: session token validation — invalid token',
+        error: 'Unable to authenticate: session token validation / token hash verification - invalid token signature',
         code: 'UNAUTHORIZED',
         status: 401,
       } as const;
@@ -121,7 +127,7 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
     // Check revoked
     if (stored.revoked) {
       return {
-        error: 'Unable to authenticate: session token validation — token has been revoked',
+        error: 'Unable to authenticate: session token validation / revocation check - token has been revoked',
         code: 'TOKEN_REVOKED',
         status: 401,
       } as const;
@@ -130,7 +136,7 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
     // Check expired
     if (stored.expiresAt && stored.expiresAt < new Date()) {
       return {
-        error: 'Unable to authenticate: session token validation — token has expired',
+        error: 'Unable to authenticate: session token validation / expiration check - token has expired',
         code: 'TOKEN_EXPIRED',
         status: 401,
       } as const;
@@ -139,7 +145,7 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
     // Check session match
     if (stored.sessionId !== sessionId) {
       return {
-        error: `Unable to access: session token validation — token is scoped to session ${stored.sessionId}, not ${sessionId}`,
+        error: `Unable to access: session token validation / session scope check - token is scoped to session ${stored.sessionId}, not ${sessionId}`,
         code: 'SESSION_MISMATCH',
         status: 403,
       } as const;
@@ -150,7 +156,7 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
     
     if (!isValid) {
       return {
-        error: 'Unable to authenticate: session token validation — invalid token signature',
+        error: 'Unable to authenticate: session token validation / final token hash verification - invalid token signature',
         code: 'UNAUTHORIZED',
         status: 401,
       } as const;
@@ -169,9 +175,14 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
       tokenId: stored.id,
     } as const;
   } catch (error) {
-    console.error('Session token verification error:', error);
+    logError({
+      consequence: 'Unable to verify token',
+      moduleProcess: 'session token validation / scoped token verification',
+      cause: 'token prefix lookup, hash verification, scope check, or last-used update failed',
+      error,
+    });
     return {
-      error: 'Unable to verify token: session token validation — internal error occurred',
+      error: 'Unable to verify token: session token validation / scoped token verification - internal error occurred',
       code: 'INTERNAL_ERROR',
       status: 500,
     } as const;

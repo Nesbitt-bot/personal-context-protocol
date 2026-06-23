@@ -3,6 +3,7 @@ import { verifyUiToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { sessions } from '@/lib/schema';
 import { createId } from '@/lib/auth';
+import { logError } from '@/lib/logging';
 import { eq, sql } from 'drizzle-orm';
 
 export async function POST(
@@ -19,7 +20,7 @@ export async function POST(
     
     if (!existing) {
       return NextResponse.json(
-        { error: 'Unable to archive session: resource lookup — session not found', code: 'NOT_FOUND' },
+        { error: 'Unable to archive session: session administration / session lookup - session not found', code: 'NOT_FOUND' },
         { status: 404 }
       );
     }
@@ -38,9 +39,14 @@ export async function POST(
 
     return NextResponse.json({ success: true, id: params.id, archived: true });
   } catch (error) {
-    console.error('Archive session error:', error);
+    logError({
+      consequence: 'Unable to archive session',
+      moduleProcess: 'session administration / archive session update',
+      cause: 'session lookup, archive update, or audit event insert failed',
+      error,
+    });
     return NextResponse.json(
-      { error: 'Unable to archive session: database update — internal error occurred', code: 'INTERNAL_ERROR' },
+      { error: 'Unable to archive session: session administration / archive session update - session lookup, archive update, or audit event insert failed', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }

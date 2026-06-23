@@ -17,18 +17,18 @@ from src.lib.logging import setup_logger, log_message
 logger = setup_logger(__name__)
 
 # Log milestones (kept forever)
-logger.info("Database connection established")
-logger.info("Starting batch processing: 1000 items")
+logger.info("Database can be queried: database connection / startup probe - connection established")
+logger.info("Batch can be tracked: batch processing / job startup - 1000 items queued")
 
 # Log progress (may be aged by age)
-logger.debug(f"Processed item {i} of {total}")
+logger.debug(f"Batch can be tracked: batch processing / item progress - processed item {i} of {total}")
 
 # Log warnings/errors (never aged out)
-logger.warning("Rate limit approaching: 450/500 requests")
-logger.error(f"Failed to process item {i}: {error}")
+logger.warning("Requests may be throttled: API client / rate-limit tracking - 450 of 500 requests used")
+logger.error(f"Item cannot be processed: batch processing / item transform - item {i} failed with {error}")
 
 # Or use convenience function
-log_message("INFO", "Operation completed successfully")
+log_message("INFO", "Operation result is available: batch processing / job completion - completed successfully")
 ```
 
 ## Log Levels
@@ -83,13 +83,13 @@ For operations > 1 minute:
 
 Example:
 ```python
-logger.info("Starting dataset processing: ~2 hours")
-logger.info("Stage 1: Data loaded (10000 records)")
-logger.debug("Processing batch 1/100...")
-logger.debug("Processing batch 50/100...")
-logger.info("Checkpoint: 50% complete, ETA 1 hour")
-logger.info("Stage 2: Processing complete")
-logger.info("Operation finished: 2 hours 15 minutes")
+logger.info("Dataset processing can be tracked: data pipeline / job startup - estimated runtime is 2 hours")
+logger.info("Dataset can be processed: data pipeline / input load - 10000 records loaded")
+logger.debug("Batch can be tracked: data pipeline / batch progress - processing batch 1 of 100")
+logger.debug("Batch can be tracked: data pipeline / batch progress - processing batch 50 of 100")
+logger.info("Interrupted work can resume: data pipeline / checkpoint persistence - 50% complete, ETA 1 hour")
+logger.info("Dataset output is ready: data pipeline / processing stage - stage 2 complete")
+logger.info("Dataset processing is complete: data pipeline / job completion - finished in 2 hours 15 minutes")
 ```
 
 ## Notifications

@@ -3,6 +3,7 @@ import { verifyUiToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { topics, sessions, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
+import { logError } from '@/lib/logging';
 import { createSessionSchema } from '@/lib/validations';
 import { eq } from 'drizzle-orm';
 
@@ -22,7 +23,7 @@ export async function POST(
     if (!validation.success) {
       return NextResponse.json(
         {
-          error: 'Unable to create session: request validation — invalid request body',
+          error: 'Unable to create session: session administration / request validation - invalid request body',
           code: 'VALIDATION_ERROR',
           details: validation.error.errors
         },
@@ -38,7 +39,7 @@ export async function POST(
     if (!topic || topic.archived) {
       return NextResponse.json(
         {
-          error: 'Unable to create session: resource lookup — topic not found',
+          error: 'Unable to create session: session administration / topic lookup - topic not found',
           code: 'NOT_FOUND'
         },
         { status: 404 }
@@ -77,9 +78,14 @@ export async function POST(
       last_message_at: null
     });
   } catch (error) {
-    console.error('Create session error:', error);
+    logError({
+      consequence: 'Unable to create session',
+      moduleProcess: 'session administration / create session transaction',
+      cause: 'topic lookup, session insert, or audit event insert failed',
+      error,
+    });
     return NextResponse.json(
-      { error: 'Unable to create session: database transaction — internal error occurred', code: 'INTERNAL_ERROR' },
+      { error: 'Unable to create session: session administration / create session transaction - topic lookup, session insert, or audit event insert failed', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }

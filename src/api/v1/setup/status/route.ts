@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { appInstance } from '@/lib/schema';
+import { logError } from '@/lib/logging';
 import { sql } from 'drizzle-orm';
 
 export async function GET() {
@@ -21,10 +22,17 @@ export async function GET() {
       needs_migration: false,
     });
   } catch (error) {
-    // Database not initialized or connection error
+    logError({
+      consequence: 'Unable to check setup status',
+      moduleProcess: 'app setup / initialization status database probe',
+      cause: 'app_instance lookup failed because the database is unavailable or the schema is missing',
+      error,
+    });
     return NextResponse.json({
       initialized: false,
       needs_migration: true,
+      error: 'Unable to check setup status: app setup / initialization status database probe - database unavailable or app_instance schema missing',
+      code: 'SETUP_STATUS_PROBE_FAILED',
     });
   }
 }

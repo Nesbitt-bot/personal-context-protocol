@@ -3,6 +3,7 @@ import { verifySessionToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { messages, sessions, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
+import { logError } from '@/lib/logging';
 import { appendMessagesSchema } from '@/lib/validations';
 import { sql, eq } from 'drizzle-orm';
 
@@ -23,7 +24,7 @@ export async function POST(
     if (!validation.success) {
       return NextResponse.json(
         {
-          error: 'Unable to append messages: request validation — invalid request body',
+          error: 'Unable to append messages: AI session recording / request validation - invalid request body',
           code: 'VALIDATION_ERROR',
           details: validation.error.errors,
         },
@@ -42,7 +43,7 @@ export async function POST(
     if (!session) {
       return NextResponse.json(
         {
-          error: 'Unable to append messages: resource lookup — session not found',
+          error: 'Unable to append messages: AI session recording / session lookup - session not found',
           code: 'NOT_FOUND',
         },
         { status: 404 },
@@ -52,7 +53,7 @@ export async function POST(
     if (session.archived) {
       return NextResponse.json(
         {
-          error: 'Unable to append messages: session state — session is archived',
+          error: 'Unable to append messages: AI session recording / session state check - session is archived',
           code: 'FORBIDDEN',
         },
         { status: 403 },
@@ -63,7 +64,7 @@ export async function POST(
     if (suggested_session_title && !authResult.canRenameSession) {
       return NextResponse.json(
         {
-          error: 'Unable to rename session: token permissions — this token cannot suggest session titles',
+          error: 'Unable to rename session: AI session recording / token permission check - this token cannot suggest session titles',
           code: 'FORBIDDEN',
         },
         { status: 403 },
@@ -156,10 +157,15 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error('Message append error:', error);
+    logError({
+      consequence: 'Unable to append messages',
+      moduleProcess: 'AI session recording / append message transaction',
+      cause: 'session lookup, ordinal calculation, message insert, session update, or audit event insert failed',
+      error,
+    });
     return NextResponse.json(
       {
-        error: 'Unable to append messages: database transaction — internal error occurred',
+        error: 'Unable to append messages: AI session recording / append message transaction - session lookup, ordinal calculation, message insert, session update, or audit event insert failed',
         code: 'INTERNAL_ERROR',
       },
       { status: 500 },

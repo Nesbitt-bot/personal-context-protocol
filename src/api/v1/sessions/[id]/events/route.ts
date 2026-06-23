@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { verifyUiToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { events, sessions } from '@/lib/schema';
+import { logError } from '@/lib/logging';
 import { eq } from 'drizzle-orm';
 
 export async function GET(
@@ -19,7 +20,7 @@ export async function GET(
     
     if (!session) {
       return NextResponse.json(
-        { error: 'Unable to get events: resource lookup — session not found', code: 'NOT_FOUND' },
+        { error: 'Unable to get events: session review / session lookup - session not found', code: 'NOT_FOUND' },
         { status: 404 }
       );
     }
@@ -31,9 +32,14 @@ export async function GET(
 
     return NextResponse.json({ events: allEvents });
   } catch (error) {
-    console.error('Get events error:', error);
+    logError({
+      consequence: 'Unable to get events',
+      moduleProcess: 'session review / event list query',
+      cause: 'session lookup or event query failed',
+      error,
+    });
     return NextResponse.json(
-      { error: 'Unable to get events: database query — internal error occurred', code: 'INTERNAL_ERROR' },
+      { error: 'Unable to get events: session review / event list query - session lookup or event query failed', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }

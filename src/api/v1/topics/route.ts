@@ -3,6 +3,7 @@ import { verifyUiToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { topics, sessions, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
+import { logError } from '@/lib/logging';
 import { createTopicSchema } from '@/lib/validations';
 import { eq, sql } from 'drizzle-orm';
 
@@ -29,9 +30,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ topics: topicsWithCount });
   } catch (error) {
-    console.error('List topics error:', error);
+    logError({
+      consequence: 'Unable to list topics',
+      moduleProcess: 'topic administration / topic list query',
+      cause: 'topic or session count query failed',
+      error,
+    });
     return NextResponse.json(
-      { error: 'Unable to list topics: database query — internal error occurred', code: 'INTERNAL_ERROR' },
+      { error: 'Unable to list topics: topic administration / topic list query - topic or session count query failed', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }
@@ -50,7 +56,7 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json(
         {
-          error: 'Unable to create topic: request validation — invalid request body',
+          error: 'Unable to create topic: topic administration / request validation - invalid request body',
           code: 'VALIDATION_ERROR',
           details: validation.error.errors
         },
@@ -69,7 +75,7 @@ export async function POST(request: NextRequest) {
     if (existing && !existing.archived) {
       return NextResponse.json(
         {
-          error: 'Unable to create topic: validation — topic title already exists',
+          error: 'Unable to create topic: topic administration / duplicate title validation - topic title already exists',
           code: 'VALIDATION_ERROR'
         },
         { status: 400 }
@@ -105,9 +111,14 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Create topic error:', error);
+    logError({
+      consequence: 'Unable to create topic',
+      moduleProcess: 'topic administration / create topic transaction',
+      cause: 'duplicate lookup, topic insert, or audit event insert failed',
+      error,
+    });
     return NextResponse.json(
-      { error: 'Unable to create topic: database transaction — internal error occurred', code: 'INTERNAL_ERROR' },
+      { error: 'Unable to create topic: topic administration / create topic transaction - duplicate lookup, topic insert, or audit event insert failed', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }

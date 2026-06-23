@@ -28,6 +28,16 @@ logs/
 # Testing
 coverage/
 .pitest/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+tsconfig.tsbuildinfo
 
 # IDE
 .idea/

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { diagnosticMessage, errorCause } from '@/lib/logging';
 
 export default function SetupPage() {
   const [initialized, setInitialized] = useState(false);
@@ -17,8 +18,15 @@ export default function SetupPage() {
       const res = await fetch('/api/v1/setup/status');
       const data = await res.json();
       setInitialized(data.initialized);
+      if (data.error) {
+        setError(data.error);
+      }
     } catch (err) {
-      setError('Unable to check setup status');
+      setError(diagnosticMessage({
+        consequence: 'Unable to check setup status',
+        moduleProcess: 'app setup / status request',
+        cause: `browser could not read /api/v1/setup/status; ${errorCause(err)}`,
+      }));
     } finally {
       setLoading(false);
     }
@@ -39,10 +47,18 @@ export default function SetupPage() {
         setInitialized(true);
         setError('');
       } else {
-        setError(data.error || 'Initialization failed');
+        setError(data.error || diagnosticMessage({
+          consequence: 'Unable to initialize database',
+          moduleProcess: 'app setup / initialize database request',
+          cause: 'API response did not include a UI token or structured error',
+        }));
       }
     } catch (err) {
-      setError('Unable to initialize database');
+      setError(diagnosticMessage({
+        consequence: 'Unable to initialize database',
+        moduleProcess: 'app setup / initialize database request',
+        cause: `browser could not reach /api/v1/setup/init or parse its response; ${errorCause(err)}`,
+      }));
     }
   }
 

@@ -61,7 +61,10 @@ def setup_logger(name: str, log_dir: str = None) -> logging.Logger:
     logger.addHandler(file_handler)
     
     # Log startup message
-    logger.info(f"Logger initialized: {log_file}")
+    logger.info(
+        "Operational logs can be replayed: structured logging / logger initialization "
+        f"- per-run log file created at {log_file}"
+    )
     
     return logger
 
@@ -71,9 +74,9 @@ def log_message(level: str, message: str, logger: logging.Logger = None):
     Log a message at the specified level.
     
     Usage:
-        log_message("INFO", "Data loaded successfully")
-        log_message("DEBUG", f"Processing item {i} of {total}")
-        log_message("ERROR", f"Failed to process: {error}")
+        log_message("INFO", "Dataset can be processed: data pipeline / load input - 10000 records loaded")
+        log_message("DEBUG", f"Batch can be tracked: data pipeline / batch progress - processed {i} of {total}")
+        log_message("ERROR", f"Batch cannot be completed: data pipeline / item processing - {error}")
     """
     if logger is None:
         logger = setup_logger(__name__)

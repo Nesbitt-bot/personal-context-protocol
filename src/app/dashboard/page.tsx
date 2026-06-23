@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { diagnosticMessage, errorCause, logError } from '@/lib/logging';
 
 interface Topic {
   id: string;
@@ -40,7 +41,7 @@ export default function Dashboard() {
     try {
       const uiToken = localStorage.getItem('ui_token');
       if (!uiToken) {
-        setError('Not authenticated. Please go to setup page first.');
+        setError('Unable to load dashboard: user authentication / local UI token lookup - ui_token missing from browser storage. Return to setup first.');
         setLoading(false);
         return;
       }
@@ -52,9 +53,15 @@ export default function Dashboard() {
       const data = await res.json();
       if (data.topics) {
         setTopics(data.topics);
+      } else if (data.error) {
+        setError(data.error);
       }
     } catch (err) {
-      setError('Unable to load topics');
+      setError(diagnosticMessage({
+        consequence: 'Unable to load topics',
+        moduleProcess: 'topic administration / list topics request',
+        cause: `browser could not reach /api/v1/topics or parse its response; ${errorCause(err)}`,
+      }));
     } finally {
       setLoading(false);
     }
@@ -72,7 +79,12 @@ export default function Dashboard() {
         setSessions(data.sessions);
       }
     } catch (err) {
-      console.error('Load sessions error:', err);
+      logError({
+        consequence: 'Unable to load sessions',
+        moduleProcess: 'session administration / list sessions request',
+        cause: `browser could not reach /api/v1/topics/${topicId}/sessions or parse its response`,
+        error: err,
+      });
     }
   }
 
@@ -95,10 +107,14 @@ export default function Dashboard() {
         setNewTopicTitle('');
         loadTopics();
       } else {
-        setError(data.error || 'Failed to create topic');
+        setError(data.error || 'Unable to create topic: topic administration / create topic request - API response did not include success or structured error');
       }
     } catch (err) {
-      setError('Unable to create topic');
+      setError(diagnosticMessage({
+        consequence: 'Unable to create topic',
+        moduleProcess: 'topic administration / create topic request',
+        cause: `browser could not reach /api/v1/topics or parse its response; ${errorCause(err)}`,
+      }));
     }
   }
 
@@ -123,10 +139,14 @@ export default function Dashboard() {
       if (data.success) {
         loadSessions(selectedTopic.id);
       } else {
-        setError(data.error || 'Failed to create session');
+        setError(data.error || 'Unable to create session: session administration / create session request - API response did not include success or structured error');
       }
     } catch (err) {
-      setError('Unable to create session');
+      setError(diagnosticMessage({
+        consequence: 'Unable to create session',
+        moduleProcess: 'session administration / create session request',
+        cause: `browser could not reach /api/v1/topics/${selectedTopic.id}/sessions or parse its response; ${errorCause(err)}`,
+      }));
     }
   }
 
@@ -290,10 +310,14 @@ Instructions for AI:
                                 alert(instructions);
                                 navigator.clipboard.writeText(instructions);
                               } else {
-                                setError(data.error || 'Failed to create token');
+                                setError(data.error || 'Unable to create token: session token administration / create token request - API response did not include token or structured error');
                               }
                             } catch (err) {
-                              setError('Unable to create token');
+                              setError(diagnosticMessage({
+                                consequence: 'Unable to create token',
+                                moduleProcess: 'session token administration / create token request',
+                                cause: `browser could not reach /api/v1/sessions/${session.id}/tokens or parse its response; ${errorCause(err)}`,
+                              }));
                             }
                           }}
                           style={{
