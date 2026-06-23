@@ -24,7 +24,6 @@ extensions = [
 html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
     'navigation_depth': 4,
-    'display_version': True,
     'collapse_navigation': False,
 }
 
@@ -44,7 +43,7 @@ suppress_warnings = [
 
 # File patterns
 templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'index.rst']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # Static files
 html_static_path = ['_static']

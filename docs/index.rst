@@ -1,5 +1,5 @@
 Personal Context Protocol Documentation
-==============>=====================
+=======================================
 
 .. toctree::
    :maxdepth: 2

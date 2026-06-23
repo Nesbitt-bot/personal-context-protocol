@@ -58,3 +58,8 @@ Append what this round actually did below:
   - Set up AGENTS.md, CLAUDE.md, CODEX.md
   - Created documentation skeleton
   - TODO: Implement actual application code
+- 2026-06-23 - Fixed Sphinx documentation build root document configuration
+  - Removed `index.rst` from Sphinx exclude patterns so the root document loads
+  - Repaired the `docs/index.rst` heading underline
+  - Added root `VERSION` with the current project version
+  - Allowed placeholder `.env.example` files to remain trackable

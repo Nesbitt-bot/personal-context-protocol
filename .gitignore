@@ -16,7 +16,6 @@ build/
 .env.production.local
 *.env
 *.bark.env
-*.env.example
 
 # Logs (per AGENTS.md guidelines)
 *.log
