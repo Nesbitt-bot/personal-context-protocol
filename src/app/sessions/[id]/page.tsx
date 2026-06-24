@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Clipboard, KeyRound, Link2, MessageSquare, Settings2 } from 'lucide-react';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { buildAgentInstruction } from '@/lib/agent-protocol';
 
 interface SessionRecord {
   id: string;
@@ -163,10 +164,14 @@ export default function SessionDetail() {
         return;
       }
 
+      // Build the recording URL from the actual page origin so it always matches
+      // where the user opened the UI, regardless of how PCP_APP_URL is set.
+      const url = `${window.location.origin}/r/${sessionId}`;
+      const text = buildAgentInstruction(url, data.access_token);
       setAccessToken(data.access_token);
-      setInstruction(data.instruction);
-      setRecordingUrl(data.recording_url);
-      await navigator.clipboard.writeText(data.instruction).catch(() => undefined);
+      setInstruction(text);
+      setRecordingUrl(url);
+      await navigator.clipboard.writeText(text).catch(() => undefined);
       await loadSession();
     } catch (err) {
       setError(diagnosticMessage({

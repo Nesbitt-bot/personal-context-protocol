@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { buildRecordingUrl, parseRecordingUrl, resolveAppBaseUrl } from '../src/lib/recording-url';
 import { buildAgentInstruction, buildAgentProtocol } from '../src/lib/agent-protocol';
 import { parseIngestPayload } from '../src/lib/ingest';
@@ -31,6 +31,29 @@ describe('recording URL', () => {
   it('round-trips build then parse', () => {
     const url = buildRecordingUrl(resolveAppBaseUrl('https://host.test'), 'ses_round');
     expect(parseRecordingUrl(url)).toEqual({ sessionId: 'ses_round' });
+  });
+
+  describe('resolveAppBaseUrl hardening', () => {
+    const original = process.env.PCP_APP_URL;
+    afterEach(() => {
+      if (original === undefined) delete process.env.PCP_APP_URL;
+      else process.env.PCP_APP_URL = original;
+    });
+
+    it('uses a valid PCP_APP_URL', () => {
+      process.env.PCP_APP_URL = 'https://pcp.example.com/';
+      expect(resolveAppBaseUrl('https://origin.test')).toBe('https://pcp.example.com');
+    });
+
+    it('falls back to the request origin when PCP_APP_URL is an unexpanded template', () => {
+      process.env.PCP_APP_URL = '${VERCEL_URL}';
+      expect(resolveAppBaseUrl('https://origin.test')).toBe('https://origin.test');
+    });
+
+    it('falls back to the request origin when PCP_APP_URL is not absolute', () => {
+      process.env.PCP_APP_URL = 'pcp.example.com';
+      expect(resolveAppBaseUrl('https://origin.test')).toBe('https://origin.test');
+    });
   });
 });
 

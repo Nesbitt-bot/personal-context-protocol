@@ -42,3 +42,13 @@ textarea {
   transition-property: background-color, border-color, color, opacity, box-shadow, transform;
   transition-timing-function: ease-out;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

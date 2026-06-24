@@ -107,5 +107,5 @@ npm run notify:bark -- "message body"
 ```
 
 The notifier prefixes every message with the app name and version, for example
-`personal-context-protocol v0.1.6: message body`, and forces passive delivery.
+`personal-context-protocol v0.1.7: message body`, and forces passive delivery.
 Never echo config values in logs.

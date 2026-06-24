@@ -6,9 +6,11 @@ import Link from 'next/link';
 import { SiteNav } from '@/components/site-nav';
 import { NavSidebar } from '@/components/dashboard/nav-sidebar';
 import { SessionWorkspace } from '@/components/dashboard/session-workspace';
+import { TokenModal } from '@/components/dashboard/token-modal';
 import { EventLog, Message, Session, Topic } from '@/components/dashboard/types';
 import { readJsonResponse } from '@/lib/http';
-import { diagnosticMessage, errorCause, logError } from '@/lib/logging';
+import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { buildAgentInstruction } from '@/lib/agent-protocol';
 
 function getUiToken() {
   if (typeof window === 'undefined') return null;
@@ -40,6 +42,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [hasUiToken, setHasUiToken] = useState(false);
   const [uiTokenSource, setUiTokenSource] = useState<string | null>(null);
+  const [tokenModalSession, setTokenModalSession] = useState<Session | null>(null);
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) || null;
   const selectedTopic = topics.find((topic) => topic.id === selectedSession?.topic_id) || null;
@@ -294,7 +297,7 @@ export default function Dashboard() {
     }
   }
 
-  async function updateSession(sessionId: string, fields: { title?: string; topic_id?: string | null; archived?: boolean }) {
+  async function updateSession(sessionId: string, fields: { title?: string; topic_id?: string | null; archived?: boolean; public?: boolean }) {
     try {
       const res = await fetch(`/api/v1/sessions/${sessionId}`, {
         method: 'PATCH',
@@ -353,6 +356,12 @@ export default function Dashboard() {
     }
   }
 
+  async function togglePublic(session: Session, next: boolean) {
+    if (await updateSession(session.id, { public: next })) {
+      setStatus(next ? 'Session is now public (read-only link).' : 'Session is now private.');
+    }
+  }
+
   async function restoreSelectedSession() {
     if (!selectedSession) return;
     if (await updateSession(selectedSession.id, { archived: false })) {
@@ -376,9 +385,12 @@ export default function Dashboard() {
         setError(data.error || 'Unable to create token: session token administration / create token request - API response did not include access token');
         return;
       }
-      setGeneratedToken(data.instruction);
+      // Build from the page origin so the recording URL matches where the UI is open.
+      const url = `${window.location.origin}/r/${session.id}`;
+      const instruction = buildAgentInstruction(url, data.access_token);
+      setGeneratedToken(instruction);
       setStatus('Recording URL + access token created. Copy them now; the token will not be shown again.');
-      await navigator.clipboard.writeText(data.instruction).catch(() => undefined);
+      await navigator.clipboard.writeText(instruction).catch(() => undefined);
     } catch (err) {
       setError(diagnosticMessage({
         consequence: 'Unable to create token',
@@ -446,8 +458,17 @@ export default function Dashboard() {
           onArchiveSelectedSession={archiveSelectedSession}
           onRestoreSelectedSession={restoreSelectedSession}
           onGenerateToken={generateToken}
+          onManageTokens={setTokenModalSession}
+          onTogglePublic={togglePublic}
         />
       </div>
+      {tokenModalSession && (
+        <TokenModal
+          sessionId={tokenModalSession.id}
+          sessionTitle={tokenModalSession.title}
+          onClose={() => setTokenModalSession(null)}
+        />
+      )}
     </main>
   );
 }

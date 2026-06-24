@@ -11,6 +11,7 @@ export interface Session {
   id: string;
   topic_id: string | null;
   title: string;
+  public?: boolean;
   archived: boolean;
   created_at: string;
   updated_at?: string;

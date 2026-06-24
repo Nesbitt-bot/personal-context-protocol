@@ -56,9 +56,18 @@ export const updateSessionSchema = z.object({
   // null moves the session to "no topic" (uncategorized).
   topic_id: z.string().min(1).nullable().optional(),
   archived: z.boolean().optional(),
+  public: z.boolean().optional(),
 }).refine((value) => (
-  value.title !== undefined || value.topic_id !== undefined || value.archived !== undefined
+  value.title !== undefined
+  || value.topic_id !== undefined
+  || value.archived !== undefined
+  || value.public !== undefined
 ), 'At least one session field is required');
+
+// Token management
+export const revokeTokenSchema = z.object({
+  token_id: z.string().min(1),
+});
 
 // Token schemas. `name` is optional (server defaults it) and `expires_in`
 // chooses the lifetime; default is 7 days, "never" stores a NULL expiry.

@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         id: sessions.id,
         topic_id: sessions.topicId,
         title: sessions.title,
+        public: sessions.public,
         archived: sessions.archived,
         created_at: sessions.createdAt,
         updated_at: sessions.updatedAt,

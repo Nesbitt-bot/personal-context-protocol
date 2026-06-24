@@ -111,14 +111,14 @@ export default function HomePage() {
 
       <section className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:py-14">
         <div className="min-w-0">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Human-owned AI memory</p>
-          <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-normal text-slate-950 dark:text-white sm:text-5xl">
+          <p className="mb-3 animate-fade-in-up text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Human-owned AI memory</p>
+          <h1 className="max-w-3xl animate-fade-in-up text-4xl font-semibold leading-tight tracking-normal text-slate-950 dark:text-white sm:text-5xl" style={{ animationDelay: '60ms' }}>
             Personal Context Protocol
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
+          <p className="mt-5 max-w-2xl animate-fade-in-up text-base leading-7 text-slate-600 dark:text-slate-300" style={{ animationDelay: '140ms' }}>
             PCP is a small control plane for AI session context. It gives humans a dashboard for topics, sessions, tokens, review, and export while keeping agent writes scoped and auditable.
           </p>
-          <div className="mt-7 flex flex-wrap gap-3">
+          <div className="mt-7 flex animate-fade-in-up flex-wrap gap-3" style={{ animationDelay: '220ms' }}>
             <Link
               className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
               href="/login"
@@ -136,7 +136,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+        <div className="animate-fade-in-up rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900" style={{ animationDelay: '300ms' }}>
           <div className="mb-5 flex items-center gap-3">
             <div className="rounded-md bg-slate-950 p-3 text-white dark:bg-sky-400 dark:text-slate-950">
               <Database size={24} />
@@ -224,10 +224,14 @@ export default function HomePage() {
       </section>
 
       <section className="mx-auto grid max-w-7xl gap-3 px-4 pb-12 sm:px-6 md:grid-cols-2 xl:grid-cols-4">
-        {features.map((feature) => {
+        {features.map((feature, index) => {
           const Icon = feature.icon;
           return (
-            <article key={feature.title} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <article
+              key={feature.title}
+              className="animate-fade-in-up rounded-md border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              style={{ animationDelay: `${380 + index * 80}ms` }}
+            >
               <Icon size={20} className="mb-3 text-sky-700 dark:text-sky-300" />
               <h2 className="text-sm font-semibold text-slate-950 dark:text-slate-50">{feature.title}</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">{feature.text}</p>

@@ -20,7 +20,9 @@ Personal Context Protocol stores AI conversation context in user-managed topics 
   `Authorization: Bearer <access-token>`.
 - Agents append messages to their assigned session only, or send a compaction
   when full upload is impossible. They never manage topics.
-- The admin dashboard previews sessions, events, token status, and exports.
+- The admin dashboard previews sessions, events, token status, and exports;
+  tokens can be revoked from a modal, and a session can be made public for a
+  read-only shared view at `/s/<sessionId>`.
 
 ## Quick Deploy
 
@@ -50,7 +52,7 @@ If you entered the wrong password: find the current token in your **most recent*
 
 ## Docker Compose Deployment
 
-Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.6; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
+Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.7; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
 
 ## Local Development
 

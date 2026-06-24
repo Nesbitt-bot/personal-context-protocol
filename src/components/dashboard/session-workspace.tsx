@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Archive, Check, Clipboard, Edit3, KeyRound, MessageSquare, RotateCcw, Settings2 } from 'lucide-react';
+import { useState } from 'react';
+import { Archive, Check, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, MessageSquare, RotateCcw, Settings2 } from 'lucide-react';
 import { formatDate } from './format';
 import { EventLog, Message, Session, Topic } from './types';
 
@@ -29,6 +30,8 @@ interface SessionWorkspaceProps {
   onArchiveSelectedSession: () => void;
   onRestoreSelectedSession: () => void;
   onGenerateToken: (session: Session) => void;
+  onManageTokens: (session: Session) => void;
+  onTogglePublic: (session: Session, next: boolean) => void;
 }
 
 function messageTone(role: string) {
@@ -65,7 +68,17 @@ export function SessionWorkspace({
   onArchiveSelectedSession,
   onRestoreSelectedSession,
   onGenerateToken,
+  onManageTokens,
+  onTogglePublic,
 }: SessionWorkspaceProps) {
+  const [copiedPublic, setCopiedPublic] = useState(false);
+
+  function copyPublicLink(sessionId: string) {
+    const url = `${window.location.origin}/s/${sessionId}`;
+    navigator.clipboard.writeText(url).catch(() => undefined);
+    setCopiedPublic(true);
+    window.setTimeout(() => setCopiedPublic(false), 1500);
+  }
   return (
     <section className="min-w-0 bg-white dark:bg-slate-950">
       <div className="flex min-h-screen flex-col">
@@ -108,6 +121,16 @@ export function SessionWorkspace({
                 </div>
                 <h2 className="truncate text-2xl font-semibold text-slate-950 dark:text-white">{selectedSession.title}</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Last activity: {formatDate(selectedSession.last_message_at)}</p>
+                {selectedSession.public && (
+                  <button
+                    className="mt-2 inline-flex items-center gap-2 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    onClick={() => copyPublicLink(selectedSession.id)}
+                    type="button"
+                    title="Copy the public read-only link"
+                  >
+                    <Globe size={13} /> {copiedPublic ? 'Copied public link' : `Public · ${window.location.origin}/s/${selectedSession.id}`}
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" onClick={onStartEditSession} type="button">
@@ -115,6 +138,19 @@ export function SessionWorkspace({
                 </button>
                 <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => onGenerateToken(selectedSession)} type="button">
                   <span className="inline-flex items-center gap-2"><KeyRound size={16} /> Token</span>
+                </button>
+                <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => onManageTokens(selectedSession)} type="button">
+                  <span className="inline-flex items-center gap-2"><ListChecks size={16} /> Tokens</span>
+                </button>
+                <button
+                  className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                  onClick={() => onTogglePublic(selectedSession, !selectedSession.public)}
+                  type="button"
+                  title={selectedSession.public ? 'Make private' : 'Make public (read-only link)'}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    {selectedSession.public ? <><Lock size={16} /> Make private</> : <><Globe size={16} /> Make public</>}
+                  </span>
                 </button>
                 {selectedSession.archived ? (
                   <button className="rounded-md border border-emerald-200 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/40" onClick={onRestoreSelectedSession} type="button">

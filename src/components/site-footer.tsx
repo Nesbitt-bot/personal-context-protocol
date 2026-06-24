@@ -1,3 +1,5 @@
+import { APP_VERSION } from '@/lib/version';
+
 const docsBaseUrl = 'https://nesbitt-bot.github.io/personal-context-protocol/';
 
 const links = [
@@ -19,6 +21,9 @@ export function SiteFooter() {
           <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">Personal Context Protocol</p>
           <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
             A scoped context layer for AI sessions: humans organize the workspace, agents append evidence, and exports stay reviewable.
+          </p>
+          <p className="mt-3 font-mono text-xs text-slate-400 dark:text-slate-500" title="Deployed app version">
+            v{APP_VERSION}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

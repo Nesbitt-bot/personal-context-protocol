@@ -1,11 +1,11 @@
 services:
   app:
-    image: personal-context-protocol:${PCP_VERSION:-0.1.6}
+    image: personal-context-protocol:${PCP_VERSION:-0.1.7}
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        APP_VERSION: "${PCP_VERSION:-0.1.6}"
+        APP_VERSION: "${PCP_VERSION:-0.1.7}"
     depends_on:
       db:
         condition: service_healthy

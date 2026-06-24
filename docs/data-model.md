@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.6"
+  "version": "0.1.7"
 }
 ```
 
@@ -96,6 +96,7 @@ AI recording sessions, optionally within a topic.
 | `id` | TEXT | `ses_<timestamp>_<id>` |
 | `topic_id` | TEXT | Parent topic (foreign key, **nullable**: NULL = uncategorized) |
 | `title` | TEXT | Session title (may be suggested by AI) |
+| `public` | BOOLEAN | When true, a read-only view is available without the admin token |
 | `archived` | BOOLEAN | Soft delete flag |
 | `created_at` | TIMESTAMPTZ | Creation time |
 | `updated_at` | TIMESTAMPTZ | Last update time |
@@ -110,6 +111,11 @@ AI recording sessions, optionally within a topic.
 **Uncategorized**: a session may have no topic (`topic_id` NULL). The UI groups
 these under "Uncategorized". Title uniqueness is scoped to the group — sessions
 under the same topic, or all topic-less sessions.
+
+**Public sharing**: when `public` is true, anyone can read the session and its
+messages via `GET /api/v1/public/sessions/:id` and the `/s/:id` page, without the
+admin UI token. Private (default) sessions return 404 from that endpoint so their
+existence is not leaked. Tokens are never exposed on the public surface.
 
 **AI access**: AI can only view/append to sessions for which it has a valid token.
 
@@ -251,6 +257,9 @@ Audit trail for all actions.
 - `token.revoked`
 - `message.appended`
 - `compaction.recorded`
+- `token.revoked`
+- `session.shared`
+- `session.unshared`
 - `topic.created`
 - `topic.renamed`
 - `topic.archived`
@@ -425,3 +434,8 @@ LIMIT 50;
 
 - Corrected the 003 backfill: credentials not set in Settings default to
   `deploy` and rotate each deploy (migration 005)
+
+### v0.1.7 (public sharing + token revocation)
+
+- Added `sessions.public` for read-only public sharing (migration 006)
+- Token revocation API + dashboard modal; recording URL built from the page origin

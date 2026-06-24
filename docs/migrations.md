@@ -141,6 +141,14 @@ WHERE source = 'user' AND EXISTS (SELECT 1 FROM applied);
 Because the UPDATE runs only when the migration record is newly inserted, it
 never re-clobbers a genuine Settings-set token created after it applies.
 
+### 0005_public_session
+
+Public read-only sharing (idempotent, data-preserving):
+- `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false`
+
+Existing sessions default to private. When `public` is true the session is
+readable without the admin token via `GET /api/v1/public/sessions/:id`.
+
 ## Checking migration status
 
 ```bash
@@ -166,4 +174,4 @@ Drizzle doesn't support automatic rollbacks. Manual approach:
 
 Schema version is stored in `app_instance.version` and updated when migrations are applied.
 
-Current version: `0.1.6`
+Current version: `0.1.7`

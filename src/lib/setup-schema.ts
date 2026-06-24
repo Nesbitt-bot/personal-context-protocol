@@ -32,6 +32,7 @@ const SCHEMA_STATEMENTS = [
     id text PRIMARY KEY,
     topic_id text REFERENCES topics(id),
     title text NOT NULL,
+    public boolean NOT NULL DEFAULT false,
     archived boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -101,6 +102,8 @@ const SCHEMA_STATEMENTS = [
   // Allow uncategorized sessions (and their messages) to have no topic.
   'ALTER TABLE sessions ALTER COLUMN topic_id DROP NOT NULL',
   'ALTER TABLE messages ALTER COLUMN topic_id DROP NOT NULL',
+  // Public read-only sharing of a session.
+  'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false',
   `CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT now(),
@@ -163,5 +166,11 @@ export async function ensureDatabaseSchema() {
     )
     UPDATE ui_auth SET source = 'deploy', updated_at = now()
     WHERE source = 'user' AND EXISTS (SELECT 1 FROM applied)
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('006_public_session', 'session_public_sharing')
+    ON CONFLICT (version) DO NOTHING
   `);
 }

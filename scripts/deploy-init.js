@@ -70,6 +70,7 @@ function schemaStatements(version) {
       id text PRIMARY KEY,
       topic_id text REFERENCES topics(id),
       title text NOT NULL,
+      public boolean NOT NULL DEFAULT false,
       archived boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
@@ -143,6 +144,8 @@ function schemaStatements(version) {
     // Allow uncategorized sessions (and their messages) to have no topic.
     'ALTER TABLE sessions ALTER COLUMN topic_id DROP NOT NULL',
     'ALTER TABLE messages ALTER COLUMN topic_id DROP NOT NULL',
+    // Public read-only sharing of a session.
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false',
     'CREATE INDEX IF NOT EXISTS messages_session_id_idx ON messages(session_id)',
     'CREATE INDEX IF NOT EXISTS messages_topic_id_idx ON messages(topic_id)',
     'CREATE INDEX IF NOT EXISTS sessions_topic_id_idx ON sessions(topic_id)',

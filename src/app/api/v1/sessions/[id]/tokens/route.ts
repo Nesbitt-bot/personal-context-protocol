@@ -4,11 +4,11 @@ import { db } from '@/lib/db';
 import { sessionTokens, sessions, events } from '@/lib/schema';
 import { generateToken, generateSalt, hashToken, createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
-import { createTokenSchema } from '@/lib/validations';
+import { createTokenSchema, revokeTokenSchema } from '@/lib/validations';
 import { DEFAULT_EXPIRATION, resolveExpiresAt, tokenStatus } from '@/lib/token-expiration';
 import { buildRecordingUrl, resolveAppBaseUrl } from '@/lib/recording-url';
 import { buildAgentInstruction } from '@/lib/agent-protocol';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +58,69 @@ export async function GET(
     });
     return NextResponse.json(
       { error: 'Unable to list tokens: session token administration / token list query - token metadata query failed', code: 'INTERNAL_ERROR' },
+      { status: 500 },
+    );
+  }
+}
+
+/** Revoke an issued token by id. Revoked tokens are rejected on every request. */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const authResult = await verifyUiToken(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const validation = revokeTokenSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        {
+          error: 'Unable to revoke token: session token administration / request validation - token_id is required',
+          code: 'VALIDATION_ERROR',
+          details: validation.error.errors,
+        },
+        { status: 400 },
+      );
+    }
+
+    const [token] = await db
+      .select({ id: sessionTokens.id, name: sessionTokens.name, revoked: sessionTokens.revoked })
+      .from(sessionTokens)
+      .where(and(eq(sessionTokens.id, validation.data.token_id), eq(sessionTokens.sessionId, params.id)));
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unable to revoke token: session token administration / token lookup - token not found for this session', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    if (!token.revoked) {
+      await db.update(sessionTokens).set({ revoked: true }).where(eq(sessionTokens.id, token.id));
+      await db.insert(events).values({
+        id: createId('evt'),
+        sessionId: params.id,
+        action: 'token.revoked',
+        actor: 'human',
+        detailsJson: { token_id: token.id, token_name: token.name },
+        createdAt: new Date(),
+      });
+    }
+
+    return NextResponse.json({ success: true, id: token.id, revoked: true });
+  } catch (error) {
+    logError({
+      consequence: 'Unable to revoke token',
+      moduleProcess: 'session token administration / revoke token update',
+      cause: 'token lookup, revoke update, or audit event insert failed',
+      error,
+    });
+    return NextResponse.json(
+      { error: 'Unable to revoke token: session token administration / revoke token update - token lookup, revoke update, or audit event insert failed', code: 'INTERNAL_ERROR' },
       { status: 500 },
     );
   }

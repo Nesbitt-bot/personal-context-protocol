@@ -149,8 +149,9 @@ Body:
 ```
 
 At least one field is required. `topic_id: null` moves the session to
-Uncategorized (no topic). `archived: true` removes the session from the active
-list; `archived: false` restores it.
+Uncategorized (no topic). `public: true` enables a read-only public view;
+`public: false` makes it private again. `archived: true` removes the session
+from the active list; `archived: false` restores it.
 
 ### GET `/sessions/:id/review`
 
@@ -170,6 +171,11 @@ Archives a session.
 
 Lists token metadata for the session (never the secret): name, status
 (`active`, `expired`, `revoked`), `expires_at`, and `last_used_at`.
+
+### PATCH `/sessions/:sessionId/tokens`
+
+Revokes an issued token. A revoked token is rejected on every subsequent
+request. Body: `{ "token_id": "tok_..." }`.
 
 ### POST `/sessions/:sessionId/tokens`
 
@@ -297,6 +303,23 @@ Rules:
 - Topic fields are not accepted.
 - `suggested_session_title` requires a token with rename permission; the server
   normalizes it and auto-suffixes duplicates within the topic.
+
+## Public
+
+### GET `/public/sessions/:id` (public)
+
+Read-only view of a session and its messages when the session is marked
+`public`. No admin token required. A private or missing session returns 404 so a
+private session's existence is not leaked. Tokens are never exposed. The `/s/:id`
+page renders this.
+
+## Recording URL origin
+
+The browser UI builds the recording URL from `window.location.origin` (where the
+admin opened the app), so it always matches the deployment. Server-side,
+`PCP_APP_URL` is used only when it is a valid absolute `http(s)` URL; an
+unexpanded template such as the literal `${VERCEL_URL}` is ignored in favor of
+the request origin. `PCP_APP_URL` is about constructing absolute URLs, not CORS.
 
 ## Export
 

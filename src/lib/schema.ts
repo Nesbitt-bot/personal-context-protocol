@@ -35,10 +35,12 @@ export const topics = pgTable('topics', {
 });
 
 // Sessions. `topicId` is nullable: a session may be uncategorized (no topic).
+// `public` exposes a read-only view without the admin UI token.
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
   topicId: text('topic_id').references(() => topics.id),
   title: text('title').notNull(),
+  public: boolean('public').notNull().default(false),
   archived: boolean('archived').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

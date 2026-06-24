@@ -14,15 +14,31 @@
 
 export const RECORDING_PATH_PREFIX = '/r/';
 
+/** A usable base URL must be an absolute http(s) URL. This rejects unexpanded
+ * templates like the literal `${VERCEL_URL}` mistakenly set in PCP_APP_URL. */
+function isUsableBaseUrl(value: string): boolean {
+  if (!/^https?:\/\//i.test(value)) return false;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Resolve the public base URL of this deployment. Prefers `PCP_APP_URL`; falls
- * back to a per-request origin when one is supplied (e.g. derived from request
- * headers). Returns an empty string when neither is available so callers can
- * surface a configuration diagnostic instead of emitting a broken URL.
+ * Resolve the public base URL of this deployment. Prefers `PCP_APP_URL` only when
+ * it is a valid absolute http(s) URL; otherwise falls back to the per-request
+ * origin (where the user actually opened the app). Returns an empty string when
+ * neither is usable so callers can surface a configuration diagnostic instead of
+ * emitting a broken URL. The browser UI builds recording URLs from
+ * `window.location.origin` directly, so a misconfigured PCP_APP_URL never
+ * reaches the copied instruction.
  */
 export function resolveAppBaseUrl(requestOrigin?: string | null): string {
   const configured = (process.env.PCP_APP_URL || '').trim();
-  const base = configured || (requestOrigin || '').trim();
+  const origin = (requestOrigin || '').trim();
+  const base = isUsableBaseUrl(configured) ? configured : origin;
   return base.replace(/\/+$/, '');
 }
 

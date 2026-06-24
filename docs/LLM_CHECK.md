@@ -122,6 +122,14 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-24 - Public sessions, token revocation, recording-URL origin fix, front-page polish (v0.1.7)
+  - Patch-bumped release metadata to 0.1.7
+  - Added `sessions.public` (migration 006); `GET /api/v1/public/sessions/:id` and `/s/:id` render a read-only view without the admin token; private sessions return 404 to avoid leaking existence
+  - Token revocation: `PATCH /api/v1/sessions/:id/tokens { token_id }` sets revoked + audit event; dashboard token-management modal lists tokens with one-click revoke; workspace gained a public/private toggle + copyable public link
+  - Recording URL: hardened `resolveAppBaseUrl` to ignore a non-absolute PCP_APP_URL (e.g. the literal `${VERCEL_URL}`) and fall back to request origin; the browser now builds the recording URL + instruction from `window.location.origin` so it always matches where the UI is open
+  - Front page: staggered fade-in-up load animations (with prefers-reduced-motion guard); footer shows the deployed `vX.Y.Z`
+  - Added resolveAppBaseUrl tests; 46 tests pass
+  - Verified live: public read returns messages only when public (404 when private), token revoke rejects the agent immediately
 - 2026-06-24 - Fixed admin token not rotating on deploy (v0.1.6)
   - Root cause: migration 003 backfilled pre-existing credentials as `source = 'user'`, which preserved them forever, so a new deploy printed "user-set admin credential preserved" and generated no token
   - Added one-time, self-guarded migration 005 (`0004_default_token_rotates.sql`) that resets mis-marked `user` rows to `deploy`; mirrored in deploy-init and ensureDatabaseSchema. After it runs, the deploy generates and prints a fresh token

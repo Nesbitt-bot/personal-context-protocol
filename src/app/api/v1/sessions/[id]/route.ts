@@ -28,6 +28,7 @@ export async function GET(
         id: sessions.id,
         topicId: sessions.topicId,
         title: sessions.title,
+        public: sessions.public,
         archived: sessions.archived,
         createdAt: sessions.createdAt,
         updatedAt: sessions.updatedAt,
@@ -96,7 +97,7 @@ export async function PATCH(
       );
     }
 
-    const { title, topic_id, archived } = validation.data;
+    const { title, topic_id, archived, public: isPublic } = validation.data;
 
     if (topic_id) {
       const [targetTopic] = await db.select().from(topics).where(eq(topics.id, topic_id));
@@ -112,6 +113,7 @@ export async function PATCH(
       ...(title !== undefined ? { title } : {}),
       ...(topic_id !== undefined ? { topicId: topic_id } : {}),
       ...(archived !== undefined ? { archived } : {}),
+      ...(isPublic !== undefined ? { public: isPublic } : {}),
       updatedAt: new Date(),
     };
 
@@ -124,7 +126,8 @@ export async function PATCH(
       id: createId('evt'),
       sessionId: params.id,
       topicId: nextTopicId ?? existing.topicId,
-      action: archived === true ? 'session.archived' : archived === false ? 'session.restored' : 'session.updated',
+      action: archived === true ? 'session.archived' : archived === false ? 'session.restored'
+        : isPublic === true ? 'session.shared' : isPublic === false ? 'session.unshared' : 'session.updated',
       actor: 'human',
       detailsJson: {
         old_title: existing.title,
@@ -132,6 +135,7 @@ export async function PATCH(
         old_topic_id: existing.topicId,
         new_topic_id: nextTopicId,
         archived: archived ?? existing.archived,
+        public: isPublic ?? existing.public,
       },
       createdAt: new Date(),
     });
@@ -142,6 +146,7 @@ export async function PATCH(
       title: title ?? existing.title,
       topic_id: nextTopicId,
       archived: archived ?? existing.archived,
+      public: isPublic ?? existing.public,
     });
   } catch (error) {
     logError({
