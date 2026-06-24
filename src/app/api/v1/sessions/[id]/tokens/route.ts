@@ -4,10 +4,11 @@ import { db } from '@/lib/db';
 import { sessionTokens, sessions, events } from '@/lib/schema';
 import { generateToken, generateSalt, hashToken, createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
-import { createTokenSchema, revokeTokenSchema } from '@/lib/validations';
+import { createTokenSchema, manageTokenSchema } from '@/lib/validations';
 import { DEFAULT_EXPIRATION, resolveExpiresAt, tokenStatus } from '@/lib/token-expiration';
 import { buildRecordingUrl, resolveAppBaseUrl } from '@/lib/recording-url';
-import { buildAgentInstruction } from '@/lib/agent-protocol';
+import { buildAgentInstruction, normalizeRecordingMode } from '@/lib/agent-protocol';
+import { uniqueTokenName } from '@/lib/session-store';
 import { and, desc, eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
@@ -63,7 +64,7 @@ export async function GET(
   }
 }
 
-/** Revoke an issued token by id. Revoked tokens are rejected on every request. */
+/** Rename and/or revoke an issued token. Revoked tokens are rejected everywhere. */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
@@ -75,11 +76,11 @@ export async function PATCH(
     }
 
     const body = await request.json().catch(() => ({}));
-    const validation = revokeTokenSchema.safeParse(body);
+    const validation = manageTokenSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
         {
-          error: 'Unable to revoke token: session token administration / request validation - token_id is required',
+          error: 'Unable to update token: session token administration / request validation - provide token_id and a new name or revoke: true',
           code: 'VALIDATION_ERROR',
           details: validation.error.errors,
         },
@@ -94,12 +95,26 @@ export async function PATCH(
 
     if (!token) {
       return NextResponse.json(
-        { error: 'Unable to revoke token: session token administration / token lookup - token not found for this session', code: 'NOT_FOUND' },
+        { error: 'Unable to update token: session token administration / token lookup - token not found for this session', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
 
-    if (!token.revoked) {
+    // Rename: keep names distinct within the session to avoid confusion.
+    if (validation.data.name !== undefined) {
+      const newName = await uniqueTokenName(params.id, validation.data.name, token.name, token.id);
+      await db.update(sessionTokens).set({ name: newName }).where(eq(sessionTokens.id, token.id));
+      await db.insert(events).values({
+        id: createId('evt'),
+        sessionId: params.id,
+        action: 'token.renamed',
+        actor: 'human',
+        detailsJson: { token_id: token.id, old_name: token.name, new_name: newName },
+        createdAt: new Date(),
+      });
+    }
+
+    if (validation.data.revoke === true && !token.revoked) {
       await db.update(sessionTokens).set({ revoked: true }).where(eq(sessionTokens.id, token.id));
       await db.insert(events).values({
         id: createId('evt'),
@@ -111,16 +126,16 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json({ success: true, id: token.id, revoked: true });
+    return NextResponse.json({ success: true, id: token.id, revoked: validation.data.revoke === true || token.revoked });
   } catch (error) {
     logError({
-      consequence: 'Unable to revoke token',
-      moduleProcess: 'session token administration / revoke token update',
-      cause: 'token lookup, revoke update, or audit event insert failed',
+      consequence: 'Unable to update token',
+      moduleProcess: 'session token administration / manage token update',
+      cause: 'token lookup, rename, revoke update, or audit event insert failed',
       error,
     });
     return NextResponse.json(
-      { error: 'Unable to revoke token: session token administration / revoke token update - token lookup, revoke update, or audit event insert failed', code: 'INTERNAL_ERROR' },
+      { error: 'Unable to update token: session token administration / manage token update - token lookup, rename, revoke update, or audit event insert failed', code: 'INTERNAL_ERROR' },
       { status: 500 },
     );
   }
@@ -155,7 +170,7 @@ export async function POST(
 
     // Verify session exists
     const [session] = await db
-      .select({ id: sessions.id, title: sessions.title })
+      .select({ id: sessions.id, title: sessions.title, mode: sessions.mode })
       .from(sessions)
       .where(eq(sessions.id, params.id));
 
@@ -169,7 +184,9 @@ export async function POST(
       );
     }
 
-    const name = validation.data.name?.trim() || `${session.title} access token`;
+    // Auto-generate a distinct name so multiple tokens never collide.
+    const name = await uniqueTokenName(params.id, validation.data.name, `${session.title} access token`);
+    const mode = normalizeRecordingMode(session.mode);
     const now = new Date();
     const expiresAt = resolveExpiresAt(expiresIn, now);
 
@@ -208,10 +225,11 @@ export async function POST(
       token,
       access_token: token,
       recording_url: recordingUrl,
-      instruction: buildAgentInstruction(recordingUrl, token),
+      instruction: buildAgentInstruction(recordingUrl, token, mode),
       session_id: params.id,
       name,
       can_rename_session: can_rename_session || false,
+      recording_mode: mode,
       expires_in: expiresIn,
       expires_at: expiresAt ? expiresAt.toISOString() : null,
       status: 'active',

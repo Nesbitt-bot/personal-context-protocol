@@ -186,8 +186,10 @@ Lists token metadata for the session (never the secret): name, status
 
 ### PATCH `/sessions/:sessionId/tokens`
 
-Revokes an issued token. A revoked token is rejected on every subsequent
-request. Body: `{ "token_id": "tok_..." }`.
+Renames and/or revokes an issued token. Body: `{ "token_id": "tok_...", "name":
+"New name" }` to rename (names are kept distinct within the session), or
+`{ "token_id": "tok_...", "revoke": true }` to revoke. A revoked token is
+rejected on every subsequent request.
 
 ### POST `/sessions/:sessionId/tokens`
 
@@ -252,8 +254,10 @@ Resolves a recording URL to its protocol descriptor.
 
 Returns the protocol descriptor: `auth`, `routes` (`record_messages`,
 `record_compact`, `ingest_any`, `review`), `allowed_actions` (note
-`manage_topics: false`), and `limits` (`max_messages_per_request: 50`,
-`max_content_chars: 100000`).
+`manage_topics: false`), `limits` (`max_messages_per_request: 50`,
+`max_content_chars: 100000`), and `recording_mode` + `recording_guidance`. The
+mode is `wild` (the agent may redact unsafe secrets) or `exact` (record
+verbatim, including credentials, for task migration).
 
 ### POST `/api/v1/agent/sessions/:sessionId/messages`
 

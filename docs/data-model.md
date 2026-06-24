@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.8"
+  "version": "0.1.9"
 }
 ```
 
@@ -96,6 +96,7 @@ AI recording sessions, optionally within a topic.
 | `id` | TEXT | `ses_<timestamp>_<id>` |
 | `topic_id` | TEXT | Parent topic (foreign key, **nullable**: NULL = uncategorized) |
 | `title` | TEXT | Session title (may be suggested by AI) |
+| `mode` | TEXT | Recording mode the agent is told to honor: `wild` (default) or `exact` |
 | `public` | BOOLEAN | When true, a read-only view is available without the admin token |
 | `archived` | BOOLEAN | Soft delete flag |
 | `created_at` | TIMESTAMPTZ | Creation time |
@@ -116,6 +117,12 @@ under the same topic, or all topic-less sessions.
 messages via `GET /api/v1/public/sessions/:id` and the `/s/:id` page, without the
 admin UI token. Private (default) sessions return 404 from that endpoint so their
 existence is not leaked. Tokens are never exposed on the public surface.
+
+**Recording mode**: `wild` (default) tells the agent it may redact secrets it
+judges unsafe; `exact` tells it to record verbatim (including credentials) for
+faithful task migration. The mode is surfaced to the agent in the protocol
+descriptor (`recording_mode` + `recording_guidance`) and the generated
+instruction. It is guidance to the agent, not a server-side filter.
 
 **AI access**: AI can only view/append to sessions for which it has a valid token.
 
@@ -258,6 +265,7 @@ Audit trail for all actions.
 - `message.appended`
 - `compaction.recorded`
 - `token.revoked`
+- `token.renamed`
 - `session.shared`
 - `session.unshared`
 - `topic.created`
@@ -444,3 +452,8 @@ LIMIT 50;
 
 - `POST /api/v1/sessions/:id/import` records a pasted agent fallback block,
   skipping messages already present (dedup by role + content)
+
+### v0.1.9 (recording modes + token rename)
+
+- Added `sessions.mode` (`wild` default / `exact`, migration 007) surfaced to the
+  agent; token rename via PATCH; auto-distinct token names on creation

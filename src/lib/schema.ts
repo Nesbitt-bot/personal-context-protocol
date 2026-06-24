@@ -40,6 +40,10 @@ export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
   topicId: text('topic_id').references(() => topics.id),
   title: text('title').notNull(),
+  // Recording mode the agent is told to honor: 'wild' (default) lets the agent
+  // redact secrets it judges unsafe; 'exact' asks for verbatim recording
+  // (including credentials) for faithful task migration.
+  mode: text('mode', { enum: ['wild', 'exact'] }).notNull().default('wild'),
   public: boolean('public').notNull().default(false),
   archived: boolean('archived').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

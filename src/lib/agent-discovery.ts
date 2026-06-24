@@ -10,7 +10,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from './db';
 import { sessions } from './schema';
-import { buildAgentProtocol } from './agent-protocol';
+import { buildAgentProtocol, normalizeRecordingMode } from './agent-protocol';
 import { buildRecordingUrl, resolveAppBaseUrl } from './recording-url';
 import { agentErrorBody, type AgentErrorBody } from './agent-errors';
 
@@ -19,7 +19,7 @@ export async function buildDiscovery(
   requestOrigin?: string | null,
 ): Promise<{ status: number; body: AgentErrorBody | Record<string, unknown> }> {
   const [session] = await db
-    .select({ id: sessions.id })
+    .select({ id: sessions.id, mode: sessions.mode })
     .from(sessions)
     .where(eq(sessions.id, sessionId));
 
@@ -28,7 +28,7 @@ export async function buildDiscovery(
   }
 
   const base = resolveAppBaseUrl(requestOrigin);
-  const protocol = buildAgentProtocol(sessionId);
+  const protocol = buildAgentProtocol(sessionId, { mode: normalizeRecordingMode(session.mode) });
 
   return {
     status: 200,

@@ -149,6 +149,14 @@ Public read-only sharing (idempotent, data-preserving):
 Existing sessions default to private. When `public` is true the session is
 readable without the admin token via `GET /api/v1/public/sessions/:id`.
 
+### 0006_session_mode
+
+Per-session recording mode (idempotent, data-preserving):
+- `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'wild'`
+
+`wild` (default) lets the agent redact secrets it judges unsafe; `exact` asks for
+verbatim recording. Existing sessions default to `wild`.
+
 ## Checking migration status
 
 ```bash
@@ -174,4 +182,4 @@ Drizzle doesn't support automatic rollbacks. Manual approach:
 
 Schema version is stored in `app_instance.version` and updated when migrations are applied.
 
-Current version: `0.1.8`
+Current version: `0.1.9`

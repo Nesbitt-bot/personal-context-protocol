@@ -84,6 +84,19 @@ describe('agent protocol', () => {
     expect(instruction).toContain('tok_secret');
     expect(instruction).toContain('Do not manage topics');
   });
+
+  it('defaults to wild mode and exposes recording guidance', () => {
+    expect(protocol.recording_mode).toBe('wild');
+    expect(protocol.recording_guidance).toMatch(/redact/i);
+  });
+
+  it('exact mode tells the agent to record verbatim', () => {
+    const exact = buildAgentProtocol('ses_1', { mode: 'exact' });
+    expect(exact.recording_mode).toBe('exact');
+    expect(exact.recording_guidance).toMatch(/verbatim/i);
+    const instruction = buildAgentInstruction('https://host/r/ses_1', 'tok', 'exact');
+    expect(instruction).toContain('Recording mode: exact');
+  });
 });
 
 describe('token expiration', () => {

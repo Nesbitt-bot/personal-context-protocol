@@ -12,6 +12,7 @@ export interface Session {
   topic_id: string | null;
   title: string;
   public?: boolean;
+  mode?: 'wild' | 'exact';
   archived: boolean;
   created_at: string;
   updated_at?: string;

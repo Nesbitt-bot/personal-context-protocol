@@ -70,6 +70,7 @@ function schemaStatements(version) {
       id text PRIMARY KEY,
       topic_id text REFERENCES topics(id),
       title text NOT NULL,
+      mode text NOT NULL DEFAULT 'wild',
       public boolean NOT NULL DEFAULT false,
       archived boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(),
@@ -146,6 +147,8 @@ function schemaStatements(version) {
     'ALTER TABLE messages ALTER COLUMN topic_id DROP NOT NULL',
     // Public read-only sharing of a session.
     'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false',
+    // Recording mode the agent is told to honor (wild = may redact, exact = verbatim).
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'wild'",
     'CREATE INDEX IF NOT EXISTS messages_session_id_idx ON messages(session_id)',
     'CREATE INDEX IF NOT EXISTS messages_topic_id_idx ON messages(topic_id)',
     'CREATE INDEX IF NOT EXISTS sessions_topic_id_idx ON sessions(topic_id)',

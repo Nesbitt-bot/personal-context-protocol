@@ -122,6 +122,11 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-24 - Session recording modes + token rename (v0.1.9)
+  - Patch-bumped to 0.1.9
+  - Added `sessions.mode` (`wild` default / `exact`, migration 007). The mode is surfaced to the agent in the protocol descriptor (`recording_mode` + `recording_guidance`) and the generated instruction: wild = may redact unsafe secrets, exact = verbatim incl. credentials for task migration. Workspace has a Wild/Exact toggle
+  - Token rename: `PATCH /api/v1/sessions/:id/tokens { token_id, name }` (also `{ token_id, revoke: true }`); names auto-suffixed distinct on create and rename; rename button in the token modal
+  - Verified live: protocol/instruction reflect the mode; rename updates the name distinctly; new tokens get distinct names; revoke still rejects. 53 tests pass
 - 2026-06-24 - Human fallback paste-import with auto-merge (v0.1.8)
   - Patch-bumped to 0.1.8
   - Added `POST /api/v1/sessions/:id/import` (UI token): parses a pasted agent fallback block (forgiving formats incl. agent wrapper JSON) and records it, skipping messages already present (dedup by role + content) so re-pasting merges cleanly; `<PCP_COMPACT>` stored as a compaction

@@ -297,7 +297,7 @@ export default function Dashboard() {
     }
   }
 
-  async function updateSession(sessionId: string, fields: { title?: string; topic_id?: string | null; archived?: boolean; public?: boolean }) {
+  async function updateSession(sessionId: string, fields: { title?: string; topic_id?: string | null; archived?: boolean; public?: boolean; mode?: 'wild' | 'exact' }) {
     try {
       const res = await fetch(`/api/v1/sessions/${sessionId}`, {
         method: 'PATCH',
@@ -362,6 +362,14 @@ export default function Dashboard() {
     }
   }
 
+  async function setMode(session: Session, mode: 'wild' | 'exact') {
+    if (await updateSession(session.id, { mode })) {
+      setStatus(mode === 'exact'
+        ? 'Recording mode: exact — agents are told to record verbatim, including credentials.'
+        : 'Recording mode: wild — agents may redact secrets they judge unsafe.');
+    }
+  }
+
   async function restoreSelectedSession() {
     if (!selectedSession) return;
     if (await updateSession(selectedSession.id, { archived: false })) {
@@ -387,7 +395,7 @@ export default function Dashboard() {
       }
       // Build from the page origin so the recording URL matches where the UI is open.
       const url = `${window.location.origin}/r/${session.id}`;
-      const instruction = buildAgentInstruction(url, data.access_token);
+      const instruction = buildAgentInstruction(url, data.access_token, session.mode || 'wild');
       setGeneratedToken(instruction);
       setStatus('Recording URL + access token created. Copy them now; the token will not be shown again.');
       await navigator.clipboard.writeText(instruction).catch(() => undefined);
@@ -460,6 +468,7 @@ export default function Dashboard() {
           onGenerateToken={generateToken}
           onManageTokens={setTokenModalSession}
           onTogglePublic={togglePublic}
+          onSetMode={setMode}
           onImported={() => selectedSession && loadSessionDetail(selectedSession.id)}
         />
       </div>

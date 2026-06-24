@@ -10,6 +10,21 @@
 export const PROTOCOL_NAME = 'personal-context-protocol';
 export const PROTOCOL_VERSION = '0.1';
 
+export type RecordingMode = 'wild' | 'exact';
+export const DEFAULT_RECORDING_MODE: RecordingMode = 'wild';
+
+/** Guidance shown to the agent for each recording mode. */
+export const RECORDING_GUIDANCE: Record<RecordingMode, string> = {
+  wild:
+    'Recording mode is "wild". If recording a value verbatim could leak a secret, credential, API key, or other sensitive data, you may redact it with a placeholder like <REDACTED> or paraphrase it. Record the substance faithfully; prioritize safety over verbatim fidelity.',
+  exact:
+    'Recording mode is "exact". Record messages verbatim, including credentials and sensitive values, because this session is being captured for faithful future task migration. Do not redact or paraphrase.',
+};
+
+export function normalizeRecordingMode(value: unknown): RecordingMode {
+  return value === 'exact' ? 'exact' : 'wild';
+}
+
 /** Hard limits enforced by the agent ingestion routes. */
 export const MAX_MESSAGES_PER_REQUEST = 50;
 export const MAX_CONTENT_CHARS = 100_000;
@@ -37,6 +52,8 @@ export interface AgentProtocol {
     max_messages_per_request: number;
     max_content_chars: number;
   };
+  recording_mode: RecordingMode;
+  recording_guidance: string;
 }
 
 /**
@@ -46,8 +63,9 @@ export interface AgentProtocol {
  */
 export function buildAgentProtocol(
   sessionId: string,
-  options: { canRenameSession?: boolean } = {},
+  options: { canRenameSession?: boolean; mode?: RecordingMode } = {},
 ): AgentProtocol {
+  const mode = options.mode ?? DEFAULT_RECORDING_MODE;
   return {
     protocol: PROTOCOL_NAME,
     version: PROTOCOL_VERSION,
@@ -74,6 +92,8 @@ export function buildAgentProtocol(
       max_messages_per_request: MAX_MESSAGES_PER_REQUEST,
       max_content_chars: MAX_CONTENT_CHARS,
     },
+    recording_mode: mode,
+    recording_guidance: RECORDING_GUIDANCE[mode],
   };
 }
 
@@ -81,7 +101,11 @@ export function buildAgentProtocol(
  * Build the copy-paste agent instruction block the human hands to an AI agent.
  * Requires only the recording URL and access token.
  */
-export function buildAgentInstruction(recordingUrl: string, accessToken: string): string {
+export function buildAgentInstruction(
+  recordingUrl: string,
+  accessToken: string,
+  mode: RecordingMode = DEFAULT_RECORDING_MODE,
+): string {
   return [
     'You are recording this conversation to Personal Context Protocol.',
     '',
@@ -94,6 +118,7 @@ export function buildAgentInstruction(recordingUrl: string, accessToken: string)
     'First fetch the recording URL or protocol endpoint to discover upload routes.',
     'Use Authorization: Bearer <access-token>.',
     'Record messages faithfully. If exact upload fails, retry ingest_any. If full upload is impossible, send a compact block.',
+    `Recording mode: ${mode}. ${RECORDING_GUIDANCE[mode]}`,
     'Do not manage topics. Do not rewrite or delete old messages. Do not claim success unless the server returns success.',
   ].join('\n');
 }

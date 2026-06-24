@@ -20,7 +20,10 @@ curl "https://<domain>/api/v1/agent/resolve?url=$RECORDING_URL"
 ```
 
 The response includes `routes` (`record_messages`, `record_compact`,
-`ingest_any`, `review`), `allowed_actions`, and `limits`. Authenticate every
+`ingest_any`, `review`), `allowed_actions`, `limits`, and `recording_mode` +
+`recording_guidance`. Honor the recording mode: in `wild` mode you may redact
+secrets/credentials you judge unsafe (use `<REDACTED>`); in `exact` mode record
+verbatim, including credentials, for faithful task migration. Authenticate every
 write with:
 
 ```http

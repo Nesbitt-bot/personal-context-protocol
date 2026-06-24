@@ -1,6 +1,6 @@
 [project]
 name = "personal-context-protocol"
-version = "0.1.8"
+version = "0.1.9"
 description = "Local-first prototype for least-privilege human context mediation between AI agents"
 requires-python = ">=3.10"
 

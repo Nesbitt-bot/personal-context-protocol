@@ -45,6 +45,7 @@ export const renameTopicSchema = z.object({
 export const createSessionSchema = z.object({
   title: z.string().max(200).optional(),
   topic_id: z.string().min(1).optional(),
+  mode: z.enum(['wild', 'exact']).optional(),
 });
 
 export const renameSessionSchema = z.object({
@@ -57,17 +58,22 @@ export const updateSessionSchema = z.object({
   topic_id: z.string().min(1).nullable().optional(),
   archived: z.boolean().optional(),
   public: z.boolean().optional(),
+  mode: z.enum(['wild', 'exact']).optional(),
 }).refine((value) => (
   value.title !== undefined
   || value.topic_id !== undefined
   || value.archived !== undefined
   || value.public !== undefined
+  || value.mode !== undefined
 ), 'At least one session field is required');
 
-// Token management
-export const revokeTokenSchema = z.object({
+// Token management: rename and/or revoke an issued token.
+export const manageTokenSchema = z.object({
   token_id: z.string().min(1),
-});
+  name: z.string().min(1).max(100).optional(),
+  revoke: z.boolean().optional(),
+}).refine((value) => value.name !== undefined || value.revoke === true,
+  'Provide a new name or revoke: true');
 
 // Token schemas. `name` is optional (server defaults it) and `expires_in`
 // chooses the lifetime; default is 7 days, "never" stores a NULL expiry.

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Archive, Check, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, MessageSquare, RotateCcw, Settings2 } from 'lucide-react';
+import { Archive, Check, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, MessageSquare, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
 import { formatDate } from './format';
 import { ImportPanel } from './import-panel';
 import { EventLog, Message, Session, Topic } from './types';
@@ -33,6 +33,7 @@ interface SessionWorkspaceProps {
   onGenerateToken: (session: Session) => void;
   onManageTokens: (session: Session) => void;
   onTogglePublic: (session: Session, next: boolean) => void;
+  onSetMode: (session: Session, mode: 'wild' | 'exact') => void;
   onImported: () => void;
 }
 
@@ -72,6 +73,7 @@ export function SessionWorkspace({
   onGenerateToken,
   onManageTokens,
   onTogglePublic,
+  onSetMode,
   onImported,
 }: SessionWorkspaceProps) {
   const [copiedPublic, setCopiedPublic] = useState(false);
@@ -124,6 +126,24 @@ export function SessionWorkspace({
                 </div>
                 <h2 className="truncate text-2xl font-semibold text-slate-950 dark:text-white">{selectedSession.title}</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Last activity: {formatDate(selectedSession.last_message_at)}</p>
+                <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-slate-200 p-0.5 text-xs dark:border-slate-700" title="Recording mode the agent is told to honor">
+                  <button
+                    className={`inline-flex items-center gap-1 rounded px-2 py-1 ${(selectedSession.mode ?? 'wild') === 'wild' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+                    onClick={() => onSetMode(selectedSession, 'wild')}
+                    type="button"
+                    title="Wild: the agent may redact secrets/credentials it judges unsafe"
+                  >
+                    <Shield size={13} /> Wild
+                  </button>
+                  <button
+                    className={`inline-flex items-center gap-1 rounded px-2 py-1 ${selectedSession.mode === 'exact' ? 'bg-amber-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+                    onClick={() => onSetMode(selectedSession, 'exact')}
+                    type="button"
+                    title="Exact: the agent records verbatim, including credentials, for task migration"
+                  >
+                    <ShieldAlert size={13} /> Exact
+                  </button>
+                </div>
                 {selectedSession.public && (
                   <button
                     className="mt-2 inline-flex items-center gap-2 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"

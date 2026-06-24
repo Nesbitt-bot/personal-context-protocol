@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { KeyRound, Loader2, X } from 'lucide-react';
+import { KeyRound, Loader2, Pencil, X } from 'lucide-react';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 
 interface TokenRecord {
@@ -72,30 +72,43 @@ export function TokenModal({ sessionId, sessionTitle, onClose }: TokenModalProps
     }
   }
 
-  async function revoke(tokenId: string) {
-    if (!window.confirm('Revoke this token? Any agent using it will be rejected immediately.')) return;
+  async function patchToken(tokenId: string, body: Record<string, unknown>, failVerb: string) {
     setBusyId(tokenId);
+    setError('');
     try {
       const res = await fetch(`/api/v1/sessions/${sessionId}/tokens`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ token_id: tokenId }),
+        body: JSON.stringify({ token_id: tokenId, ...body }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setError(data.error || 'Unable to revoke token: session token administration / revoke request - API response did not indicate success');
+        setError(data.error || `Unable to ${failVerb} token: session token administration / ${failVerb} request - API response did not indicate success`);
         return;
       }
       await load();
     } catch (err) {
       setError(diagnosticMessage({
-        consequence: 'Unable to revoke token',
-        moduleProcess: 'session token administration / revoke request',
-        cause: `browser could not reach the revoke endpoint; ${errorCause(err)}`,
+        consequence: `Unable to ${failVerb} token`,
+        moduleProcess: `session token administration / ${failVerb} request`,
+        cause: `browser could not reach the token endpoint; ${errorCause(err)}`,
       }));
     } finally {
       setBusyId('');
     }
+  }
+
+  function rename(tokenId: string, currentName: string) {
+    const name = window.prompt('Rename token', currentName);
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === currentName) return;
+    patchToken(tokenId, { name: trimmed }, 'rename');
+  }
+
+  function revoke(tokenId: string) {
+    if (!window.confirm('Revoke this token? Any agent using it will be rejected immediately.')) return;
+    patchToken(tokenId, { revoke: true }, 'revoke');
   }
 
   return (
@@ -135,18 +148,30 @@ export function TokenModal({ sessionId, sessionTitle, onClose }: TokenModalProps
                       {token.expires_at ? `Expires ${formatDate(token.expires_at)}` : 'Never expires'} · Last used {formatDate(token.last_used_at)}
                     </p>
                   </div>
-                  {token.status === 'revoked' ? (
-                    <span className="shrink-0 text-xs text-slate-400">revoked</span>
-                  ) : (
+                  <div className="flex shrink-0 items-center gap-2">
                     <button
-                      className="shrink-0 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/40"
-                      onClick={() => revoke(token.id)}
+                      className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                      onClick={() => rename(token.id, token.name)}
                       disabled={busyId === token.id}
                       type="button"
+                      title="Rename token"
+                      aria-label="Rename token"
                     >
-                      {busyId === token.id ? 'Revoking...' : 'Revoke'}
+                      <Pencil size={14} />
                     </button>
-                  )}
+                    {token.status === 'revoked' ? (
+                      <span className="text-xs text-slate-400">revoked</span>
+                    ) : (
+                      <button
+                        className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/40"
+                        onClick={() => revoke(token.id)}
+                        disabled={busyId === token.id}
+                        type="button"
+                      >
+                        {busyId === token.id ? '...' : 'Revoke'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

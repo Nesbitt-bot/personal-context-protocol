@@ -12,6 +12,7 @@ interface SessionRecord {
   id: string;
   title: string;
   topic_title: string | null;
+  mode?: 'wild' | 'exact';
   archived: boolean;
   createdAt: string;
   lastMessageAt: string | null;
@@ -168,7 +169,7 @@ export default function SessionDetail() {
       // Build the recording URL from the actual page origin so it always matches
       // where the user opened the UI, regardless of how PCP_APP_URL is set.
       const url = `${window.location.origin}/r/${sessionId}`;
-      const text = buildAgentInstruction(url, data.access_token);
+      const text = buildAgentInstruction(url, data.access_token, session?.mode || 'wild');
       setAccessToken(data.access_token);
       setInstruction(text);
       setRecordingUrl(url);

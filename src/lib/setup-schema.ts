@@ -32,6 +32,7 @@ const SCHEMA_STATEMENTS = [
     id text PRIMARY KEY,
     topic_id text REFERENCES topics(id),
     title text NOT NULL,
+    mode text NOT NULL DEFAULT 'wild',
     public boolean NOT NULL DEFAULT false,
     archived boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -104,6 +105,8 @@ const SCHEMA_STATEMENTS = [
   'ALTER TABLE messages ALTER COLUMN topic_id DROP NOT NULL',
   // Public read-only sharing of a session.
   'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false',
+  // Recording mode the agent is told to honor (wild = may redact, exact = verbatim).
+  "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'wild'",
   `CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT now(),
@@ -171,6 +174,12 @@ export async function ensureDatabaseSchema() {
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
     VALUES ('006_public_session', 'session_public_sharing')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('007_session_mode', 'session_recording_mode')
     ON CONFLICT (version) DO NOTHING
   `);
 }
