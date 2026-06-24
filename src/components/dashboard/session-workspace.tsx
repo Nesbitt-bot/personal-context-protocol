@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Archive, Check, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, MessageSquare, RotateCcw, Settings2 } from 'lucide-react';
 import { formatDate } from './format';
+import { ImportPanel } from './import-panel';
 import { EventLog, Message, Session, Topic } from './types';
 
 interface SessionWorkspaceProps {
@@ -32,6 +33,7 @@ interface SessionWorkspaceProps {
   onGenerateToken: (session: Session) => void;
   onManageTokens: (session: Session) => void;
   onTogglePublic: (session: Session, next: boolean) => void;
+  onImported: () => void;
 }
 
 function messageTone(role: string) {
@@ -70,6 +72,7 @@ export function SessionWorkspace({
   onGenerateToken,
   onManageTokens,
   onTogglePublic,
+  onImported,
 }: SessionWorkspaceProps) {
   const [copiedPublic, setCopiedPublic] = useState(false);
 
@@ -253,6 +256,7 @@ export function SessionWorkspace({
                 ))}
               </div>
             )}
+            {selectedSession && <ImportPanel sessionId={selectedSession.id} onImported={onImported} />}
           </div>
 
           <aside className="border-t border-slate-200 bg-slate-50 px-5 py-5 dark:border-slate-800 dark:bg-slate-900/70 xl:border-l xl:border-t-0">

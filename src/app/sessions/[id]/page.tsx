@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Clipboard, KeyRound, Link2, MessageSquare, Settings2 } from 'lucide-react';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { buildAgentInstruction } from '@/lib/agent-protocol';
+import { ImportPanel } from '@/components/dashboard/import-panel';
 
 interface SessionRecord {
   id: string;
@@ -344,6 +345,7 @@ export default function SessionDetail() {
                 ))}
               </div>
             )}
+            <ImportPanel sessionId={sessionId} onImported={loadSession} />
           </section>
 
           <aside className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">

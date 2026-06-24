@@ -122,6 +122,12 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-24 - Human fallback paste-import with auto-merge (v0.1.8)
+  - Patch-bumped to 0.1.8
+  - Added `POST /api/v1/sessions/:id/import` (UI token): parses a pasted agent fallback block (forgiving formats incl. agent wrapper JSON) and records it, skipping messages already present (dedup by role + content) so re-pasting merges cleanly; `<PCP_COMPACT>` stored as a compaction
+  - New pure `import-merge.ts` (dedupeNewMessages) + tests; `parseIngestPayload` gained a `maxMessages` option for larger human imports
+  - Added an ImportPanel (terminal-style paste box) below the messages widget on the session detail page and the dashboard workspace
+  - Verified live: agent-wrapper JSON imports; re-paste imports nothing new; superset imports only the delta; compact block stored; empty/garbage returns 422; ordinals stay monotonic. 51 tests pass
 - 2026-06-24 - Public sessions, token revocation, recording-URL origin fix, front-page polish (v0.1.7)
   - Patch-bumped release metadata to 0.1.7
   - Added `sessions.public` (migration 006); `GET /api/v1/public/sessions/:id` and `/s/:id` render a read-only view without the admin token; private sessions return 404 to avoid leaking existence

@@ -186,8 +186,15 @@ function tryJson(text: string): unknown | undefined {
  * Parse a raw request body (already read as text) into a normalized ingest
  * result. The order matters: explicit PCP tags win, then structured JSON, then
  * a best-effort transcript fallback. Only a genuinely empty body is an error.
+ *
+ * `maxMessages` caps how many messages are returned. The agent routes use the
+ * protocol limit; the human paste-import allows a larger batch.
  */
-export function parseIngestPayload(rawBody: string): IngestResult {
+export function parseIngestPayload(
+  rawBody: string,
+  options: { maxMessages?: number } = {},
+): IngestResult {
+  const limit = options.maxMessages ?? MAX_MESSAGES_PER_REQUEST;
   const text = (rawBody || '').trim();
   if (!text) {
     return { kind: 'error', reason: 'empty request body' };
@@ -205,17 +212,17 @@ export function parseIngestPayload(rawBody: string): IngestResult {
   const appendTag = extractTag(text, 'PCP_APPEND');
   if (appendTag !== null) {
     const messages = coerceMessages(tryJson(appendTag));
-    if (messages) return { kind: 'messages', messages: messages.slice(0, MAX_MESSAGES_PER_REQUEST) };
+    if (messages) return { kind: 'messages', messages: messages.slice(0, limit) };
     const transcript = parseTranscript(appendTag);
-    if (transcript.length) return { kind: 'messages', messages: transcript.slice(0, MAX_MESSAGES_PER_REQUEST) };
+    if (transcript.length) return { kind: 'messages', messages: transcript.slice(0, limit) };
     return { kind: 'error', reason: 'PCP_APPEND block contained no messages' };
   }
 
-  // 3. Structured JSON body.
+  // 3. Structured JSON body (incl. an agent wrapper object with a messages array).
   const json = tryJson(text);
   if (json !== undefined) {
     const messages = coerceMessages(json);
-    if (messages) return { kind: 'messages', messages: messages.slice(0, MAX_MESSAGES_PER_REQUEST) };
+    if (messages) return { kind: 'messages', messages: messages.slice(0, limit) };
     const compact = coerceCompact(json);
     if (compact && compact.summary) return { kind: 'compact', compact };
   }
@@ -223,7 +230,7 @@ export function parseIngestPayload(rawBody: string): IngestResult {
   // 4. Raw transcript / markdown fallback.
   const transcript = parseTranscript(text);
   if (transcript.length) {
-    return { kind: 'messages', messages: transcript.slice(0, MAX_MESSAGES_PER_REQUEST) };
+    return { kind: 'messages', messages: transcript.slice(0, limit) };
   }
 
   return { kind: 'error', reason: 'body did not match any supported format' };

@@ -153,6 +153,18 @@ Uncategorized (no topic). `public: true` enables a read-only public view;
 `public: false` makes it private again. `archived: true` removes the session
 from the active list; `archived: false` restores it.
 
+### POST `/sessions/:id/import`
+
+Human fallback import (UI token). When an agent cannot upload from its sandbox,
+the admin pastes the agent's fallback block here. Accepts the same forgiving
+formats as agent ingest — a `{ "messages": [...] }` block, an agent wrapper
+object that contains a `messages` array, `<PCP_APPEND>`/`<PCP_COMPACT>`,
+ChatML-like arrays, or a plain transcript. Messages already present (matched by
+role + content) are skipped, so re-pasting merges cleanly.
+
+Body: `{ "payload": "<pasted text>" }` (or the raw pasted text). Response:
+`{ success, imported_as: "messages"|"compact", imported, skipped }`.
+
 ### GET `/sessions/:id/review`
 
 Returns messages for review.

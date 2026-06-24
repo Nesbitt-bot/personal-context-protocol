@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.7"
+  "version": "0.1.8"
 }
 ```
 
@@ -439,3 +439,8 @@ LIMIT 50;
 
 - Added `sessions.public` for read-only public sharing (migration 006)
 - Token revocation API + dashboard modal; recording URL built from the page origin
+
+### v0.1.8 (human fallback import)
+
+- `POST /api/v1/sessions/:id/import` records a pasted agent fallback block,
+  skipping messages already present (dedup by role + content)

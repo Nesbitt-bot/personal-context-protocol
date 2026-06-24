@@ -460,6 +460,7 @@ export default function Dashboard() {
           onGenerateToken={generateToken}
           onManageTokens={setTokenModalSession}
           onTogglePublic={togglePublic}
+          onImported={() => selectedSession && loadSessionDetail(selectedSession.id)}
         />
       </div>
       {tokenModalSession && (
