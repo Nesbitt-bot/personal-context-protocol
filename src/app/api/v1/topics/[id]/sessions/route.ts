@@ -5,6 +5,7 @@ import { topics, sessions, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
 import { createSessionSchema } from '@/lib/validations';
+import { DEFAULT_SESSION_TITLE, generateUniqueTitle } from '@/lib/naming';
 import { desc, eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
@@ -87,11 +88,9 @@ export async function POST(
       );
     }
 
-    const { title } = validation.data;
-
     // Verify topic exists
     const [topic] = await db.select().from(topics).where(eq(topics.id, params.id));
-    
+
     if (!topic || topic.archived) {
       return NextResponse.json(
         {
@@ -101,6 +100,17 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    // Auto-name and auto-suffix within the topic so "New Session" works one-click.
+    const siblings = await db
+      .select({ title: sessions.title })
+      .from(sessions)
+      .where(eq(sessions.topicId, params.id));
+    const title = generateUniqueTitle(
+      validation.data.title,
+      siblings.map((session) => session.title),
+      DEFAULT_SESSION_TITLE,
+    );
 
     const sessionId = createId('ses');
     

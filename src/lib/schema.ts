@@ -82,6 +82,26 @@ export const messages = pgTable('messages', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Compactions: durable session summaries stored alongside (never replacing)
+// raw messages, for when full message upload is impossible.
+export const compactions = pgTable('compactions', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => sessions.id),
+  summary: text('summary').notNull(),
+  timelineJson: jsonb('timeline_json'),
+  decisionsJson: jsonb('decisions_json'),
+  requirementsJson: jsonb('requirements_json'),
+  openQuestionsJson: jsonb('open_questions_json'),
+  artifactsJson: jsonb('artifacts_json'),
+  warningsJson: jsonb('warnings_json'),
+  provider: text('provider'),
+  baseModel: text('base_model'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  metadataJson: jsonb('metadata_json').default({}),
+});
+
 // Events
 export const events = pgTable('events', {
   id: text('id').primaryKey(),

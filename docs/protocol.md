@@ -61,13 +61,15 @@ Lists topics with session counts.
 
 ### POST `/topics`
 
-Creates a topic.
+Creates a topic. `title` is optional and free-text: omit it (or send `{}`) and
+the server generates a unique default name (`New Topic`, `New Topic 2`, ...).
+Duplicate titles are auto-suffixed instead of rejected.
 
 Body:
 
 ```json
 {
-  "title": "work-notes",
+  "title": "Research",
   "description": "optional"
 }
 ```
@@ -96,7 +98,9 @@ Lists sessions inside a topic.
 
 ### POST `/topics/:topicId/sessions`
 
-Creates a session inside a topic.
+Creates a session inside a topic. `title` is optional: omit it for a unique
+default name (`New Session`, `New Session 2`, ...) within the topic. Duplicate
+titles are auto-suffixed.
 
 Body:
 
@@ -140,24 +144,106 @@ Archives a session.
 
 ## Tokens
 
+### GET `/sessions/:sessionId/tokens`
+
+Lists token metadata for the session (never the secret): name, status
+(`active`, `expired`, `revoked`), `expires_at`, and `last_used_at`.
+
 ### POST `/sessions/:sessionId/tokens`
 
-Creates an AI session token and returns it once.
+Creates a session access token and returns it once, together with the recording
+URL and a ready-to-paste agent instruction.
 
-Body:
+Body (all fields optional):
 
 ```json
 {
   "name": "Claude session",
-  "can_rename_session": false
+  "can_rename_session": false,
+  "expires_in": "7d"
 }
 ```
 
-## AI Message Append
+- `name` defaults to `<session title> access token`.
+- `expires_in` is one of `1h`, `24h`, `7d`, `30d`, `never`. Default is `7d`.
+  `never` stores a NULL `expires_at`; expired tokens are rejected at auth time.
+
+Response (token shown only here):
+
+```json
+{
+  "success": true,
+  "access_token": "<raw token, shown once>",
+  "recording_url": "https://<domain>/r/<sessionId>",
+  "instruction": "You are recording this conversation to Personal Context Protocol. ...",
+  "expires_in": "7d",
+  "expires_at": "2026-06-30T00:00:00.000Z",
+  "status": "active"
+}
+```
+
+## Agent Recording (URL + token)
+
+An external AI agent needs only two things: a **recording URL** and an **access
+token**. The URL carries all non-secret session information and is the entry
+point for discovering upload routes; the token is the only credential. Agent
+routes return a structured envelope:
+
+```json
+{
+  "ok": false,
+  "code": "TOKEN_EXPIRED",
+  "retryable": false,
+  "message": "The session token expired.",
+  "next_steps": ["Ask the user to generate a new access token."]
+}
+```
+
+### GET `/r/:sessionId` (public)
+
+Recording URL entry point. Returns the protocol descriptor so an agent can
+discover where to upload. No token required.
+
+### GET `/api/v1/agent/resolve?url=<recording-url>` (public)
+
+Resolves a recording URL to its protocol descriptor.
+
+### GET `/api/v1/agent/sessions/:sessionId/protocol` (public)
+
+Returns the protocol descriptor: `auth`, `routes` (`record_messages`,
+`record_compact`, `ingest_any`, `review`), `allowed_actions` (note
+`manage_topics: false`), and `limits` (`max_messages_per_request: 50`,
+`max_content_chars: 100000`).
+
+### POST `/api/v1/agent/sessions/:sessionId/messages`
+
+Append-only message recording. Same body as the legacy message route; requires
+`Authorization: Bearer <access-token>`.
+
+### POST `/api/v1/agent/sessions/:sessionId/compact`
+
+Stores a durable session summary when full message upload is impossible.
+Compactions are additional records and never replace raw messages.
+
+Body (`summary` required):
+
+```json
+{ "summary": "...", "decisions": ["..."], "open_questions": ["..."] }
+```
+
+### POST `/api/v1/agent/sessions/:sessionId/ingest`
+
+Forgiving ingestion. Accepts `{ messages }`, `<PCP_APPEND>...</PCP_APPEND>`,
+`<PCP_COMPACT>...</PCP_COMPACT>`, ChatML-like arrays, or raw transcript text, and
+normalizes into messages or a compaction. On failure it returns structured retry
+guidance (`code: "UNPARSEABLE_PAYLOAD"`), not a vague error.
+
+## AI Message Append (legacy)
 
 ### POST `/sessions/:sessionId/messages`
 
-Appends messages to the session bound to the bearer token.
+Appends messages to the session bound to the bearer token. Retained for
+back-compat; new agents should use `/api/v1/agent/sessions/:sessionId/messages`.
 
 Body:
 
@@ -183,11 +269,12 @@ Body:
 
 Rules:
 
-- `messages` must contain 1 to 100 messages.
+- `messages` must contain 1 to 50 messages.
 - `role` must be `user`, `assistant`, `system`, `tool`, or `correction`.
 - `content` is required.
 - Topic fields are not accepted.
-- `suggested_session_title` requires a token with rename permission.
+- `suggested_session_title` requires a token with rename permission; the server
+  normalizes it and auto-suffixes duplicates within the topic.
 
 ## Export
 

@@ -104,6 +104,21 @@ function schemaStatements(version) {
       created_at timestamptz NOT NULL DEFAULT now(),
       UNIQUE (session_id, ordinal)
     )`,
+    `CREATE TABLE IF NOT EXISTS compactions (
+      id text PRIMARY KEY,
+      session_id text NOT NULL REFERENCES sessions(id),
+      summary text NOT NULL,
+      timeline_json jsonb,
+      decisions_json jsonb,
+      requirements_json jsonb,
+      open_questions_json jsonb,
+      artifacts_json jsonb,
+      warnings_json jsonb,
+      provider text,
+      base_model text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      metadata_json jsonb DEFAULT '{}'
+    )`,
     `CREATE TABLE IF NOT EXISTS events (
       id text PRIMARY KEY,
       session_id text REFERENCES sessions(id),
@@ -118,6 +133,8 @@ function schemaStatements(version) {
       applied_at timestamptz NOT NULL DEFAULT now(),
       checksum text
     )`,
+    // Defensive upgrade for deployments initialized before token expiration existed.
+    'ALTER TABLE session_tokens ADD COLUMN IF NOT EXISTS expires_at timestamptz',
     'CREATE INDEX IF NOT EXISTS messages_session_id_idx ON messages(session_id)',
     'CREATE INDEX IF NOT EXISTS messages_topic_id_idx ON messages(topic_id)',
     'CREATE INDEX IF NOT EXISTS sessions_topic_id_idx ON sessions(topic_id)',
@@ -125,6 +142,7 @@ function schemaStatements(version) {
     'CREATE INDEX IF NOT EXISTS session_tokens_session_id_idx ON session_tokens(session_id)',
     'CREATE INDEX IF NOT EXISTS events_session_id_idx ON events(session_id)',
     'CREATE INDEX IF NOT EXISTS events_created_at_idx ON events(created_at)',
+    'CREATE INDEX IF NOT EXISTS compactions_session_id_idx ON compactions(session_id)',
   ];
 }
 

@@ -1,32 +1,49 @@
 import { z } from 'zod';
+import { MAX_CONTENT_CHARS, MAX_MESSAGES_PER_REQUEST } from './agent-protocol';
+import { EXPIRATION_CHOICES } from './token-expiration';
 
 // Message schemas
 export const messageInputSchema = z.object({
   role: z.enum(['user', 'assistant', 'system', 'tool', 'correction']),
-  content: z.string().min(1).max(10000),
+  content: z.string().min(1).max(MAX_CONTENT_CHARS),
   provider: z.string().max(100).optional(),
   base_model: z.string().max(100).optional(),
   provider_timestamp: z.string().datetime().optional(),
 });
 
 export const appendMessagesSchema = z.object({
-  messages: z.array(messageInputSchema).min(1).max(100),
+  messages: z.array(messageInputSchema).min(1).max(MAX_MESSAGES_PER_REQUEST),
   suggested_session_title: z.string().max(200).optional(),
 });
 
-// Topic schemas
+// Compaction schema (agent compact + ingest routes)
+export const createCompactSchema = z.object({
+  summary: z.string().min(1).max(MAX_CONTENT_CHARS),
+  timeline: z.unknown().optional(),
+  decisions: z.unknown().optional(),
+  requirements: z.unknown().optional(),
+  open_questions: z.unknown().optional(),
+  artifacts: z.unknown().optional(),
+  warnings: z.unknown().optional(),
+  provider: z.string().max(100).optional(),
+  base_model: z.string().max(100).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+// Topic schemas. Titles are free-text and optional: a human can click
+// "New Topic" without typing, and the server auto-generates/auto-suffixes.
 export const createTopicSchema = z.object({
-  title: z.string().min(1).max(100).regex(/^[a-zA-Z0-9-]+$/, 'Title must be alphanumeric with hyphens'),
+  title: z.string().max(100).optional(),
   description: z.string().max(500).optional(),
 });
 
 export const renameTopicSchema = z.object({
-  title: z.string().min(1).max(100).regex(/^[a-zA-Z0-9-]+$/, 'Title must be alphanumeric with hyphens'),
+  title: z.string().min(1).max(100),
 });
 
 // Session schemas
 export const createSessionSchema = z.object({
-  title: z.string().min(1).max(200),
+  title: z.string().max(200).optional(),
 });
 
 export const renameSessionSchema = z.object({
@@ -41,10 +58,12 @@ export const updateSessionSchema = z.object({
   value.title !== undefined || value.topic_id !== undefined || value.archived !== undefined
 ), 'At least one session field is required');
 
-// Token schemas
+// Token schemas. `name` is optional (server defaults it) and `expires_in`
+// chooses the lifetime; default is 7 days, "never" stores a NULL expiry.
 export const createTokenSchema = z.object({
-  name: z.string().min(1).max(100),
+  name: z.string().min(1).max(100).optional(),
   can_rename_session: z.boolean().optional().default(false),
+  expires_in: z.enum(EXPIRATION_CHOICES).optional(),
 });
 
 // Setup schemas

@@ -1,23 +1,34 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { verifySessionToken } from '@/lib/middleware';
-import { db } from '@/lib/db';
-import { messages, sessions, events } from '@/lib/schema';
-import { createId } from '@/lib/auth';
+import { appendMessagesToSession } from '@/lib/recording-store';
 import { logError } from '@/lib/logging';
 import { appendMessagesSchema } from '@/lib/validations';
-import { sql, eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
+const FAILURE_STATUS: Record<string, number> = {
+  NOT_FOUND: 404,
+  SESSION_ARCHIVED: 403,
+  FORBIDDEN: 403,
+};
 
+const FAILURE_MESSAGE: Record<string, string> = {
+  NOT_FOUND: 'Unable to append messages: AI session recording / session lookup - session not found',
+  SESSION_ARCHIVED: 'Unable to append messages: AI session recording / session state check - session is archived',
+  FORBIDDEN: 'Unable to rename session: AI session recording / token permission check - this token cannot suggest session titles',
+};
 
-
+/**
+ * Legacy scoped message append: `POST /api/v1/sessions/<id>/messages`. Retained
+ * for back-compat; new agents should use `/api/v1/agent/sessions/<id>/messages`.
+ * Delegates to the shared store so message append and title normalization share
+ * one code path.
+ */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
-    // Verify session token
     const authResult = await verifySessionToken(request, params.id);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
@@ -25,7 +36,7 @@ export async function POST(
 
     const body = await request.json();
     const validation = appendMessagesSchema.safeParse(body);
-    
+
     if (!validation.success) {
       return NextResponse.json(
         {
@@ -37,128 +48,33 @@ export async function POST(
       );
     }
 
-    const { messages: newMessages, suggested_session_title } = validation.data;
+    const result = await appendMessagesToSession({
+      sessionId: params.id,
+      messages: validation.data.messages,
+      suggestedTitle: validation.data.suggested_session_title,
+      canRenameSession: authResult.canRenameSession,
+      actor: `ai:${authResult.tokenId}`,
+    });
 
-    // Verify session exists and is not archived
-    const [session] = await db
-      .select({ archived: sessions.archived, topicId: sessions.topicId, title: sessions.title })
-      .from(sessions)
-      .where(eq(sessions.id, params.id));
-
-    if (!session) {
+    if (!result.ok) {
       return NextResponse.json(
-        {
-          error: 'Unable to append messages: AI session recording / session lookup - session not found',
-          code: 'NOT_FOUND',
-        },
-        { status: 404 },
+        { error: FAILURE_MESSAGE[result.code], code: result.code === 'SESSION_ARCHIVED' ? 'FORBIDDEN' : result.code },
+        { status: FAILURE_STATUS[result.code] },
       );
-    }
-
-    if (session.archived) {
-      return NextResponse.json(
-        {
-          error: 'Unable to append messages: AI session recording / session state check - session is archived',
-          code: 'FORBIDDEN',
-        },
-        { status: 403 },
-      );
-    }
-
-    // Check if token can rename session
-    if (suggested_session_title && !authResult.canRenameSession) {
-      return NextResponse.json(
-        {
-          error: 'Unable to rename session: AI session recording / token permission check - this token cannot suggest session titles',
-          code: 'FORBIDDEN',
-        },
-        { status: 403 },
-      );
-    }
-
-    // Insert messages in transaction
-    const insertedMessages = await db.transaction(async (tx) => {
-      // Get current max ordinal for this session
-      const [maxOrdinal] = await tx
-        .select({ max: sql<number>`max(${messages.ordinal})` })
-        .from(messages)
-        .where(eq(messages.sessionId, params.id));
-
-      let currentOrdinal = maxOrdinal?.max ? maxOrdinal.max : 0;
-      const inserted: Array<{ id: string; ordinal: number }> = [];
-
-      for (const msg of newMessages) {
-        currentOrdinal++;
-        const messageId = createId('msg');
-
-        await tx.insert(messages).values({
-          id: messageId,
-          sessionId: params.id,
-          topicId: session.topicId, // Denormalized from session
-          ordinal: currentOrdinal,
-          role: msg.role,
-            content: msg.content,
-            contentType: 'markdown', // Default
-            provider: msg.provider || 'unknown',
-            BaseModel: msg.base_model || 'unknown',
-            providerTimestamp: msg.provider_timestamp ? new Date(msg.provider_timestamp) : null,
-            observedAt: new Date(),
-            sourceJson: null,
-            metadataJson: {},
-            createdAt: new Date(),
-          });
-
-          inserted.push({ id: messageId, ordinal: currentOrdinal });
-        }
-
-        // Update session last_message_at
-        await tx
-          .update(sessions)
-          .set({ lastMessageAt: new Date() })
-          .where(eq(sessions.id, params.id));
-
-        // Log event
-        await tx.insert(events).values({
-          id: createId('evt'),
-          sessionId: params.id,
-          action: 'message.appended',
-          actor: `ai:${params.id}`,
-          detailsJson: { message_count: newMessages.length, first_ordinal: currentOrdinal - newMessages.length + 1 },
-          createdAt: new Date(),
-        });
-
-        return inserted;
-      });
-
-    // Rename session if suggested
-    if (suggested_session_title) {
-      await db
-        .update(sessions)
-        .set({ title: suggested_session_title, updatedAt: new Date() })
-        .where(eq(sessions.id, params.id));
-
-      await db.insert(events).values({
-        id: createId('evt'),
-        sessionId: params.id,
-        action: 'session.renamed',
-        actor: `ai:${params.id}`,
-        detailsJson: { suggested_title: suggested_session_title },
-        createdAt: new Date(),
-      });
     }
 
     return NextResponse.json({
       success: true,
-      messages: insertedMessages.map((m, i) => ({
-        id: m.id,
+      messages: result.messages.map((message) => ({
+        id: message.id,
         session_id: params.id,
-        ordinal: m.ordinal,
-        created_at: new Date().toISOString(),
+        ordinal: message.ordinal,
+        created_at: result.session.last_message_at,
       })),
       session: {
         id: params.id,
-        title: suggested_session_title || session.title,
-        last_message_at: new Date().toISOString(),
+        title: result.session.title,
+        last_message_at: result.session.last_message_at,
       },
     });
   } catch (error) {

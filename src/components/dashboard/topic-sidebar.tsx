@@ -51,12 +51,12 @@ export function TopicSidebar({
           value={newTopicTitle}
           onChange={(event) => onNewTopicTitleChange(event.target.value)}
           onKeyDown={(event) => event.key === 'Enter' && onCreateTopic()}
-          placeholder="new-topic"
+          placeholder="New topic name (optional)"
         />
         <button
           className="rounded-md bg-slate-950 p-2 text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
           onClick={onCreateTopic}
-          title="Create topic"
+          title="New topic (name optional)"
           type="button"
         >
           <Plus size={18} />

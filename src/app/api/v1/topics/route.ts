@@ -5,6 +5,7 @@ import { topics, sessions, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
 import { createTopicSchema } from '@/lib/validations';
+import { DEFAULT_TOPIC_TITLE, generateUniqueTitle } from '@/lib/naming';
 import { eq, sql } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
@@ -69,23 +70,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, description } = validation.data;
+    const { title: requestedTitle, description } = validation.data;
 
-    // Check for duplicate title
-    const [existing] = await db
-      .select()
-      .from(topics)
-      .where(eq(topics.title, title));
-    
-    if (existing && !existing.archived) {
-      return NextResponse.json(
-        {
-          error: 'Unable to create topic: topic administration / duplicate title validation - topic title already exists',
-          code: 'VALIDATION_ERROR'
-        },
-        { status: 400 }
-      );
-    }
+    // Auto-name and auto-suffix instead of blocking on duplicates so a human can
+    // click "New Topic" without pausing to name it.
+    const existingTopics = await db.select({ title: topics.title }).from(topics);
+    const title = generateUniqueTitle(
+      requestedTitle,
+      existingTopics.map((topic) => topic.title),
+      DEFAULT_TOPIC_TITLE,
+    );
 
     const topicId = createId('topic');
     

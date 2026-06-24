@@ -5,19 +5,69 @@ import { sessionTokens, sessions, events } from '@/lib/schema';
 import { generateToken, generateSalt, hashToken, createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
 import { createTokenSchema } from '@/lib/validations';
-import { eq } from 'drizzle-orm';
+import { DEFAULT_EXPIRATION, resolveExpiresAt, tokenStatus } from '@/lib/token-expiration';
+import { buildRecordingUrl, resolveAppBaseUrl } from '@/lib/recording-url';
+import { buildAgentInstruction } from '@/lib/agent-protocol';
+import { desc, eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
+/** List token metadata (never the secret) so the UI can show status. */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const authResult = await verifyUiToken(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
+    }
 
+    const rows = await db
+      .select({
+        id: sessionTokens.id,
+        name: sessionTokens.name,
+        canRenameSession: sessionTokens.canRenameSession,
+        revoked: sessionTokens.revoked,
+        createdAt: sessionTokens.createdAt,
+        expiresAt: sessionTokens.expiresAt,
+        lastUsedAt: sessionTokens.lastUsedAt,
+      })
+      .from(sessionTokens)
+      .where(eq(sessionTokens.sessionId, params.id))
+      .orderBy(desc(sessionTokens.createdAt));
 
+    const now = new Date();
+    const tokens = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      can_rename_session: row.canRenameSession,
+      status: tokenStatus({ revoked: row.revoked, expiresAt: row.expiresAt }, now),
+      created_at: row.createdAt,
+      expires_at: row.expiresAt,
+      last_used_at: row.lastUsedAt,
+    }));
+
+    return NextResponse.json({ tokens });
+  } catch (error) {
+    logError({
+      consequence: 'Unable to list tokens',
+      moduleProcess: 'session token administration / token list query',
+      cause: 'token metadata query failed',
+      error,
+    });
+    return NextResponse.json(
+      { error: 'Unable to list tokens: session token administration / token list query - token metadata query failed', code: 'INTERNAL_ERROR' },
+      { status: 500 },
+    );
+  }
+}
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
-    // Verify UI token
     const authResult = await verifyUiToken(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
@@ -25,7 +75,7 @@ export async function POST(
 
     const body = await request.json();
     const validation = createTokenSchema.safeParse(body);
-    
+
     if (!validation.success) {
       return NextResponse.json(
         {
@@ -37,11 +87,12 @@ export async function POST(
       );
     }
 
-    const { name, can_rename_session } = validation.data;
+    const { can_rename_session } = validation.data;
+    const expiresIn = validation.data.expires_in || DEFAULT_EXPIRATION;
 
     // Verify session exists
     const [session] = await db
-      .select({ id: sessions.id, topicId: sessions.topicId })
+      .select({ id: sessions.id, title: sessions.title })
       .from(sessions)
       .where(eq(sessions.id, params.id));
 
@@ -55,13 +106,15 @@ export async function POST(
       );
     }
 
-    // Generate token
+    const name = validation.data.name?.trim() || `${session.title} access token`;
+    const now = new Date();
+    const expiresAt = resolveExpiresAt(expiresIn, now);
+
     const token = generateToken();
     const salt = generateSalt();
     const tokenHash = await hashToken(token, salt);
     const tokenId = createId('tok');
 
-    // Insert token
     await db.insert(sessionTokens).values({
       id: tokenId,
       sessionId: params.id,
@@ -70,27 +123,36 @@ export async function POST(
       name,
       canRenameSession: can_rename_session || false,
       tokenPrefix: token.substring(0, 16),
-      createdAt: new Date(),
+      expiresAt,
+      createdAt: now,
     });
 
-    // Log event
     await db.insert(events).values({
       id: createId('evt'),
       sessionId: params.id,
       action: 'token.created',
       actor: 'human',
-      detailsJson: { token_name: name, token_id: tokenId },
-      createdAt: new Date(),
+      detailsJson: { token_name: name, token_id: tokenId, expires_in: expiresIn },
+      createdAt: now,
     });
 
-    // Return token ONLY in this response
+    const baseUrl = resolveAppBaseUrl(request.nextUrl.origin);
+    const recordingUrl = buildRecordingUrl(baseUrl, params.id);
+
+    // The token (and the instruction containing it) are returned ONLY here.
     return NextResponse.json({
       success: true,
       token,
+      access_token: token,
+      recording_url: recordingUrl,
+      instruction: buildAgentInstruction(recordingUrl, token),
       session_id: params.id,
       name,
       can_rename_session: can_rename_session || false,
-      created_at: new Date().toISOString(),
+      expires_in: expiresIn,
+      expires_at: expiresAt ? expiresAt.toISOString() : null,
+      status: 'active',
+      created_at: now.toISOString(),
     });
   } catch (error) {
     logError({

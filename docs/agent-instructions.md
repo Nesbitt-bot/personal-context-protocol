@@ -1,15 +1,37 @@
 # AI Agent Instructions
 
-Use only the session credentials provided by the human:
+You need only two things from the human:
 
-- `APP_URL`
-- `SESSION_ID`
-- `SESSION_TOKEN`
+- **Recording URL** — `https://<domain>/r/<sessionId>`
+- **Access Token** — the secret, shown once
+
+The recording URL carries all non-secret session information. The access token
+is the only credential. You do not need an app URL, session id, topic id, API
+route, or payload schema separately — discover them from the URL.
+
+## Discover the upload routes
+
+Fetch the recording URL (or its protocol endpoint) to learn where to upload:
+
+```bash
+curl "$RECORDING_URL"
+# or, if you only have the URL string:
+curl "https://<domain>/api/v1/agent/resolve?url=$RECORDING_URL"
+```
+
+The response includes `routes` (`record_messages`, `record_compact`,
+`ingest_any`, `review`), `allowed_actions`, and `limits`. Authenticate every
+write with:
+
+```http
+Authorization: Bearer <access-token>
+```
 
 ## Allowed
 
 - Append messages to the assigned session.
-- Suggest a session title when the token permits it.
+- Record a compaction (durable summary) when full upload is impossible.
+- Suggest a session title when the token permits it (the server normalizes it).
 
 ## Not Allowed
 
@@ -17,47 +39,57 @@ Use only the session credentials provided by the human:
 - Do not access another session.
 - Do not include `topic_id`, `topic_name`, or any topic field.
 - Do not edit or delete previous messages.
-- Do not log or reveal the session token.
+- Do not log or reveal the access token.
+- Do not claim success unless the server returns success.
 
-## Append Messages
+## Record messages
 
 ```bash
-curl -X POST "$APP_URL/api/v1/sessions/$SESSION_ID/messages" \
-  -H "Authorization: Bearer $SESSION_TOKEN" \
+curl -X POST "https://<domain>/api/v1/agent/sessions/<sessionId>/messages" \
+  -H "Authorization: Bearer <access-token>" \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [
-      {
-        "role": "user",
-        "content": "User message",
-        "provider": "unknown",
-        "base_model": "unknown"
-      },
-      {
-        "role": "assistant",
-        "content": "Assistant response",
-        "provider": "openai",
-        "base_model": "gpt"
-      }
+      { "role": "user", "content": "User message" },
+      { "role": "assistant", "content": "Assistant response", "provider": "anthropic", "base_model": "claude" }
     ]
   }'
 ```
 
-Allowed roles:
+Allowed roles: `user`, `assistant`, `system`, `tool`, `correction`. Corrections
+are appended as new messages, never edits.
 
-- `user`
-- `assistant`
-- `system`
-- `tool`
-- `correction`
+## Record a compaction
 
-Corrections must be appended as new messages.
+When you cannot upload full messages, send a durable summary:
+
+```bash
+curl -X POST "https://<domain>/api/v1/agent/sessions/<sessionId>/compact" \
+  -H "Authorization: Bearer <access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{ "summary": "What happened", "decisions": ["..."], "open_questions": ["..."] }'
+```
+
+## Forgiving ingest (fallback)
+
+If exact upload fails, post whatever you have to `ingest_any` and the server will
+normalize it (JSON, `<PCP_APPEND>`/`<PCP_COMPACT>` blocks, ChatML arrays, or raw
+transcript):
+
+```bash
+curl -X POST "https://<domain>/api/v1/agent/sessions/<sessionId>/ingest" \
+  -H "Authorization: Bearer <access-token>" \
+  --data-binary 'User: hello
+Assistant: hi there'
+```
 
 ## Errors
 
-Stop and ask the human when you receive:
+Agent routes return a structured envelope:
 
-- `401`: token missing, invalid, expired, or revoked
-- `403`: token is not allowed to perform the requested action
-- `404`: session not found
-- `400`: request body is invalid
+```json
+{ "ok": false, "code": "TOKEN_EXPIRED", "retryable": false, "message": "...", "next_steps": ["..."] }
+```
+
+Follow `next_steps`. Retry only when `retryable` is true. Stop and ask the human
+on `TOKEN_EXPIRED`, `TOKEN_REVOKED`, `SESSION_MISMATCH`, or `NOT_FOUND`.

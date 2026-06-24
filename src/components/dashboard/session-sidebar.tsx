@@ -70,14 +70,14 @@ export function SessionSidebar({
           value={newSessionTitle}
           onChange={(event) => onNewSessionTitleChange(event.target.value)}
           onKeyDown={(event) => event.key === 'Enter' && onCreateSession()}
-          placeholder="New session"
+          placeholder="New session name (optional)"
           disabled={!selectedTopic}
         />
         <button
           className="rounded-md bg-emerald-600 p-2 text-white hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-emerald-400 dark:text-slate-950 dark:hover:bg-emerald-300"
           onClick={onCreateSession}
           disabled={!selectedTopic}
-          title="Create session"
+          title="New session (name optional)"
           type="button"
         >
           <Plus size={18} />

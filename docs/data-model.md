@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.2"
+  "version": "0.1.3"
 }
 ```
 
@@ -114,8 +114,15 @@ Scoped tokens for AI agents.
 | `can_rename_session` | BOOLEAN | Allow session title suggestions |
 | `revoked` | BOOLEAN | Soft revoke flag |
 | `created_at` | TIMESTAMPTZ | Creation time |
-| `expires_at` | TIMESTAMPTZ | Optional expiry |
+| `expires_at` | TIMESTAMPTZ | Expiry; NULL means never expire |
 | `last_used_at` | TIMESTAMPTZ | Last successful use |
+| `token_prefix` | TEXT | First 16 chars for fast lookup |
+
+**Expiration**: Tokens may be created with `expires_in` of `1h`, `24h`, `7d`
+(default), `30d`, or `never`. `never` stores a NULL `expires_at`; tokens created
+before expiration existed also have NULL and are treated as never-expiring.
+Expired tokens are rejected at authentication time. Status is derived as
+`active`, `expired`, or `revoked`.
 
 **Constraints**:
 - Primary key: `id`
@@ -175,6 +182,33 @@ Immutable conversation messages.
 - `tool`: Tool response
 - `correction`: Correction to previous message
 
+### compactions
+
+Durable session summaries stored alongside raw messages, for when full message
+upload is impossible. Compactions are **additional** records and never replace
+messages.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | TEXT | `cmp_<timestamp>_<id>` |
+| `session_id` | TEXT | Parent session (foreign key) |
+| `summary` | TEXT | Required summary text |
+| `timeline_json` | JSONB | Optional timeline |
+| `decisions_json` | JSONB | Optional decisions |
+| `requirements_json` | JSONB | Optional requirements |
+| `open_questions_json` | JSONB | Optional open questions |
+| `artifacts_json` | JSONB | Optional artifacts |
+| `warnings_json` | JSONB | Optional warnings |
+| `provider` | TEXT | AI provider |
+| `base_model` | TEXT | Model name |
+| `created_at` | TIMESTAMPTZ | Insertion time |
+| `metadata_json` | JSONB | Extra metadata |
+
+**Constraints**:
+- Primary key: `id`
+- Foreign key: `session_id → sessions.id`
+- Index: `session_id`
+
 ### events
 
 Audit trail for all actions.
@@ -203,6 +237,7 @@ Audit trail for all actions.
 - `token.created`
 - `token.revoked`
 - `message.appended`
+- `compaction.recorded`
 - `topic.created`
 - `topic.renamed`
 - `topic.archived`
@@ -233,6 +268,7 @@ All IDs use `prefix_<timestamp>_<random>` format:
 | `ses_` | sessions |
 | `tok_` | session_tokens |
 | `msg_` | messages |
+| `cmp_` | compactions |
 | `evt_` | events |
 
 **Example**: `topic_1719099900_a3f2b1c4`
@@ -356,3 +392,9 @@ LIMIT 50;
 - Immutable messages
 - Audit events
 - Migration tracking
+
+### v0.1.3 (agent recording URL)
+
+- Added `compactions` table for durable session summaries
+- Session access tokens gained expiration choices (`expires_at`, NULL = never)
+- Agent recording-URL + token model with public protocol discovery

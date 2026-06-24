@@ -15,11 +15,14 @@ PCP is a small Next.js + Postgres app for recording AI sessions with least-privi
 
 1. Deploy initialization creates the app schema and admin credential.
 2. Human logs in with `PCP_ADMIN_TOKEN` or the generated first-login UI token.
-3. Human creates topics and sessions.
+3. Human creates topics and sessions one-click (names are generated if omitted).
 4. Human edits, moves, archives, or restores sessions from the dashboard.
-5. Human generates a session token for one AI agent/session.
-6. AI appends messages through `POST /api/v1/sessions/:sessionId/messages`.
-7. Human reviews messages and events in the admin UI.
+5. Human generates a **recording URL + access token** pair for one AI agent/session,
+   choosing a token expiration (default 7 days).
+6. The AI fetches the recording URL to discover routes, then records via
+   `POST /api/v1/agent/sessions/:sessionId/messages` (or `/compact`, `/ingest`)
+   with `Authorization: Bearer <access-token>`.
+7. Human reviews messages, compactions, events, and token status in the admin UI.
 
 ## Invariants
 

@@ -87,6 +87,17 @@ Initial schema creation:
 - `schema_migrations` table
 - All indexes
 
+### 0001_agent_recording
+
+Agent recording-URL model (idempotent, data-preserving):
+- `compactions` table for durable session summaries (additional records, never
+  replacing raw messages)
+- Defensive `ALTER TABLE session_tokens ADD COLUMN IF NOT EXISTS expires_at`
+  (NULL means never expire; pre-existing tokens keep NULL)
+
+The same statements run through the idempotent `ensureDatabaseSchema()` bootstrap
+so fresh deploys and existing databases converge to the same schema.
+
 ## Checking migration status
 
 ```bash
@@ -112,4 +123,4 @@ Drizzle doesn't support automatic rollbacks. Manual approach:
 
 Schema version is stored in `app_instance.version` and updated when migrations are applied.
 
-Current version: `0.1.2`
+Current version: `0.1.3`

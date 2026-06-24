@@ -205,8 +205,9 @@ export default function Dashboard() {
   }
 
   async function createTopic() {
+    // Title is optional: clicking "New Topic" with an empty box lets the server
+    // generate a unique default name.
     const title = newTopicTitle.trim();
-    if (!title) return;
 
     try {
       const uiToken = getUiToken();
@@ -216,7 +217,7 @@ export default function Dashboard() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${uiToken}`,
         },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify(title ? { title } : {}),
       });
       const data = await readJsonResponse(res, {
         consequence: 'Unable to create topic',
@@ -231,7 +232,7 @@ export default function Dashboard() {
 
       setNewTopicTitle('');
       setSelectedTopicId(data.id);
-      setStatus(`Topic created: ${title}`);
+      setStatus(`Topic created: ${data.title || title}`);
       await loadTopics();
     } catch (err) {
       setError(diagnosticMessage({
@@ -243,8 +244,10 @@ export default function Dashboard() {
   }
 
   async function createSession() {
+    // Title is optional: one-click "New Session" lets the server generate a
+    // unique default name within the topic.
     const title = newSessionTitle.trim();
-    if (!selectedTopic || !title) return;
+    if (!selectedTopic) return;
 
     try {
       const uiToken = getUiToken();
@@ -254,7 +257,7 @@ export default function Dashboard() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${uiToken}`,
         },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify(title ? { title } : {}),
       });
       const data = await readJsonResponse(res, {
         consequence: 'Unable to create session',
@@ -269,7 +272,7 @@ export default function Dashboard() {
 
       setNewSessionTitle('');
       setSelectedSessionId(data.id);
-      setStatus(`Session created: ${title}`);
+      setStatus(`Session created: ${data.title || title}`);
       await loadSessions(selectedTopic.id);
       await loadTopics();
     } catch (err) {
@@ -347,10 +350,8 @@ export default function Dashboard() {
   }
 
   async function generateToken(session: Session) {
-    const name = window.prompt('Token name', `${session.title} AI token`);
-    if (!name?.trim()) return;
-    const canRename = window.confirm('Allow AI to suggest session titles?');
-
+    // Quick generate with the default 7-day expiry. Full expiration controls and
+    // the token status list live on the session detail page (/sessions/<id>).
     try {
       const uiToken = getUiToken();
       const res = await fetch(`/api/v1/sessions/${session.id}/tokens`, {
@@ -359,7 +360,7 @@ export default function Dashboard() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${uiToken}`,
         },
-        body: JSON.stringify({ name: name.trim(), can_rename_session: canRename }),
+        body: JSON.stringify({ expires_in: '7d' }),
       });
       const data = await readJsonResponse(res, {
         consequence: 'Unable to create token',
@@ -367,23 +368,14 @@ export default function Dashboard() {
         fallbackCause: 'create token endpoint did not return JSON',
       });
 
-      if (!res.ok || data.error || !data.token) {
-        setError(data.error || 'Unable to create token: session token administration / create token request - API response did not include token');
+      if (!res.ok || data.error || !data.access_token) {
+        setError(data.error || 'Unable to create token: session token administration / create token request - API response did not include access token');
         return;
       }
 
-      const instructions = [
-        `APP_URL: ${window.location.origin}`,
-        `SESSION_ID: ${session.id}`,
-        `SESSION_TOKEN: ${data.token}`,
-        '',
-        `POST ${window.location.origin}/api/v1/sessions/${session.id}/messages`,
-        'Use Authorization: Bearer <SESSION_TOKEN>',
-      ].join('\n');
-
-      setGeneratedToken(instructions);
-      setStatus('Session token created. Copy it now; it will not be shown again.');
-      await navigator.clipboard.writeText(instructions).catch(() => undefined);
+      setGeneratedToken(data.instruction);
+      setStatus('Recording URL + access token created. Copy them now; the token will not be shown again.');
+      await navigator.clipboard.writeText(data.instruction).catch(() => undefined);
     } catch (err) {
       setError(diagnosticMessage({
         consequence: 'Unable to create token',

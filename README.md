@@ -10,10 +10,14 @@ Vercel + Neon Postgres web app for scoped AI session recording.
 
 Personal Context Protocol stores AI conversation context in user-managed topics and sessions.
 
-- Admin users create topics and recording sessions in the web UI.
-- Each session gets a scoped API token for an external AI agent.
-- Agents append messages to their assigned session only.
-- The admin dashboard previews sessions, events, and exports.
+- Admin users create topics and recording sessions in the web UI (one click, no
+  naming required — defaults are generated and duplicates auto-suffixed).
+- Each session produces a **recording URL + access token** pair. An agent fetches
+  the recording URL to discover its upload routes, then records using only
+  `Authorization: Bearer <access-token>`.
+- Agents append messages to their assigned session only, or send a compaction
+  when full upload is impossible. They never manage topics.
+- The admin dashboard previews sessions, events, token status, and exports.
 
 ## Quick Deploy
 
@@ -41,7 +45,7 @@ After login, use **Settings** to set a custom admin token. Settings rotation is 
 
 ## Docker Compose Deployment
 
-Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.2; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
+Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.3; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
 
 ## Local Development
 
@@ -69,12 +73,16 @@ npm run build
 - Generated during deploy initialization when `PCP_ADMIN_TOKEN` is not configured; the generated first-login token is printed once in build/start logs.
 - Can be rotated from the Settings page after login.
 
-### AI session token
+### AI session access token
 
-- Generated per session and shown once.
+- Generated per session and shown once, paired with the session's recording URL.
 - Stored as a salted hash with a token prefix for lookup.
-- Scoped to one session.
-- Can append messages and optionally rename its session.
+- Scoped to exactly one session.
+- Expiration is chosen at creation: `1h`, `24h`, `7d` (default), `30d`, or
+  `never`. Expired or revoked tokens are rejected; tokens created before
+  expiration existed are treated as never-expiring.
+- Can append messages, record compactions, and optionally suggest its session
+  title. Cannot manage topics.
 
 ## Documentation
 

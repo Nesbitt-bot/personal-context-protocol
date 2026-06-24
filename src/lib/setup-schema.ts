@@ -66,6 +66,21 @@ const SCHEMA_STATEMENTS = [
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (session_id, ordinal)
   )`,
+  `CREATE TABLE IF NOT EXISTS compactions (
+    id text PRIMARY KEY,
+    session_id text NOT NULL REFERENCES sessions(id),
+    summary text NOT NULL,
+    timeline_json jsonb,
+    decisions_json jsonb,
+    requirements_json jsonb,
+    open_questions_json jsonb,
+    artifacts_json jsonb,
+    warnings_json jsonb,
+    provider text,
+    base_model text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    metadata_json jsonb DEFAULT '{}'
+  )`,
   `CREATE TABLE IF NOT EXISTS events (
     id text PRIMARY KEY,
     session_id text REFERENCES sessions(id),
@@ -75,6 +90,8 @@ const SCHEMA_STATEMENTS = [
     details_json jsonb DEFAULT '{}',
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
+  // Defensive upgrade for deployments initialized before token expiration existed.
+  'ALTER TABLE session_tokens ADD COLUMN IF NOT EXISTS expires_at timestamptz',
   `CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT now(),
@@ -87,6 +104,7 @@ const SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS session_tokens_session_id_idx ON session_tokens(session_id)',
   'CREATE INDEX IF NOT EXISTS events_session_id_idx ON events(session_id)',
   'CREATE INDEX IF NOT EXISTS events_created_at_idx ON events(created_at)',
+  'CREATE INDEX IF NOT EXISTS compactions_session_id_idx ON compactions(session_id)',
 ];
 
 /**
@@ -102,6 +120,12 @@ export async function ensureDatabaseSchema() {
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
     VALUES ('001_initial', 'initial_schema')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('002_agent_recording', 'compactions_and_token_expiration')
     ON CONFLICT (version) DO NOTHING
   `);
 }

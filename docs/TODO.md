@@ -40,6 +40,32 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
   - [x] Sphinx documentation build root fixed
   - [x] README and protocol docs updated for implemented routes
 
+## v0.1.3 Completed — Agent recording URL
+
+Shipped within the v0.1 line. The agent recording-URL surface and token
+expiration land here as part of v0.1; the move to **v0.2.0 is gated on
+completing v0.1 Remaining Hardening below**, not on shipping this feature.
+
+- [x] **Recording URL + token model**
+  - [x] `GET /r/:sessionId` public recording-URL entry point
+  - [x] `GET /api/v1/agent/resolve?url=` and `GET /api/v1/agent/sessions/:id/protocol`
+  - [x] Self-describing protocol (auth, routes, allowed_actions, limits)
+  - [x] Copyable Recording URL + Access Token pair in the session UI
+
+- [x] **Agent ingestion**
+  - [x] `POST /api/v1/agent/sessions/:id/messages` append (append-only)
+  - [x] `POST /api/v1/agent/sessions/:id/compact` durable summaries (additional records)
+  - [x] `POST /api/v1/agent/sessions/:id/ingest` forgiving parser (JSON, PCP tags, ChatML, transcript)
+  - [x] Structured `{ ok, code, retryable, message, next_steps }` agent errors
+
+- [x] **Token expiration**
+  - [x] `expires_in` choices (1h/24h/7d/30d/never), default 7d, NULL = never expire
+  - [x] Reject expired tokens; show active/expired/revoked + last used in UI
+
+- [x] **Naming**
+  - [x] One-click topic/session creation with generated default names
+  - [x] Duplicate title auto-suffixing; AI-suggested title normalization
+
 ## v0.1 Remaining Hardening
 
 - [ ] **Startup validation**

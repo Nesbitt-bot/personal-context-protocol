@@ -122,6 +122,17 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-23 - Added agent recording-URL model (v0.1.3)
+  - Patch-bumped release metadata to 0.1.3 (VERSION, package.json, package-lock, version.ts, Dockerfile, docker-compose, pyproject)
+  - Version policy: stays in the v0.1 line. A 0.2.0 bump is gated on completing v0.1 Remaining Hardening (startup validation, setup integration tests, security audit, API docs sync); it is not triggered by shipping a feature while that work is open. Corrected an earlier 0.2.0 bump back to 0.1.3 for this reason.
+  - Added pure helper libs: naming, recording-url, agent-protocol, ingest, agent-errors, token-expiration
+  - Added `compactions` table + idempotent migration `0001_agent_recording.sql` and setup-schema bootstrap
+  - Added public discovery routes (`/r/:id`, `/agent/resolve`, `/agent/sessions/:id/protocol`) and agent write routes (messages, compact, ingest) with structured `{ ok, code, retryable, message, next_steps }` errors
+  - Token expiration choices (1h/24h/7d/30d/never, default 7d; NULL = never); token list shows active/expired/revoked + last used
+  - One-click topic/session creation with generated default names; duplicate titles auto-suffixed; AI-suggested titles normalized + de-duped within topic
+  - Session detail UI shows recording URL, expiration controls, copyable URL+token agent instruction, and issued-token status
+  - Added tests (naming, recording-url, protocol, ingest, token-expiration, agent-errors); 43 tests pass
+  - DB-backed routes verified via typecheck + build; no live Neon DB in the test env, so route-level append/compact/expiry rejection are covered by their pure building blocks plus example curl in docs/agent-instructions.md
 - 2026-06-23 - Added deploy-time database/admin bootstrap
   - Bumped release metadata to 0.1.2 for the current change round
   - Added build/start deploy initialization for schema, app instance, and admin credential
