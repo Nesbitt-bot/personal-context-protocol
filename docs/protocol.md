@@ -92,6 +92,26 @@ Archives a topic.
 
 ## Admin Sessions
 
+### GET `/sessions`
+
+Lists every session across all topics, including uncategorized ones
+(`topic_id: null`). Used by the dashboard to group sessions by topic.
+
+### POST `/sessions`
+
+Creates a session. `topic_id` is optional — omit it for an **uncategorized**
+(no-topic) session. `title` is optional and auto-suffixed for uniqueness within
+the topic group (or the uncategorized group).
+
+Body (all fields optional):
+
+```json
+{
+  "title": "Conversation title",
+  "topic_id": "topic_123"
+}
+```
+
 ### GET `/topics/:topicId/sessions`
 
 Lists sessions inside a topic.
@@ -128,7 +148,9 @@ Body:
 }
 ```
 
-At least one field is required. `archived: true` removes the session from the active list; `archived: false` restores it.
+At least one field is required. `topic_id: null` moves the session to
+Uncategorized (no topic). `archived: true` removes the session from the active
+list; `archived: false` restores it.
 
 ### GET `/sessions/:id/review`
 

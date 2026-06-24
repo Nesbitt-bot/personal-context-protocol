@@ -41,9 +41,10 @@ export const renameTopicSchema = z.object({
   title: z.string().min(1).max(100),
 });
 
-// Session schemas
+// Session schemas. `topic_id` is optional: omit it for an uncategorized session.
 export const createSessionSchema = z.object({
   title: z.string().max(200).optional(),
+  topic_id: z.string().min(1).optional(),
 });
 
 export const renameSessionSchema = z.object({
@@ -52,7 +53,8 @@ export const renameSessionSchema = z.object({
 
 export const updateSessionSchema = z.object({
   title: z.string().min(1).max(200).optional(),
-  topic_id: z.string().min(1).optional(),
+  // null moves the session to "no topic" (uncategorized).
+  topic_id: z.string().min(1).nullable().optional(),
   archived: z.boolean().optional(),
 }).refine((value) => (
   value.title !== undefined || value.topic_id !== undefined || value.archived !== undefined

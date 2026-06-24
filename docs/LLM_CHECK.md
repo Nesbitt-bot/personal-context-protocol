@@ -122,6 +122,14 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-24 - ChatGPT-style nav, context menu, and uncategorized sessions (v0.1.5)
+  - Patch-bumped release metadata to 0.1.5
+  - Made `sessions.topic_id` and `messages.topic_id` nullable + idempotent migration `0003_optional_topic.sql` (mirrored in setup-schema and deploy-init)
+  - Added `GET/POST /api/v1/sessions` (list all + create with optional topic); `PATCH /sessions/:id` accepts `topic_id: null` to move to Uncategorized
+  - Null-safe session-title uniqueness within the topic group or the uncategorized group (new `session-store.ts`; recording-store rename made null-safe)
+  - Replaced the two-column topic/session sidebars with one ChatGPT-style nav: collapsible topic groups + Uncategorized group, sessions nested as items; removed `topic-sidebar.tsx` and `session-sidebar.tsx`
+  - Right-click + long-press context menu to remove (archive) topics/sessions, with confirm; removing a topic moves its sessions to Uncategorized so none are lost
+  - Verified end-to-end against live Postgres: nullable columns, uncategorized create + auto-suffix, grouping, agent append to a no-topic session (message.topic_id NULL), move to/from a topic, archive
 - 2026-06-23 - Per-deploy admin token rotation + recovery guidance (v0.1.4)
   - Patch-bumped release metadata to 0.1.4
   - Added `ui_auth.source` (deploy/env/user) + idempotent migration `0002_admin_token_source.sql`; pre-existing credentials migrate to `user` so an upgrade never rotates a token already in use

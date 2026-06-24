@@ -9,7 +9,7 @@ export interface Topic {
 
 export interface Session {
   id: string;
-  topic_id: string;
+  topic_id: string | null;
   title: string;
   archived: boolean;
   created_at: string;

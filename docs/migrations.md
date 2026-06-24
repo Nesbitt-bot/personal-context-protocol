@@ -109,6 +109,15 @@ Admin credential provenance (idempotent, lockout-safe):
 (`PCP_ADMIN_TOKEN`), or `user` (set in Settings). New installs default the
 column to `deploy` and deploy initialization sets it explicitly.
 
+### 0003_optional_topic
+
+Uncategorized sessions (idempotent, data-preserving):
+- `ALTER TABLE sessions ALTER COLUMN topic_id DROP NOT NULL`
+- `ALTER TABLE messages ALTER COLUMN topic_id DROP NOT NULL`
+
+A session (and its denormalized messages) may now have no topic. The foreign key
+remains; NULL is simply allowed. Existing rows keep their `topic_id`.
+
 ## Checking migration status
 
 ```bash
@@ -134,4 +143,4 @@ Drizzle doesn't support automatic rollbacks. Manual approach:
 
 Schema version is stored in `app_instance.version` and updated when migrations are applied.
 
-Current version: `0.1.4`
+Current version: `0.1.5`

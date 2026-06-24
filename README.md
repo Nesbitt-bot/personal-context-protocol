@@ -11,7 +11,10 @@ Vercel + Neon Postgres web app for scoped AI session recording.
 Personal Context Protocol stores AI conversation context in user-managed topics and sessions.
 
 - Admin users create topics and recording sessions in the web UI (one click, no
-  naming required — defaults are generated and duplicates auto-suffixed).
+  naming required — defaults are generated and duplicates auto-suffixed). The
+  ChatGPT-style nav shows topics as collapsible groups with nested sessions, plus
+  an Uncategorized group for sessions with no topic. Right-click or long-press an
+  item to remove it.
 - Each session produces a **recording URL + access token** pair. An agent fetches
   the recording URL to discover its upload routes, then records using only
   `Authorization: Bearer <access-token>`.
@@ -47,7 +50,7 @@ If you entered the wrong password: find the current token in your **most recent*
 
 ## Docker Compose Deployment
 
-Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.4; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
+Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.5; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
 
 ## Local Development
 

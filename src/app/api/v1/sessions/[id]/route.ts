@@ -117,17 +117,20 @@ export async function PATCH(
 
     await db.update(sessions).set(updates).where(eq(sessions.id, params.id));
 
+    // topic_id may be null (move to uncategorized); distinguish "unset" (undefined).
+    const nextTopicId = topic_id === undefined ? existing.topicId : topic_id;
+
     await db.insert(events).values({
       id: createId('evt'),
       sessionId: params.id,
-      topicId: topic_id || existing.topicId,
+      topicId: nextTopicId ?? existing.topicId,
       action: archived === true ? 'session.archived' : archived === false ? 'session.restored' : 'session.updated',
       actor: 'human',
       detailsJson: {
         old_title: existing.title,
         new_title: title ?? existing.title,
         old_topic_id: existing.topicId,
-        new_topic_id: topic_id ?? existing.topicId,
+        new_topic_id: nextTopicId,
         archived: archived ?? existing.archived,
       },
       createdAt: new Date(),
@@ -137,7 +140,7 @@ export async function PATCH(
       success: true,
       id: params.id,
       title: title ?? existing.title,
-      topic_id: topic_id ?? existing.topicId,
+      topic_id: nextTopicId,
       archived: archived ?? existing.archived,
     });
   } catch (error) {

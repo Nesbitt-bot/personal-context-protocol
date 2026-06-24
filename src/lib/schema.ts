@@ -34,12 +34,10 @@ export const topics = pgTable('topics', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Sessions
+// Sessions. `topicId` is nullable: a session may be uncategorized (no topic).
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
-  topicId: text('topic_id')
-    .notNull()
-    .references(() => topics.id),
+  topicId: text('topic_id').references(() => topics.id),
   title: text('title').notNull(),
   archived: boolean('archived').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -70,9 +68,8 @@ export const messages = pgTable('messages', {
   sessionId: text('session_id')
     .notNull()
     .references(() => sessions.id),
-  topicId: text('topic_id')
-    .notNull()
-    .references(() => topics.id),
+  // Denormalized from the session; null when the session has no topic.
+  topicId: text('topic_id').references(() => topics.id),
   ordinal: integer('ordinal').notNull(),
   role: text('role', { enum: ['user', 'assistant', 'system', 'tool', 'correction'] }).notNull(),
   content: text('content').notNull(),

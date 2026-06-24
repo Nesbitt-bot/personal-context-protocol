@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.4"
+  "version": "0.1.5"
 }
 ```
 
@@ -88,12 +88,12 @@ Human-managed topics/categories for organizing sessions.
 
 ### sessions
 
-AI recording sessions within topics.
+AI recording sessions, optionally within a topic.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | TEXT | `ses_<timestamp>_<id>` |
-| `topic_id` | TEXT | Parent topic (foreign key) |
+| `topic_id` | TEXT | Parent topic (foreign key, **nullable**: NULL = uncategorized) |
 | `title` | TEXT | Session title (may be suggested by AI) |
 | `archived` | BOOLEAN | Soft delete flag |
 | `created_at` | TIMESTAMPTZ | Creation time |
@@ -102,9 +102,13 @@ AI recording sessions within topics.
 
 **Constraints**:
 - Primary key: `id`
-- Foreign key: `topic_id → topics.id`
+- Foreign key: `topic_id → topics.id` (nullable)
 - Index: `topic_id`
 - Index: `archived`
+
+**Uncategorized**: a session may have no topic (`topic_id` NULL). The UI groups
+these under "Uncategorized". Title uniqueness is scoped to the group — sessions
+under the same topic, or all topic-less sessions.
 
 **AI access**: AI can only view/append to sessions for which it has a valid token.
 
@@ -154,7 +158,7 @@ Immutable conversation messages.
 |--------|------|-------------|
 | `id` | TEXT | `msg_<timestamp>_<id>` |
 | `session_id` | TEXT | Parent session (foreign key) |
-| `topic_id` | TEXT | Denormalized topic (foreign key) |
+| `topic_id` | TEXT | Denormalized topic (foreign key, nullable; NULL for uncategorized sessions) |
 | `ordinal` | INTEGER | Order within session (1, 2, 3...) |
 | `role` | TEXT | `user`, `assistant`, `system`, `tool`, `correction` |
 | `content` | TEXT | Message content (markdown/text) |
@@ -401,8 +405,17 @@ LIMIT 50;
 - Audit events
 - Migration tracking
 
-### v0.1.4 (agent recording URL)
+### v0.1.3 (agent recording URL)
 
 - Added `compactions` table for durable session summaries
 - Session access tokens gained expiration choices (`expires_at`, NULL = never)
 - Agent recording-URL + token model with public protocol discovery
+
+### v0.1.4 (admin token rotation)
+
+- Added `ui_auth.source` (`deploy` | `env` | `user`) for per-deploy rotation
+
+### v0.1.5 (uncategorized sessions)
+
+- `sessions.topic_id` and `messages.topic_id` made nullable (NULL = no topic)
+- ChatGPT-style nav: collapsible topic groups with nested sessions

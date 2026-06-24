@@ -103,7 +103,7 @@ export function SessionWorkspace({
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
                 <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  <span>{selectedTopic?.title}</span>
+                  <span>{selectedTopic?.title || 'Uncategorized'}</span>
                   {selectedSession.archived && <span className="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">Archived</span>}
                 </div>
                 <h2 className="truncate text-2xl font-semibold text-slate-950 dark:text-white">{selectedSession.title}</h2>
@@ -155,6 +155,7 @@ export function SessionWorkspace({
                   value={editTopicId}
                   onChange={(event) => onEditTopicIdChange(event.target.value)}
                 >
+                  <option value="">Uncategorized (no topic)</option>
                   {topics.map((topic) => (
                     <option key={topic.id} value={topic.id}>{topic.title}</option>
                   ))}

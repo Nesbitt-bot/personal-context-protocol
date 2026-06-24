@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { SiteNav } from '@/components/site-nav';
-import { SessionSidebar } from '@/components/dashboard/session-sidebar';
+import { NavSidebar } from '@/components/dashboard/nav-sidebar';
 import { SessionWorkspace } from '@/components/dashboard/session-workspace';
-import { TopicSidebar } from '@/components/dashboard/topic-sidebar';
 import { EventLog, Message, Session, Topic } from '@/components/dashboard/types';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause, logError } from '@/lib/logging';
@@ -17,8 +16,9 @@ function getUiToken() {
 }
 
 /**
- * Dashboard coordinates API calls and passes all rendering to focused topic,
- * session, and workspace components.
+ * Dashboard coordinates API calls and renders a ChatGPT-style nav (collapsible
+ * topic groups with nested sessions, plus an Uncategorized group) alongside the
+ * session workspace.
  */
 export default function Dashboard() {
   const router = useRouter();
@@ -26,10 +26,8 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [events, setEvents] = useState<EventLog[]>([]);
-  const [selectedTopicId, setSelectedTopicId] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState('');
-  const [newTopicTitle, setNewTopicTitle] = useState('');
-  const [newSessionTitle, setNewSessionTitle] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editingSession, setEditingSession] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editTopicId, setEditTopicId] = useState('');
@@ -43,44 +41,14 @@ export default function Dashboard() {
   const [hasUiToken, setHasUiToken] = useState(false);
   const [uiTokenSource, setUiTokenSource] = useState<string | null>(null);
 
-  const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) || null;
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) || null;
-
-  const visibleSessions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return sessions.filter((session) => {
-      if (!showArchived && session.archived) return false;
-      if (!normalizedQuery) return true;
-      return session.title.toLowerCase().includes(normalizedQuery);
-    });
-  }, [query, sessions, showArchived]);
+  const selectedTopic = topics.find((topic) => topic.id === selectedSession?.topic_id) || null;
 
   useEffect(() => {
     setHasUiToken(Boolean(getUiToken()));
-    loadTopics();
+    loadAll();
     loadAuthState();
   }, []);
-
-  /** Reads the admin credential provenance to warn when a deploy token is in use. */
-  async function loadAuthState() {
-    const uiToken = getUiToken();
-    if (!uiToken) return;
-    try {
-      const res = await fetch('/api/v1/auth/check', { headers: { Authorization: `Bearer ${uiToken}` } });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && typeof data.ui_token_source === 'string') {
-        setUiTokenSource(data.ui_token_source);
-      }
-    } catch {
-      // Non-fatal: the warning banner is advisory only.
-    }
-  }
-
-  useEffect(() => {
-    if (selectedTopicId) {
-      loadSessions(selectedTopicId);
-    }
-  }, [selectedTopicId]);
 
   useEffect(() => {
     if (selectedSessionId) {
@@ -91,7 +59,19 @@ export default function Dashboard() {
     }
   }, [selectedSessionId]);
 
-  /** Saves the one-time UI token in browser storage for admin API calls. */
+  /** Reads the admin credential provenance to warn when a deploy token is in use. */
+  async function loadAuthState() {
+    const uiToken = getUiToken();
+    if (!uiToken) return;
+    try {
+      const res = await fetch('/api/v1/auth/check', { headers: { Authorization: `Bearer ${uiToken}` } });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && typeof data.ui_token_source === 'string') setUiTokenSource(data.ui_token_source);
+    } catch {
+      // Non-fatal: the warning banner is advisory only.
+    }
+  }
+
   function saveUiToken() {
     const token = uiTokenInput.trim();
     if (!token) return;
@@ -99,10 +79,25 @@ export default function Dashboard() {
     setHasUiToken(true);
     setUiTokenInput('');
     setError('');
-    loadTopics();
+    loadAll();
+    loadAuthState();
   }
 
-  async function loadTopics() {
+  function toggleExpand(groupId: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
+  function authHeaders(): Record<string, string> {
+    return { Authorization: `Bearer ${getUiToken()}` };
+  }
+
+  /** Loads topics and every session in one pass, then groups them in the nav. */
+  async function loadAll() {
     setLoading(true);
     try {
       const uiToken = getUiToken();
@@ -112,83 +107,50 @@ export default function Dashboard() {
         return;
       }
 
-      const res = await fetch('/api/v1/topics', {
-        headers: { Authorization: `Bearer ${uiToken}` },
-      });
-      const data = await readJsonResponse(res, {
+      const [topicsRes, sessionsRes] = await Promise.all([
+        fetch('/api/v1/topics', { headers: authHeaders() }),
+        fetch('/api/v1/sessions', { headers: authHeaders() }),
+      ]);
+      const topicsData = await readJsonResponse(topicsRes, {
         consequence: 'Unable to load topics',
         moduleProcess: 'topic administration / list topics request',
         fallbackCause: 'topics endpoint did not return JSON',
       });
+      const sessionsData = await readJsonResponse(sessionsRes, {
+        consequence: 'Unable to load sessions',
+        moduleProcess: 'session administration / list sessions request',
+        fallbackCause: 'sessions endpoint did not return JSON',
+      });
 
-      if (!res.ok || data.error) {
-        setError(data.error || 'Unable to load topics: topic administration / list topics request - API response did not include topics');
+      if (!topicsRes.ok || topicsData.error) {
+        setError(topicsData.error || 'Unable to load topics: topic administration / list topics request - API response did not include topics');
+        return;
+      }
+      if (!sessionsRes.ok || sessionsData.error) {
+        setError(sessionsData.error || 'Unable to load sessions: session administration / list sessions request - API response did not include sessions');
         return;
       }
 
-      const activeTopics = (data.topics || []).filter((topic: Topic) => !topic.archived);
-      setTopics(activeTopics);
-
-      if (!selectedTopicId && activeTopics[0]) {
-        setSelectedTopicId(activeTopics[0].id);
-      }
+      setTopics(topicsData.topics || []);
+      setSessions(sessionsData.sessions || []);
+      setError('');
     } catch (err) {
       setError(diagnosticMessage({
-        consequence: 'Unable to load topics',
-        moduleProcess: 'topic administration / list topics request',
-        cause: `browser could not reach /api/v1/topics or parse its response; ${errorCause(err)}`,
+        consequence: 'Unable to load workspace',
+        moduleProcess: 'dashboard / initial data load',
+        cause: `browser could not reach the topics or sessions endpoint or parse its response; ${errorCause(err)}`,
       }));
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadSessions(topicId: string) {
-    try {
-      const uiToken = getUiToken();
-      const res = await fetch(`/api/v1/topics/${topicId}/sessions`, {
-        headers: { Authorization: `Bearer ${uiToken}` },
-      });
-      const data = await readJsonResponse(res, {
-        consequence: 'Unable to load sessions',
-        moduleProcess: 'session administration / list sessions request',
-        fallbackCause: 'topic sessions endpoint did not return JSON',
-      });
-
-      if (!res.ok || data.error) {
-        setError(data.error || 'Unable to load sessions: session administration / list sessions request - API response did not include sessions');
-        return;
-      }
-
-      const nextSessions: Session[] = data.sessions || [];
-      setSessions(nextSessions);
-
-      if (!nextSessions.some((session) => session.id === selectedSessionId)) {
-        const firstActive = nextSessions.find((session) => !session.archived) || nextSessions[0];
-        setSelectedSessionId(firstActive?.id || '');
-      }
-    } catch (err) {
-      logError({
-        consequence: 'Unable to load sessions',
-        moduleProcess: 'session administration / list sessions request',
-        cause: `browser could not reach /api/v1/topics/${topicId}/sessions or parse its response`,
-        error: err,
-      });
-    }
-  }
-
   async function loadSessionDetail(sessionId: string) {
     try {
-      const uiToken = getUiToken();
       const [reviewRes, eventsRes] = await Promise.all([
-        fetch(`/api/v1/sessions/${sessionId}/review`, {
-          headers: { Authorization: `Bearer ${uiToken}` },
-        }),
-        fetch(`/api/v1/sessions/${sessionId}/events`, {
-          headers: { Authorization: `Bearer ${uiToken}` },
-        }),
+        fetch(`/api/v1/sessions/${sessionId}/review`, { headers: authHeaders() }),
+        fetch(`/api/v1/sessions/${sessionId}/events`, { headers: authHeaders() }),
       ]);
-
       const reviewData = await readJsonResponse(reviewRes, {
         consequence: 'Unable to load messages',
         moduleProcess: 'session review / message list request',
@@ -204,7 +166,6 @@ export default function Dashboard() {
         setError(reviewData.error || 'Unable to load messages: session review / message list request - API response did not include messages');
         return;
       }
-
       if (!eventsRes.ok || eventsData.error) {
         setError(eventsData.error || 'Unable to load events: session review / event list request - API response did not include events');
         return;
@@ -223,35 +184,20 @@ export default function Dashboard() {
   }
 
   async function createTopic() {
-    // Title is optional: clicking "New Topic" with an empty box lets the server
-    // generate a unique default name.
-    const title = newTopicTitle.trim();
-
     try {
-      const uiToken = getUiToken();
-      const res = await fetch('/api/v1/topics', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${uiToken}`,
-        },
-        body: JSON.stringify(title ? { title } : {}),
-      });
+      const res = await fetch('/api/v1/topics', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: '{}' });
       const data = await readJsonResponse(res, {
         consequence: 'Unable to create topic',
         moduleProcess: 'topic administration / create topic request',
         fallbackCause: 'create topic endpoint did not return JSON',
       });
-
       if (!res.ok || data.error) {
         setError(data.error || 'Unable to create topic: topic administration / create topic request - API response did not include success');
         return;
       }
-
-      setNewTopicTitle('');
-      setSelectedTopicId(data.id);
-      setStatus(`Topic created: ${data.title || title}`);
-      await loadTopics();
+      setExpanded((prev) => new Set(prev).add(data.id));
+      setStatus(`Topic created: ${data.title}`);
+      await loadAll();
     } catch (err) {
       setError(diagnosticMessage({
         consequence: 'Unable to create topic',
@@ -261,65 +207,98 @@ export default function Dashboard() {
     }
   }
 
-  async function createSession() {
-    // Title is optional: one-click "New Session" lets the server generate a
-    // unique default name within the topic.
-    const title = newSessionTitle.trim();
-    if (!selectedTopic) return;
-
+  async function createSession(topicId: string | null) {
     try {
-      const uiToken = getUiToken();
-      const res = await fetch(`/api/v1/topics/${selectedTopic.id}/sessions`, {
+      const res = await fetch('/api/v1/sessions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${uiToken}`,
-        },
-        body: JSON.stringify(title ? { title } : {}),
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(topicId ? { topic_id: topicId } : {}),
       });
       const data = await readJsonResponse(res, {
         consequence: 'Unable to create session',
         moduleProcess: 'session administration / create session request',
         fallbackCause: 'create session endpoint did not return JSON',
       });
-
       if (!res.ok || data.error) {
         setError(data.error || 'Unable to create session: session administration / create session request - API response did not include success');
         return;
       }
-
-      setNewSessionTitle('');
+      setExpanded((prev) => new Set(prev).add(topicId ?? '__none__'));
       setSelectedSessionId(data.id);
-      setStatus(`Session created: ${data.title || title}`);
-      await loadSessions(selectedTopic.id);
-      await loadTopics();
+      setStatus(`Session created: ${data.title}`);
+      await loadAll();
     } catch (err) {
       setError(diagnosticMessage({
         consequence: 'Unable to create session',
         moduleProcess: 'session administration / create session request',
-        cause: `browser could not reach /api/v1/topics/${selectedTopic.id}/sessions or parse its response; ${errorCause(err)}`,
+        cause: `browser could not reach /api/v1/sessions or parse its response; ${errorCause(err)}`,
       }));
     }
   }
 
-  function startEditSession() {
-    if (!selectedSession) return;
-    setEditTitle(selectedSession.title);
-    setEditTopicId(selectedSession.topic_id);
-    setEditingSession(true);
+  async function renameTopic(topicId: string) {
+    const topic = topics.find((item) => item.id === topicId);
+    const title = window.prompt('Rename topic', topic?.title || '');
+    if (title === null) return;
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    try {
+      const res = await fetch(`/api/v1/topics/${topicId}/rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ title: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setError(data.error || 'Unable to rename topic: topic administration / rename topic request - API response did not include success');
+        return;
+      }
+      await loadAll();
+    } catch (err) {
+      setError(diagnosticMessage({
+        consequence: 'Unable to rename topic',
+        moduleProcess: 'topic administration / rename topic request',
+        cause: `browser could not reach the rename endpoint or parse its response; ${errorCause(err)}`,
+      }));
+    }
   }
 
-  async function updateSession(fields: { title?: string; topic_id?: string; archived?: boolean }) {
-    if (!selectedSession) return;
-
+  async function removeTopic(topicId: string) {
+    if (!window.confirm('Remove this topic? Its sessions move to Uncategorized.')) return;
     try {
-      const uiToken = getUiToken();
-      const res = await fetch(`/api/v1/sessions/${selectedSession.id}`, {
+      // Move the topic's active sessions to Uncategorized so none are lost.
+      const orphaned = sessions.filter((session) => session.topic_id === topicId && !session.archived);
+      await Promise.all(
+        orphaned.map((session) =>
+          fetch(`/api/v1/sessions/${session.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ topic_id: null }),
+          }),
+        ),
+      );
+      const res = await fetch(`/api/v1/topics/${topicId}/archive`, { method: 'POST', headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setError(data.error || 'Unable to remove topic: topic administration / archive topic request - API response did not indicate success');
+        return;
+      }
+      setStatus('Topic removed. Its sessions moved to Uncategorized.');
+      await loadAll();
+    } catch (err) {
+      setError(diagnosticMessage({
+        consequence: 'Unable to remove topic',
+        moduleProcess: 'topic administration / remove topic request',
+        cause: `browser could not reach the archive endpoint or parse its response; ${errorCause(err)}`,
+      }));
+    }
+  }
+
+  async function updateSession(sessionId: string, fields: { title?: string; topic_id?: string | null; archived?: boolean }) {
+    try {
+      const res = await fetch(`/api/v1/sessions/${sessionId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${uiToken}`,
-        },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(fields),
       });
       const data = await readJsonResponse(res, {
@@ -327,57 +306,65 @@ export default function Dashboard() {
         moduleProcess: 'session administration / update session request',
         fallbackCause: 'update session endpoint did not return JSON',
       });
-
       if (!res.ok || data.error) {
         setError(data.error || 'Unable to update session: session administration / update session request - API response did not include success');
-        return;
+        return false;
       }
-
-      setEditingSession(false);
-      setStatus('Session updated');
-      const nextTopicId = fields.topic_id || selectedTopicId;
-      if (nextTopicId !== selectedTopicId) {
-        setSelectedTopicId(nextTopicId);
-      }
-      await loadSessions(nextTopicId);
-      await loadTopics();
-      setSelectedSessionId(selectedSession.id);
+      await loadAll();
+      return true;
     } catch (err) {
       setError(diagnosticMessage({
         consequence: 'Unable to update session',
         moduleProcess: 'session administration / update session request',
-        cause: `browser could not reach /api/v1/sessions/${selectedSession.id} or parse its response; ${errorCause(err)}`,
+        cause: `browser could not reach /api/v1/sessions/${sessionId} or parse its response; ${errorCause(err)}`,
       }));
+      return false;
     }
+  }
+
+  async function removeSession(sessionId: string) {
+    if (!window.confirm('Remove this session? It is archived and can be restored from Show archived.')) return;
+    const ok = await updateSession(sessionId, { archived: true });
+    if (ok && selectedSessionId === sessionId) setSelectedSessionId('');
+    if (ok) setStatus('Session removed.');
+  }
+
+  function startEditSession() {
+    if (!selectedSession) return;
+    setEditTitle(selectedSession.title);
+    setEditTopicId(selectedSession.topic_id || '');
+    setEditingSession(true);
   }
 
   async function saveSessionEdits() {
     const title = editTitle.trim();
-    if (!selectedSession || !title || !editTopicId) return;
-    await updateSession({ title, topic_id: editTopicId });
+    if (!selectedSession || !title) return;
+    const ok = await updateSession(selectedSession.id, { title, topic_id: editTopicId || null });
+    if (ok) {
+      setEditingSession(false);
+      setStatus('Session updated');
+    }
   }
 
   async function archiveSelectedSession() {
     if (!selectedSession) return;
-    await updateSession({ archived: true });
+    if (await updateSession(selectedSession.id, { archived: true })) {
+      setStatus('Session archived');
+    }
   }
 
   async function restoreSelectedSession() {
     if (!selectedSession) return;
-    await updateSession({ archived: false });
+    if (await updateSession(selectedSession.id, { archived: false })) {
+      setStatus('Session restored');
+    }
   }
 
   async function generateToken(session: Session) {
-    // Quick generate with the default 7-day expiry. Full expiration controls and
-    // the token status list live on the session detail page (/sessions/<id>).
     try {
-      const uiToken = getUiToken();
       const res = await fetch(`/api/v1/sessions/${session.id}/tokens`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${uiToken}`,
-        },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ expires_in: '7d' }),
       });
       const data = await readJsonResponse(res, {
@@ -385,12 +372,10 @@ export default function Dashboard() {
         moduleProcess: 'session token administration / create token request',
         fallbackCause: 'create token endpoint did not return JSON',
       });
-
       if (!res.ok || data.error || !data.access_token) {
         setError(data.error || 'Unable to create token: session token administration / create token request - API response did not include access token');
         return;
       }
-
       setGeneratedToken(data.instruction);
       setStatus('Recording URL + access token created. Copy them now; the token will not be shown again.');
       await navigator.clipboard.writeText(data.instruction).catch(() => undefined);
@@ -417,32 +402,25 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      <div className="grid min-h-[calc(100vh-57px)] grid-cols-1 lg:grid-cols-[280px_360px_minmax(0,1fr)]">
-        <TopicSidebar
+      <div className="grid min-h-[calc(100vh-57px)] grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <NavSidebar
           topics={topics}
+          sessions={sessions}
           loading={loading}
-          selectedTopicId={selectedTopicId}
-          newTopicTitle={newTopicTitle}
-          onNewTopicTitleChange={setNewTopicTitle}
-          onCreateTopic={createTopic}
-          onRefreshTopics={loadTopics}
-          onSelectTopic={(topicId) => {
-            setSelectedTopicId(topicId);
-            setSelectedSessionId('');
-          }}
-        />
-        <SessionSidebar
-          selectedTopic={selectedTopic}
-          sessions={visibleSessions}
           selectedSessionId={selectedSessionId}
+          expanded={expanded}
           query={query}
           showArchived={showArchived}
-          newSessionTitle={newSessionTitle}
+          onToggleExpand={toggleExpand}
           onQueryChange={setQuery}
           onShowArchivedChange={setShowArchived}
-          onNewSessionTitleChange={setNewSessionTitle}
-          onCreateSession={createSession}
           onSelectSession={setSelectedSessionId}
+          onCreateSession={createSession}
+          onCreateTopic={createTopic}
+          onRefresh={loadAll}
+          onRenameTopic={renameTopic}
+          onRemoveTopic={removeTopic}
+          onRemoveSession={removeSession}
         />
         <SessionWorkspace
           error={error}

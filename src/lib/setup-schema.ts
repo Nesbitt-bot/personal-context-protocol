@@ -30,7 +30,7 @@ const SCHEMA_STATEMENTS = [
   )`,
   `CREATE TABLE IF NOT EXISTS sessions (
     id text PRIMARY KEY,
-    topic_id text NOT NULL REFERENCES topics(id),
+    topic_id text REFERENCES topics(id),
     title text NOT NULL,
     archived boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -53,7 +53,7 @@ const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS messages (
     id text PRIMARY KEY,
     session_id text NOT NULL REFERENCES sessions(id),
-    topic_id text NOT NULL REFERENCES topics(id),
+    topic_id text REFERENCES topics(id),
     ordinal integer NOT NULL,
     role text NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool', 'correction')),
     content text NOT NULL,
@@ -98,6 +98,9 @@ const SCHEMA_STATEMENTS = [
   // deploy-generated token that the next deploy would replace.
   'ALTER TABLE ui_auth ADD COLUMN IF NOT EXISTS source text',
   "UPDATE ui_auth SET source = 'user' WHERE source IS NULL",
+  // Allow uncategorized sessions (and their messages) to have no topic.
+  'ALTER TABLE sessions ALTER COLUMN topic_id DROP NOT NULL',
+  'ALTER TABLE messages ALTER COLUMN topic_id DROP NOT NULL',
   `CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT now(),
@@ -138,6 +141,12 @@ export async function ensureDatabaseSchema() {
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
     VALUES ('003_admin_token_source', 'ui_auth_source_provenance')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('004_optional_topic', 'nullable_session_and_message_topic')
     ON CONFLICT (version) DO NOTHING
   `);
 }

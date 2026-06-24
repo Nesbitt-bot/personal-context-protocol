@@ -68,7 +68,7 @@ function schemaStatements(version) {
     )`,
     `CREATE TABLE IF NOT EXISTS sessions (
       id text PRIMARY KEY,
-      topic_id text NOT NULL REFERENCES topics(id),
+      topic_id text REFERENCES topics(id),
       title text NOT NULL,
       archived boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(),
@@ -91,7 +91,7 @@ function schemaStatements(version) {
     `CREATE TABLE IF NOT EXISTS messages (
       id text PRIMARY KEY,
       session_id text NOT NULL REFERENCES sessions(id),
-      topic_id text NOT NULL REFERENCES topics(id),
+      topic_id text REFERENCES topics(id),
       ordinal integer NOT NULL,
       role text NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool', 'correction')),
       content text NOT NULL,
@@ -140,6 +140,9 @@ function schemaStatements(version) {
     // marked 'user' (never auto-rotated) rather than treated as deploy-generated.
     'ALTER TABLE ui_auth ADD COLUMN IF NOT EXISTS source text',
     "UPDATE ui_auth SET source = 'user' WHERE source IS NULL",
+    // Allow uncategorized sessions (and their messages) to have no topic.
+    'ALTER TABLE sessions ALTER COLUMN topic_id DROP NOT NULL',
+    'ALTER TABLE messages ALTER COLUMN topic_id DROP NOT NULL',
     'CREATE INDEX IF NOT EXISTS messages_session_id_idx ON messages(session_id)',
     'CREATE INDEX IF NOT EXISTS messages_topic_id_idx ON messages(topic_id)',
     'CREATE INDEX IF NOT EXISTS sessions_topic_id_idx ON sessions(topic_id)',

@@ -12,7 +12,7 @@
  *   - topic ids are resolved internally and never surfaced to the agent.
  */
 
-import { and, eq, ne, sql } from 'drizzle-orm';
+import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import { db } from './db';
 import { messages, sessions, events, compactions } from './schema';
 import { createId } from './auth';
@@ -45,7 +45,7 @@ export interface AppendSuccess {
 async function applySuggestedSessionTitle(
   tx: Tx,
   sessionId: string,
-  topicId: string,
+  topicId: string | null,
   currentTitle: string,
   suggested: string,
   actor: string,
@@ -55,10 +55,13 @@ async function applySuggestedSessionTitle(
     return currentTitle;
   }
 
+  // Siblings are sessions in the same group: the same topic, or the other
+  // uncategorized sessions when this session has no topic.
+  const sameGroup = topicId === null ? isNull(sessions.topicId) : eq(sessions.topicId, topicId);
   const siblings = await tx
     .select({ title: sessions.title })
     .from(sessions)
-    .where(and(eq(sessions.topicId, topicId), ne(sessions.id, sessionId)));
+    .where(and(sameGroup, ne(sessions.id, sessionId)));
 
   const uniqueTitle = generateUniqueTitle(normalized, siblings.map((row) => row.title), normalized);
   if (uniqueTitle === currentTitle) {
