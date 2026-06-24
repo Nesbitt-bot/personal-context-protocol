@@ -118,6 +118,29 @@ Uncategorized sessions (idempotent, data-preserving):
 A session (and its denormalized messages) may now have no topic. The foreign key
 remains; NULL is simply allowed. Existing rows keep their `topic_id`.
 
+### 0004_default_token_rotates
+
+Corrects the 003 backfill. Migration 003 marked pre-existing admin credentials
+`source = 'user'`, which preserved them forever and stopped per-deploy rotation.
+The intended default is to rotate the deploy-generated token each deploy; only a
+token set in Settings (tagged `user` after this migration) is preserved. A
+one-time, self-guarded data-modifying CTE resets the mis-marked rows to
+`deploy`:
+
+```sql
+WITH applied AS (
+  INSERT INTO schema_migrations (version, checksum)
+  VALUES ('005_default_token_rotates', 'reset_legacy_user_source')
+  ON CONFLICT (version) DO NOTHING
+  RETURNING version
+)
+UPDATE ui_auth SET source = 'deploy', updated_at = now()
+WHERE source = 'user' AND EXISTS (SELECT 1 FROM applied);
+```
+
+Because the UPDATE runs only when the migration record is newly inserted, it
+never re-clobbers a genuine Settings-set token created after it applies.
+
 ## Checking migration status
 
 ```bash
@@ -143,4 +166,4 @@ Drizzle doesn't support automatic rollbacks. Manual approach:
 
 Schema version is stored in `app_instance.version` and updated when migrations are applied.
 
-Current version: `0.1.5`
+Current version: `0.1.6`

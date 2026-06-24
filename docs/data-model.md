@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.5"
+  "version": "0.1.6"
 }
 ```
 
@@ -61,8 +61,9 @@ Stores the UI admin token hash.
 deploy (the previous one stops working); `env` tokens come from
 `PCP_ADMIN_TOKEN` and are reconciled each deploy; `user` tokens are set in
 Settings and never auto-rotated. Precedence is environment > user > deploy.
-Pre-existing credentials are migrated to `user` so an upgrade never rotates a
-token already in use.
+The default for any credential not explicitly set in Settings (including
+pre-existing ones) is `deploy`, so it rotates each deploy until the admin sets
+their own token or `PCP_ADMIN_TOKEN`.
 
 **Note**: The raw UI token is shown only during setup, never stored.
 
@@ -419,3 +420,8 @@ LIMIT 50;
 
 - `sessions.topic_id` and `messages.topic_id` made nullable (NULL = no topic)
 - ChatGPT-style nav: collapsible topic groups with nested sessions
+
+### v0.1.6 (token rotation default fix)
+
+- Corrected the 003 backfill: credentials not set in Settings default to
+  `deploy` and rotate each deploy (migration 005)

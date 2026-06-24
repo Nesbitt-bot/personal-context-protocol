@@ -194,6 +194,21 @@ async function main() {
       ON CONFLICT (version) DO NOTHING
     `;
 
+    // One-time correction (migration 005): migration 003 backfilled pre-existing
+    // credentials as 'user', which preserved them forever. The default is to
+    // rotate the deploy token each deploy; only a Settings-set token (tagged
+    // 'user' AFTER this point) is preserved. Runs exactly once per database.
+    await sql`
+      WITH applied AS (
+        INSERT INTO schema_migrations (version, checksum)
+        VALUES ('005_default_token_rotates', 'reset_legacy_user_source')
+        ON CONFLICT (version) DO NOTHING
+        RETURNING version
+      )
+      UPDATE ui_auth SET source = 'deploy', updated_at = now()
+      WHERE source = 'user' AND EXISTS (SELECT 1 FROM applied)
+    `;
+
     const [existingCredential] = await sql`SELECT source FROM ui_auth WHERE id = 'ui_1' LIMIT 1`;
     const existingSource = existingCredential ? existingCredential.source : null;
 
@@ -203,7 +218,7 @@ async function main() {
       console.log(`${PROJECT} v${VERSION} deploy initialization: database ready; admin token loaded from PCP_ADMIN_TOKEN.`);
     } else if (existingSource === 'user') {
       // The admin set their own token in Settings; never auto-rotate it.
-      console.log(`${PROJECT} v${VERSION} deploy initialization: database ready; user-set admin credential preserved.`);
+      console.log(`${PROJECT} v${VERSION} deploy initialization: database ready; a Settings-set (user-owned) admin token is in effect and was NOT rotated. Clear it in Settings, or unset PCP_ADMIN_TOKEN, to resume per-deploy rotation.`);
     } else {
       // No PCP_ADMIN_TOKEN and no user-set token: generate a fresh deploy token
       // for this deploy so an old deploy token is never reused. Printed once.

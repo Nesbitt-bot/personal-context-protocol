@@ -149,4 +149,19 @@ export async function ensureDatabaseSchema() {
     VALUES ('004_optional_topic', 'nullable_session_and_message_topic')
     ON CONFLICT (version) DO NOTHING
   `);
+
+  // One-time correction (migration 005): migration 003 over-marked pre-existing
+  // credentials as 'user' (preserved forever). Reset them to 'deploy' so the
+  // default per-deploy rotation applies; only Settings-set tokens (tagged 'user'
+  // after this point) are preserved. Self-guarded — runs once per database.
+  await db.execute(sql`
+    WITH applied AS (
+      INSERT INTO schema_migrations (version, checksum)
+      VALUES ('005_default_token_rotates', 'reset_legacy_user_source')
+      ON CONFLICT (version) DO NOTHING
+      RETURNING version
+    )
+    UPDATE ui_auth SET source = 'deploy', updated_at = now()
+    WHERE source = 'user' AND EXISTS (SELECT 1 FROM applied)
+  `);
 }

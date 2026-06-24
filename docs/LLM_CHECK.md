@@ -122,6 +122,12 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-24 - Fixed admin token not rotating on deploy (v0.1.6)
+  - Root cause: migration 003 backfilled pre-existing credentials as `source = 'user'`, which preserved them forever, so a new deploy printed "user-set admin credential preserved" and generated no token
+  - Added one-time, self-guarded migration 005 (`0004_default_token_rotates.sql`) that resets mis-marked `user` rows to `deploy`; mirrored in deploy-init and ensureDatabaseSchema. After it runs, the deploy generates and prints a fresh token
+  - Default for any credential not set in Settings is now `deploy` (rotates each deploy); only a Settings-set token (tagged `user` after migration 005) or `PCP_ADMIN_TOKEN` (`env`) stops rotation
+  - Clarified the deploy-init "preserved" log so the user is notified that a Settings-set token is in effect and how to resume rotation
+  - Verified live: a row mis-marked `user` rotates and prints a new token after the corrective migration; a Settings-set token (tagged after 005) is preserved across deploys
 - 2026-06-24 - ChatGPT-style nav, context menu, and uncategorized sessions (v0.1.5)
   - Patch-bumped release metadata to 0.1.5
   - Made `sessions.topic_id` and `messages.topic_id` nullable + idempotent migration `0003_optional_topic.sql` (mirrored in setup-schema and deploy-init)
