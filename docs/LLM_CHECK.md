@@ -122,6 +122,14 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-23 - Per-deploy admin token rotation + recovery guidance (v0.1.4)
+  - Patch-bumped release metadata to 0.1.4
+  - Added `ui_auth.source` (deploy/env/user) + idempotent migration `0002_admin_token_source.sql`; pre-existing credentials migrate to `user` so an upgrade never rotates a token already in use
+  - deploy-init now rotates the admin token on every deploy unless PCP_ADMIN_TOKEN (env) or a Settings-set (user) token owns the credential; the fresh token is printed once
+  - Settings rotation tags `user`; setup/init and env reconcile tag their source
+  - Login wrong-password error now explains deploy-log lookup, PCP_ADMIN_TOKEN reset, and their precedence, with a link to the deployment guide's admin-token-recovery section
+  - Dashboard shows a Tailwind warning banner below the nav when a deploy-generated token is in use; auth/check returns `ui_token_source`
+  - Verified end-to-end against live Postgres: first deploy generates token; redeploy rotates it (old token rejected); env-set and user-set tokens preserved; wrong token returns recovery link
 - 2026-06-23 - Added agent recording-URL model (v0.1.3)
   - Patch-bumped release metadata to 0.1.3 (VERSION, package.json, package-lock, version.ts, Dockerfile, docker-compose, pyproject)
   - Version policy: stays in the v0.1 line. A 0.2.0 bump is gated on completing v0.1 Remaining Hardening (startup validation, setup integration tests, security audit, API docs sync); it is not triggered by shipping a feature while that work is open. Corrected an earlier 0.2.0 bump back to 0.1.3 for this reason.

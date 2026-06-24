@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { logError } from '@/lib/logging';
-import { DEPLOYMENT_GUIDE_URL, configuredAdminToken } from '@/lib/admin-token';
+import { ADMIN_TOKEN_RECOVERY_URL, DEPLOYMENT_GUIDE_URL, configuredAdminToken } from '@/lib/admin-token';
 
 /**
  * Verify UI token and return session info
@@ -46,12 +46,16 @@ export async function verifyUiToken(request: NextRequest) {
     }
 
     const isValid = await verifyToken(token, stored.tokenHash, stored.salt);
-    
+
     if (!isValid) {
+      const guidance = configuredAdminToken()
+        ? 'this value does not match PCP_ADMIN_TOKEN. PCP_ADMIN_TOKEN owns the admin credential, so log in with exactly that env-var value (32+ characters), or change the env var and redeploy.'
+        : 'no PCP_ADMIN_TOKEN is set, so the active token is the one PCP generated and printed once in your deploy/build logs (search for "generated first-login admin token"). On each deploy a fresh token is generated and the old one stops working. To choose your own stable token instead, set PCP_ADMIN_TOKEN (32+ characters) and redeploy — the env var then owns the credential and overrides the generated one.';
       return {
-        error: 'Unable to log in: user authentication / UI token verification - invalid UI token',
+        error: `Unable to log in: user authentication / UI token verification - the admin token is incorrect. ${guidance}`,
         code: 'UNAUTHORIZED',
         status: 401,
+        docsUrl: ADMIN_TOKEN_RECOVERY_URL,
       } as const;
     }
 

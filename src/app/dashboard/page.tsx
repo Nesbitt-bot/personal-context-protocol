@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SiteNav } from '@/components/site-nav';
 import { SessionSidebar } from '@/components/dashboard/session-sidebar';
@@ -40,6 +41,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [hasUiToken, setHasUiToken] = useState(false);
+  const [uiTokenSource, setUiTokenSource] = useState<string | null>(null);
 
   const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) || null;
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) || null;
@@ -56,7 +58,23 @@ export default function Dashboard() {
   useEffect(() => {
     setHasUiToken(Boolean(getUiToken()));
     loadTopics();
+    loadAuthState();
   }, []);
+
+  /** Reads the admin credential provenance to warn when a deploy token is in use. */
+  async function loadAuthState() {
+    const uiToken = getUiToken();
+    if (!uiToken) return;
+    try {
+      const res = await fetch('/api/v1/auth/check', { headers: { Authorization: `Bearer ${uiToken}` } });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && typeof data.ui_token_source === 'string') {
+        setUiTokenSource(data.ui_token_source);
+      }
+    } catch {
+      // Non-fatal: the warning banner is advisory only.
+    }
+  }
 
   useEffect(() => {
     if (selectedTopicId) {
@@ -388,6 +406,17 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
       <SiteNav />
+      {uiTokenSource === 'deploy' && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+          <div className="mx-auto flex max-w-7xl items-start gap-2">
+            <span>
+              You are signed in with a <strong>deploy-generated</strong> admin token. A fresh token is generated on every deploy, so do not reuse an old deploy token. Set your own stable token in{' '}
+              <Link href="/settings" className="font-medium underline">Settings</Link>, or define the{' '}
+              <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50">PCP_ADMIN_TOKEN</code> environment variable (32+ chars) and redeploy.
+            </span>
+          </div>
+        </div>
+      )}
       <div className="grid min-h-[calc(100vh-57px)] grid-cols-1 lg:grid-cols-[280px_360px_minmax(0,1fr)]">
         <TopicSidebar
           topics={topics}

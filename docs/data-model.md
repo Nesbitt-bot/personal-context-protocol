@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.3"
+  "version": "0.1.4"
 }
 ```
 
@@ -48,6 +48,7 @@ Stores the UI admin token hash.
 | `id` | TEXT | Always `ui_1` |
 | `token_hash` | TEXT | Salted hash of UI token |
 | `salt` | TEXT | Salt for hashing |
+| `source` | TEXT | Credential owner: `deploy`, `env`, or `user` |
 | `created_at` | TIMESTAMPTZ | Token creation time |
 | `updated_at` | TIMESTAMPTZ | Last rotation time |
 | `last_used_at` | TIMESTAMPTZ | Last successful auth |
@@ -55,6 +56,13 @@ Stores the UI admin token hash.
 **Constraints**:
 - Primary key: `id`
 - Always exactly one row
+
+**Source / rotation**: `deploy` tokens are auto-generated and rotated on every
+deploy (the previous one stops working); `env` tokens come from
+`PCP_ADMIN_TOKEN` and are reconciled each deploy; `user` tokens are set in
+Settings and never auto-rotated. Precedence is environment > user > deploy.
+Pre-existing credentials are migrated to `user` so an upgrade never rotates a
+token already in use.
 
 **Note**: The raw UI token is shown only during setup, never stored.
 
@@ -393,7 +401,7 @@ LIMIT 50;
 - Audit events
 - Migration tracking
 
-### v0.1.3 (agent recording URL)
+### v0.1.4 (agent recording URL)
 
 - Added `compactions` table for durable session summaries
 - Session access tokens gained expiration choices (`expires_at`, NULL = never)

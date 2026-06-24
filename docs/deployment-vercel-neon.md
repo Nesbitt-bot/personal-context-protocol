@@ -36,7 +36,7 @@ openssl rand -hex 32
 `PCP_ADMIN_TOKEN` is optional. When it is missing, deploy initialization creates the admin credential automatically and logs the generated token with a banner like:
 
 ```text
-personal-context-protocol v0.1.3 - generated deployment admin token
+personal-context-protocol v0.1.4 - generated deployment admin token
 Admin token: <generated-token>
 Log in with this token, then change it immediately in Settings.
 ```
@@ -54,9 +54,41 @@ If the database is already initialized and the browser token is lost:
 
 Build and runtime logs report whether `PCP_ADMIN_TOKEN` is configured. If deploy initialization generates a first-login token because `PCP_ADMIN_TOKEN` is not configured, that generated token is printed once so the deployment can be used without pre-seeded credentials. Change it immediately after first login.
 
+## Admin token recovery
+
+The admin (UI) credential comes from one of three sources. Precedence is
+**environment > user > deploy**:
+
+| Source | How it is set | Rotation |
+|---|---|---|
+| `env` | `PCP_ADMIN_TOKEN` is configured | Reconciled to the env value on every deploy; the env var owns the credential |
+| `user` | You set a custom token in **Settings** after login | Never auto-rotated |
+| `deploy` | Neither of the above — PCP generates one | A fresh token is generated on **every deploy**; the previous deploy token stops working |
+
+### I entered the wrong password / lost the token
+
+1. **Check your deploy logs.** If you did not set `PCP_ADMIN_TOKEN`, the active
+   token is the one PCP generated and printed once during build/start, under a
+   banner containing `Admin token:`. Because a new token is generated on each
+   deploy, use the token from the **most recent** deploy — do not reuse an older
+   one.
+2. **Set your own token via the environment.** Add `PCP_ADMIN_TOKEN` (32+
+   characters) in Vercel (or Docker Compose) and redeploy. The environment
+   variable then owns the credential and overrides any generated token, so it no
+   longer rotates per deploy and is never printed in logs.
+3. **Or set it in Settings.** After logging in, open **Settings** and set a
+   custom token. That marks the credential `user`-managed, so deploys stop
+   rotating it. (Settings rotation is disabled while `PCP_ADMIN_TOKEN` is
+   configured, because the env var owns the credential.)
+
+How they relate: setting `PCP_ADMIN_TOKEN` always wins and freezes the
+credential to that value; clearing it and setting a token in Settings keeps a
+stable token inside the database; with neither, PCP keeps the deployment usable
+by minting a fresh token each deploy and printing it once.
+
 ## Docker Compose Alternative
 
-Docker Compose deployment is documented in [deployment-docker-compose.md](deployment-docker-compose.md). It builds the app image with the versioned tag `personal-context-protocol:0.1.3` by default, generates a local `.env` when needed, and runs Postgres locally.
+Docker Compose deployment is documented in [deployment-docker-compose.md](deployment-docker-compose.md). It builds the app image with the versioned tag `personal-context-protocol:0.1.4` by default, generates a local `.env` when needed, and runs Postgres locally.
 
 ## Local Development
 
@@ -96,7 +128,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "database": "pending"
 }
 ```

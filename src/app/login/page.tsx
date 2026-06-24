@@ -227,7 +227,7 @@ function LoginForm() {
       </div>
 
       <p className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
-        Use the one-time setup token generated during database initialization. The browser stores it locally after validation.
+        Use the admin token. If you did not set <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_ADMIN_TOKEN</code>, it is the token PCP printed once in your deploy/build logs and a fresh one is generated on each deploy. To set your own stable token, define <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_ADMIN_TOKEN</code> (32+ chars) and redeploy, or change it in Settings after login.
       </p>
 
       {error && (
@@ -235,7 +235,7 @@ function LoginForm() {
           <p>{error}</p>
           {errorDocsUrl && (
             <a className="mt-2 inline-flex font-medium underline" href={errorDocsUrl} rel="noreferrer" target="_blank">
-              Open deployment guide
+              How to find or reset the admin token
             </a>
           )}
         </div>

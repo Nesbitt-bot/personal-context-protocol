@@ -37,7 +37,7 @@ export async function POST() {
     const [existing] = await db.select().from(appInstance);
     if (existing) {
       if (deployToken) {
-        await storeAdminToken(deployToken);
+        await storeAdminToken(deployToken, 'env');
         return NextResponse.json({
           success: true,
           initialized: true,
@@ -50,7 +50,7 @@ export async function POST() {
       const hasCredential = await adminCredentialExists();
       if (!hasCredential) {
         const recoveryToken = generateToken();
-        await storeAdminToken(recoveryToken);
+        await storeAdminToken(recoveryToken, 'deploy');
         logGeneratedAdminToken(recoveryToken, 'The database was initialized, but the admin credential row was missing.');
         return NextResponse.json({
           success: true,
@@ -72,7 +72,7 @@ export async function POST() {
     }
 
     const uiToken = deployToken || generateToken();
-    await storeAdminToken(uiToken);
+    await storeAdminToken(uiToken, deployToken ? 'env' : 'deploy');
     if (!deployToken) {
       logGeneratedAdminToken(uiToken, 'PCP_ADMIN_TOKEN was not configured during fallback setup initialization.');
     }

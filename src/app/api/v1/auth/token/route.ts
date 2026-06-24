@@ -41,7 +41,8 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    await storeAdminToken(newToken);
+    // Mark as user-set so deploy initialization never auto-rotates it.
+    await storeAdminToken(newToken, 'user');
     return NextResponse.json({ success: true, message: 'Admin token updated. Use the new token on the next login.' });
   } catch (error) {
     logError({

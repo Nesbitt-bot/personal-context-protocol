@@ -15,6 +15,7 @@ const SCHEMA_STATEMENTS = [
     id text PRIMARY KEY DEFAULT 'ui_1',
     token_hash text NOT NULL,
     salt text NOT NULL,
+    source text NOT NULL DEFAULT 'deploy',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     last_used_at timestamptz
@@ -92,6 +93,11 @@ const SCHEMA_STATEMENTS = [
   )`,
   // Defensive upgrade for deployments initialized before token expiration existed.
   'ALTER TABLE session_tokens ADD COLUMN IF NOT EXISTS expires_at timestamptz',
+  // Admin credential provenance. Added nullable so pre-existing credentials can
+  // be marked 'user' (never auto-rotated) instead of being treated as a
+  // deploy-generated token that the next deploy would replace.
+  'ALTER TABLE ui_auth ADD COLUMN IF NOT EXISTS source text',
+  "UPDATE ui_auth SET source = 'user' WHERE source IS NULL",
   `CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT now(),
@@ -126,6 +132,12 @@ export async function ensureDatabaseSchema() {
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
     VALUES ('002_agent_recording', 'compactions_and_token_expiration')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('003_admin_token_source', 'ui_auth_source_provenance')
     ON CONFLICT (version) DO NOTHING
   `);
 }

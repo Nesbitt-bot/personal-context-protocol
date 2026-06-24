@@ -53,6 +53,7 @@ function schemaStatements(version) {
       id text PRIMARY KEY DEFAULT 'ui_1',
       token_hash text NOT NULL,
       salt text NOT NULL,
+      source text NOT NULL DEFAULT 'deploy',
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
       last_used_at timestamptz
@@ -135,6 +136,10 @@ function schemaStatements(version) {
     )`,
     // Defensive upgrade for deployments initialized before token expiration existed.
     'ALTER TABLE session_tokens ADD COLUMN IF NOT EXISTS expires_at timestamptz',
+    // Admin credential provenance. Added nullable so a pre-existing credential is
+    // marked 'user' (never auto-rotated) rather than treated as deploy-generated.
+    'ALTER TABLE ui_auth ADD COLUMN IF NOT EXISTS source text',
+    "UPDATE ui_auth SET source = 'user' WHERE source IS NULL",
     'CREATE INDEX IF NOT EXISTS messages_session_id_idx ON messages(session_id)',
     'CREATE INDEX IF NOT EXISTS messages_topic_id_idx ON messages(topic_id)',
     'CREATE INDEX IF NOT EXISTS sessions_topic_id_idx ON sessions(topic_id)',
@@ -146,16 +151,17 @@ function schemaStatements(version) {
   ];
 }
 
-async function storeAdminToken(sql, token) {
+async function storeAdminToken(sql, token, source) {
   const salt = generateSalt();
   const tokenHash = await hashToken(token.trim(), salt);
 
   await sql`
-    INSERT INTO ui_auth (id, token_hash, salt, created_at, updated_at)
-    VALUES ('ui_1', ${tokenHash}, ${salt}, now(), now())
+    INSERT INTO ui_auth (id, token_hash, salt, source, created_at, updated_at)
+    VALUES ('ui_1', ${tokenHash}, ${salt}, ${source}, now(), now())
     ON CONFLICT (id) DO UPDATE SET
       token_hash = EXCLUDED.token_hash,
       salt = EXCLUDED.salt,
+      source = EXCLUDED.source,
       updated_at = now()
   `;
 }
@@ -185,16 +191,27 @@ async function main() {
       ON CONFLICT (version) DO NOTHING
     `;
 
-    const existingCredential = await sql`SELECT id FROM ui_auth WHERE id = 'ui_1' LIMIT 1`;
+    const [existingCredential] = await sql`SELECT source FROM ui_auth WHERE id = 'ui_1' LIMIT 1`;
+    const existingSource = existingCredential ? existingCredential.source : null;
+
     if (configuredAdminToken) {
-      await storeAdminToken(sql, configuredAdminToken);
+      // The environment variable owns the credential; reconcile it every deploy.
+      await storeAdminToken(sql, configuredAdminToken, 'env');
       console.log(`${PROJECT} v${VERSION} deploy initialization: database ready; admin token loaded from PCP_ADMIN_TOKEN.`);
-    } else if (existingCredential.length === 0) {
-      const generatedToken = generateToken();
-      await storeAdminToken(sql, generatedToken);
-      logGeneratedAdminToken(generatedToken, 'PCP_ADMIN_TOKEN was not configured and the database did not have an admin credential.');
+    } else if (existingSource === 'user') {
+      // The admin set their own token in Settings; never auto-rotate it.
+      console.log(`${PROJECT} v${VERSION} deploy initialization: database ready; user-set admin credential preserved.`);
     } else {
-      console.log(`${PROJECT} v${VERSION} deploy initialization: database ready; existing admin credential preserved.`);
+      // No PCP_ADMIN_TOKEN and no user-set token: generate a fresh deploy token
+      // for this deploy so an old deploy token is never reused. Printed once.
+      const generatedToken = generateToken();
+      await storeAdminToken(sql, generatedToken, 'deploy');
+      logGeneratedAdminToken(
+        generatedToken,
+        existingCredential
+          ? 'PCP_ADMIN_TOKEN is not configured and no user-set token exists, so a fresh admin token was generated for this deploy. The previous deploy token no longer works.'
+          : 'PCP_ADMIN_TOKEN was not configured and the database did not have an admin credential.',
+      );
     }
 
     await sql`

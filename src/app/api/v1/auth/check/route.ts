@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUiToken } from '@/lib/middleware';
 import { ensureDatabaseSchema } from '@/lib/setup-schema';
-import { AdminTokenConfigurationError, reconcileConfiguredAdminToken } from '@/lib/admin-token';
+import { AdminTokenConfigurationError, adminTokenSource, reconcileConfiguredAdminToken } from '@/lib/admin-token';
 import { logError } from '@/lib/logging';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, user_id: authResult.userId, env_admin_token_configured: tokenState.configured });
+    const source = await adminTokenSource();
+    return NextResponse.json({
+      success: true,
+      user_id: authResult.userId,
+      env_admin_token_configured: tokenState.configured,
+      ui_token_source: source,
+    });
   } catch (error) {
     if (error instanceof AdminTokenConfigurationError) {
       return NextResponse.json(

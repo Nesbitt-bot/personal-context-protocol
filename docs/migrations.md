@@ -98,6 +98,17 @@ Agent recording-URL model (idempotent, data-preserving):
 The same statements run through the idempotent `ensureDatabaseSchema()` bootstrap
 so fresh deploys and existing databases converge to the same schema.
 
+### 0002_admin_token_source
+
+Admin credential provenance (idempotent, lockout-safe):
+- `ALTER TABLE ui_auth ADD COLUMN IF NOT EXISTS source text` (nullable)
+- `UPDATE ui_auth SET source = 'user' WHERE source IS NULL` so a pre-existing
+  credential is treated as user-managed and is never auto-rotated by a deploy
+
+`source` is `deploy` (auto-generated, rotated each deploy), `env`
+(`PCP_ADMIN_TOKEN`), or `user` (set in Settings). New installs default the
+column to `deploy` and deploy initialization sets it explicitly.
+
 ## Checking migration status
 
 ```bash
@@ -123,4 +134,4 @@ Drizzle doesn't support automatic rollbacks. Manual approach:
 
 Schema version is stored in `app_instance.version` and updated when migrations are applied.
 
-Current version: `0.1.3`
+Current version: `0.1.4`

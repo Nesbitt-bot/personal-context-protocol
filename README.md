@@ -37,15 +37,17 @@ Personal Context Protocol stores AI conversation context in user-managed topics 
 
 ## Admin Token Recovery
 
-If `PCP_ADMIN_TOKEN` is not configured during deployment, PCP generates a temporary admin token during deploy initialization, stores only its salted hash, and prints it once in build/start logs so a fresh deploy can be used without pre-seeded credentials. Log in with that generated token, then change it immediately in **Settings** so the real credential is never visible in logs.
+The admin credential has one of three sources, with precedence **environment > user > deploy**:
 
-If the database is already initialized and the UI token is lost, set `PCP_ADMIN_TOKEN` in Vercel or Docker Compose, redeploy/recreate the app, and log in with that value. The app reconciles that token into the `ui_auth` table. User-supplied `PCP_ADMIN_TOKEN` values are never printed in logs.
+- **deploy** — if you set neither of the below, PCP generates a token during deploy initialization and prints it once in build/start logs. A **fresh token is generated on every deploy**, so the previous deploy token stops working — never reuse an old one. While a deploy token is in use, the dashboard shows a warning banner prompting you to set your own.
+- **env** — set `PCP_ADMIN_TOKEN` (32+ chars) and redeploy. The env var owns the credential, overrides any generated token, stops per-deploy rotation, and is never printed in logs.
+- **user** — after login, use **Settings** to set a custom token. That marks the credential user-managed so deploys stop rotating it. Settings rotation is disabled while `PCP_ADMIN_TOKEN` is configured because the env var owns the credential.
 
-After login, use **Settings** to set a custom admin token. Settings rotation is disabled while `PCP_ADMIN_TOKEN` remains configured because the environment variable owns the credential.
+If you entered the wrong password: find the current token in your **most recent** deploy logs (banner containing `Admin token:`), or set `PCP_ADMIN_TOKEN` and redeploy. The login page links to the [admin token recovery guide](https://nesbitt-bot.github.io/personal-context-protocol/deployment-vercel-neon.html#admin-token-recovery).
 
 ## Docker Compose Deployment
 
-Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.3; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
+Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.4; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
 
 ## Local Development
 

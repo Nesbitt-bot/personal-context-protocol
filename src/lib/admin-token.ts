@@ -5,6 +5,9 @@ import { eq, sql } from 'drizzle-orm';
 
 export const ADMIN_TOKEN_ENV = 'PCP_ADMIN_TOKEN';
 export const DEPLOYMENT_GUIDE_URL = 'https://nesbitt-bot.github.io/personal-context-protocol/deployment-vercel-neon.html';
+// Section of the deployment guide that explains finding the generated token in
+// deploy logs, resetting via PCP_ADMIN_TOKEN, and how the two relate.
+export const ADMIN_TOKEN_RECOVERY_URL = `${DEPLOYMENT_GUIDE_URL}#admin-token-recovery`;
 const MIN_ADMIN_TOKEN_LENGTH = 32;
 
 export class AdminTokenConfigurationError extends Error {
@@ -54,6 +57,8 @@ export function logGeneratedAdminToken(token: string, reason: string) {
   console.log(`${'='.repeat(70)}\n`);
 }
 
+export type AdminTokenSource = 'deploy' | 'env' | 'user';
+
 /**
  * Returns whether the database already has the single admin credential row.
  */
@@ -68,10 +73,27 @@ export async function adminCredentialExists() {
 }
 
 /**
- * Stores a UI/admin token as a salted hash. The plaintext token is accepted only
- * at the API/env boundary and is never returned or logged by this helper.
+ * Returns who owns the current admin credential, or null when none exists. Used
+ * by the UI to warn when a deploy-generated token is in use (the admin has not
+ * set their own via Settings or PCP_ADMIN_TOKEN).
  */
-export async function storeAdminToken(token: string) {
+export async function adminTokenSource(): Promise<AdminTokenSource | null> {
+  const [stored] = await db
+    .select({ source: uiAuth.source })
+    .from(uiAuth)
+    .where(eq(uiAuth.id, 'ui_1'))
+    .limit(1);
+
+  if (!stored) return null;
+  return (stored.source as AdminTokenSource | null) ?? 'user';
+}
+
+/**
+ * Stores a UI/admin token as a salted hash, tagging its provenance. The
+ * plaintext token is accepted only at the API/env boundary and is never returned
+ * or logged by this helper.
+ */
+export async function storeAdminToken(token: string, source: AdminTokenSource = 'deploy') {
   const validationError = validateAdminToken(token);
   if (validationError) {
     throw new Error(validationError);
@@ -81,11 +103,12 @@ export async function storeAdminToken(token: string) {
   const tokenHash = await hashToken(token.trim(), salt);
 
   await db.execute(sql`
-    INSERT INTO ui_auth (id, token_hash, salt, created_at, updated_at)
-    VALUES ('ui_1', ${tokenHash}, ${salt}, now(), now())
+    INSERT INTO ui_auth (id, token_hash, salt, source, created_at, updated_at)
+    VALUES ('ui_1', ${tokenHash}, ${salt}, ${source}, now(), now())
     ON CONFLICT (id) DO UPDATE SET
       token_hash = EXCLUDED.token_hash,
       salt = EXCLUDED.salt,
+      source = EXCLUDED.source,
       updated_at = now()
   `);
 }
@@ -102,6 +125,6 @@ export async function reconcileConfiguredAdminToken() {
     return { configured: false, applied: false };
   }
 
-  await storeAdminToken(token);
+  await storeAdminToken(token, 'env');
   return { configured: true, applied: true };
 }
