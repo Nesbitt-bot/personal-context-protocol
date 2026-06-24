@@ -13,12 +13,13 @@ PCP is a small Next.js + Postgres app for recording AI sessions with least-privi
 
 ## Workflow
 
-1. Human initializes the app and logs in with `PCP_ADMIN_TOKEN` or the generated first-login UI token.
-2. Human creates topics and sessions.
-3. Human edits, moves, archives, or restores sessions from the dashboard.
-4. Human generates a session token for one AI agent/session.
-5. AI appends messages through `POST /api/v1/sessions/:sessionId/messages`.
-6. Human reviews messages and events in the admin UI.
+1. Deploy initialization creates the app schema and admin credential.
+2. Human logs in with `PCP_ADMIN_TOKEN` or the generated first-login UI token.
+3. Human creates topics and sessions.
+4. Human edits, moves, archives, or restores sessions from the dashboard.
+5. Human generates a session token for one AI agent/session.
+6. AI appends messages through `POST /api/v1/sessions/:sessionId/messages`.
+7. Human reviews messages and events in the admin UI.
 
 ## Invariants
 
@@ -33,7 +34,7 @@ PCP is a small Next.js + Postgres app for recording AI sessions with least-privi
 1. Deploy the repo to Vercel.
 2. Create a Neon database.
 3. Set `DATABASE_URL`, `PCP_INSTANCE_SECRET`, and `PCP_APP_URL`.
-4. Redeploy and initialize from the app homepage. If `PCP_ADMIN_TOKEN` is not set, PCP generates a temporary first-login token, shows it once, and prints it once in deployment logs. Change it in Settings after login.
+4. Redeploy. Build-time deploy initialization creates the schema and admin credential. If `PCP_ADMIN_TOKEN` is not set, PCP generates a temporary first-login token and prints it once in deployment logs. Change it in Settings after login.
 
 See [deployment-vercel-neon.md](deployment-vercel-neon.md) or [deployment-docker-compose.md](deployment-docker-compose.md) for exact deployment commands.
 

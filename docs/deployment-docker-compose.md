@@ -23,16 +23,15 @@ Bash:
 export PCP_VERSION="$(cat VERSION)"
 ```
 
-The default Compose image is `personal-context-protocol:0.1.1`. When `VERSION` changes, set `PCP_VERSION` to the new value before building so each release gets a distinct image tag.
+The default Compose image is `personal-context-protocol:0.1.2`. When `VERSION` changes, set `PCP_VERSION` to the new value before building so each release gets a distinct image tag.
 
 ## Start Locally
 
 ```bash
-docker compose build app
-docker compose up -d
+npm run docker:up
 ```
 
-Open http://localhost:3000 and click **Initialize Database**. If `PCP_ADMIN_TOKEN` is set, log in with that value. Otherwise, PCP generates a temporary first-login token, shows it once on the setup page, and prints it once in container logs. Log in with it, then change it immediately in **Settings**.
+`npm run docker:up` creates or repairs `.env` with random local credentials, builds the app, starts Postgres, initializes the database after Postgres is healthy, and prints the generated first-login token once in app container logs when `PCP_ADMIN_TOKEN` is empty. Log in with that token, then change it immediately in **Settings**.
 
 ## Environment Variables
 
@@ -40,10 +39,12 @@ Compose provides local defaults for development. Override them when needed:
 
 | Name | Default | Purpose |
 |---|---|---|
-| `PCP_VERSION` | `0.1.1` | App image tag and Docker build version |
+| `PCP_VERSION` | `0.1.2` | App image tag and Docker build version |
 | `PCP_PORT` | `3000` | Host port mapped to the app container |
 | `PCP_APP_URL` | `http://localhost:3000` | Public app URL used by clients |
 | `PCP_INSTANCE_SECRET` | Local placeholder | 32+ character instance secret |
+| `POSTGRES_PASSWORD` | Generated in `.env` | Local Postgres password |
+| `DATABASE_URL` | Generated in `.env` | App connection string for the Compose Postgres service |
 | `PCP_ADMIN_TOKEN` | Empty | Optional 32+ character admin/reset token |
 
 ## Reset Admin Token With Env
@@ -60,7 +61,7 @@ docker compose up -d --build app
 3. Log in with `PCP_ADMIN_TOKEN`.
 4. To move the credential back into database-managed settings, unset `PCP_ADMIN_TOKEN`, recreate the app container, then open **Settings** and set a custom admin token.
 
-Build and runtime logs report whether `PCP_ADMIN_TOKEN` is configured. User-supplied `PCP_ADMIN_TOKEN` values are not printed. If setup generates a first-login token because `PCP_ADMIN_TOKEN` is empty, that generated token is printed once so the local deployment can log in without pre-seeded credentials.
+Build and runtime logs report whether `PCP_ADMIN_TOKEN` is configured. User-supplied `PCP_ADMIN_TOKEN` values are not printed. If deploy initialization generates a first-login token because `PCP_ADMIN_TOKEN` is empty, that generated token is printed once so the local deployment can log in without pre-seeded credentials.
 
 ## Health Check
 
@@ -73,7 +74,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "database": "pending"
 }
 ```

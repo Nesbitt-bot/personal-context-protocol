@@ -28,13 +28,12 @@ Personal Context Protocol stores AI conversation context in user-managed topics 
 | `PCP_APP_URL` | Your Vercel URL |
 | `PCP_ADMIN_TOKEN` | Optional 32+ character admin/reset token. Leave unset for zero-config first login. |
 
-4. Redeploy the Vercel project.
-5. Open the app and click **Initialize Database**.
-6. Log in with `PCP_ADMIN_TOKEN` if configured. Otherwise, use the generated first-login token shown by setup and printed once in Vercel function logs, then change it immediately in **Settings**.
+4. Redeploy the Vercel project. The build initializes the empty database and creates the admin credential.
+5. Log in with `PCP_ADMIN_TOKEN` if configured. Otherwise, use the generated first-login token printed once in Vercel build logs, then change it immediately in **Settings**.
 
 ## Admin Token Recovery
 
-If `PCP_ADMIN_TOKEN` is not configured during first-run setup, PCP generates a temporary admin token, stores only its salted hash, shows it once in the browser, and prints it once in deployment function logs so a fresh deploy can be used without pre-seeded credentials. Log in with that generated token, then change it immediately in **Settings** so the real credential is never visible in logs.
+If `PCP_ADMIN_TOKEN` is not configured during deployment, PCP generates a temporary admin token during deploy initialization, stores only its salted hash, and prints it once in build/start logs so a fresh deploy can be used without pre-seeded credentials. Log in with that generated token, then change it immediately in **Settings** so the real credential is never visible in logs.
 
 If the database is already initialized and the UI token is lost, set `PCP_ADMIN_TOKEN` in Vercel or Docker Compose, redeploy/recreate the app, and log in with that value. The app reconciles that token into the `ui_auth` table. User-supplied `PCP_ADMIN_TOKEN` values are never printed in logs.
 
@@ -42,7 +41,7 @@ After login, use **Settings** to set a custom admin token. Settings rotation is 
 
 ## Docker Compose Deployment
 
-Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.1; set PCP_VERSION from the root VERSION file before building a new release tag. See [Docker Compose deployment](docs/deployment-docker-compose.md).
+Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.2; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
 
 ## Local Development
 
@@ -67,7 +66,7 @@ npm run build
 
 - Unlocks the admin UI and protected admin API routes.
 - Stored as a salted hash in Postgres.
-- Generated during setup when `PCP_ADMIN_TOKEN` is not configured; the generated first-login token is shown once and printed once in deployment logs.
+- Generated during deploy initialization when `PCP_ADMIN_TOKEN` is not configured; the generated first-login token is printed once in build/start logs.
 - Can be rotated from the Settings page after login.
 
 ### AI session token

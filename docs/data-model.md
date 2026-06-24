@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.1"
+  "version": "0.1.2"
 }
 ```
 

@@ -17,8 +17,8 @@ function summarizeSecret(value) {
 }
 
 /**
- * Build-time diagnostics for Vercel. This validates deployment configuration
- * without printing generated admin tokens or any other secret material.
+ * Build-time diagnostics for Vercel. The deploy initializer that follows this
+ * script creates the database schema and first admin credential when possible.
  */
 printHeader('build pre-check');
 
@@ -26,7 +26,7 @@ const missing = requiredEnvVars.filter((name) => !process.env[name]);
 if (missing.length > 0) {
   console.log('Unable to validate build configuration: deployment configuration / required environment variables - missing keys:');
   missing.forEach((name) => console.log(`   - ${name}`));
-  console.log('Build will continue, but setup cannot complete until these variables are configured.');
+  console.log('Build will continue, but deploy initialization cannot run until these variables are configured.');
 } else {
   console.log('Build configuration / required environment variables - all required keys are present.');
 }
@@ -43,9 +43,9 @@ console.log(`PCP_ADMIN_TOKEN: ${process.env.PCP_ADMIN_TOKEN ? 'configured' : 'no
 if (process.env.PCP_ADMIN_TOKEN) {
   console.log('\nAdmin UI token policy: user-supplied PCP_ADMIN_TOKEN is never printed in logs.');
 } else {
-  console.log('\nAdmin UI token policy: PCP_ADMIN_TOKEN is not configured. First-run setup will generate a temporary admin token, show it in the browser, and print it once in deployment function logs. Change it immediately in Settings after first login.');
+  console.log('\nAdmin UI token policy: PCP_ADMIN_TOKEN is not configured. Deploy initialization will generate a temporary admin token and print it once in build/start logs. Change it immediately in Settings after first login.');
 }
-console.log('Database schema policy: setup/status and setup/init create the schema automatically when DATABASE_URL is configured.');
+console.log('Database schema policy: deploy initialization creates the schema and app instance automatically when DATABASE_URL is configured.');
 console.log(`\n${'='.repeat(70)}\n`);
 
 

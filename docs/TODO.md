@@ -12,8 +12,10 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
   - [x] API routes marked dynamic so builds do not execute runtime database handlers
 
 - [x] **Setup and authentication**
-  - [x] One-time setup token returned in the browser setup response
+  - [x] Deploy initialization creates schema, app instance, and the first admin credential
+  - [x] One-time fallback setup token returned in the browser setup response
   - [x] Admin login page prompts for the UI token before dashboard access
+  - [x] Admin login page prompts for fallback initialization when the database is not initialized
   - [x] `/api/v1/auth/check` validates the UI token before saving it in browser storage
   - [x] Direct `/dashboard` access without `ui_token` redirects to `/login?next=/dashboard`
   - [x] Automatic Postgres schema bootstrap when setup status/init runs with `DATABASE_URL`
@@ -34,6 +36,7 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
 - [x] **Diagnostics and docs**
   - [x] Error messages include consequence, module/process, and cause
   - [x] Build/runtime diagnostics identify missing required env vars without printing secrets
+  - [x] Build/start deploy initialization prints PCP-generated first-login admin tokens when `PCP_ADMIN_TOKEN` is absent
   - [x] Sphinx documentation build root fixed
   - [x] README and protocol docs updated for implemented routes
 

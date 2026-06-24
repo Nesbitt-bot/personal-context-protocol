@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS app_instance (
   id text PRIMARY KEY DEFAULT 'instance_1',
   created_at timestamptz NOT NULL DEFAULT now(),
   initialized_at timestamptz,
-  version text NOT NULL DEFAULT '0.1.1'
+  version text NOT NULL DEFAULT '0.1.2'
 );
 
 -- ui_auth: UI admin token hash

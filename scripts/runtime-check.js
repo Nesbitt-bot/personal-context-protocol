@@ -42,7 +42,7 @@ console.log(`Instance: ${process.env.VERCEL_DEPLOYMENT_ID || 'unknown'}`);
 if (process.env.PCP_ADMIN_TOKEN) {
   console.log('\nAdmin UI token policy: user-supplied PCP_ADMIN_TOKEN is never printed on service restart.');
 } else {
-  console.log('\nAdmin UI token policy: PCP_ADMIN_TOKEN is not configured. First-run setup will generate a temporary admin token, show it in the browser, and print it once in deployment function logs. Change it immediately in Settings after first login.');
+  console.log('\nAdmin UI token policy: PCP_ADMIN_TOKEN is not configured. Runtime deploy initialization will generate a temporary admin token when no admin credential exists and print it once in start logs. Change it immediately in Settings after first login.');
 }
 console.log(`\n${'='.repeat(70)}\n`);
 

@@ -111,7 +111,7 @@ Append what this round actually did below:
   - Updated build/runtime diagnostics to show whether `PCP_ADMIN_TOKEN` is configured without revealing its value
   - Added setup/init repair for initialized databases missing the `ui_auth` credential row
 - 2026-06-23 - Added Docker Compose deployment path
-  - Added versioned Dockerfile and docker-compose.yml with image tag default personal-context-protocol:0.1.1
+  - Added versioned Dockerfile and docker-compose.yml with image tag default personal-context-protocol:0.1.2
   - Added root VERSION consistency checks for package, Dockerfile, Compose, and runtime fallback
   - Updated deployment docs for admin token reset through PCP_ADMIN_TOKEN
 - 2026-06-23 - Added zero-config first-login admin token flow
@@ -122,4 +122,9 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-23 - Added deploy-time database/admin bootstrap
+  - Bumped release metadata to 0.1.2 for the current change round
+  - Added build/start deploy initialization for schema, app instance, and admin credential
+  - Added Docker `.env` generation and `npm run docker:up`
+  - Updated login to offer fallback initialization only when deploy initialization did not run
 

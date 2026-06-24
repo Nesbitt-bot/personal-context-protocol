@@ -36,7 +36,7 @@ export function assertConfiguredAdminTokenIsValid() {
 }
 
 export function generatedAdminTokenMessage() {
-  return 'No PCP_ADMIN_TOKEN was configured, so PCP generated a first-login admin token. It is shown once here and printed once in deployment logs. Log in with it, then change it immediately in Settings so the real credential is never visible in logs.';
+  return 'No PCP_ADMIN_TOKEN was configured, so PCP generated a first-login admin token. It is shown once here and printed once in server logs. Log in with it, then change it immediately in Settings so the real credential is never visible in logs.';
 }
 
 /**

@@ -16,7 +16,7 @@ const features = [
 ];
 
 /**
- * Public introduction page plus first-run setup controls. The status probe decides
+ * Public introduction page plus fallback setup controls. The status probe decides
  * whether visitors should initialize the database or enter the dashboard.
  */
 export default function HomePage() {

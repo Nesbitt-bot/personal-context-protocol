@@ -38,7 +38,7 @@ export async function verifyUiToken(request: NextRequest) {
       }
 
       return {
-        error: 'Unable to log in: first-run admin credential / generated token setup - no admin credential exists yet. Open the app home page and click Initialize Database to generate a first-login token; PCP will show it once and print it once in deployment logs.',
+        error: 'Unable to log in: first-run admin credential / deploy initialization - no admin credential exists yet. Deploy initialization should create it automatically when DATABASE_URL is configured; use the login page fallback initializer or redeploy after fixing DATABASE_URL.',
         code: 'SETUP_REQUIRED',
         status: 409,
         docsUrl: DEPLOYMENT_GUIDE_URL,

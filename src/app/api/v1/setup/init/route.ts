@@ -74,7 +74,7 @@ export async function POST() {
     const uiToken = deployToken || generateToken();
     await storeAdminToken(uiToken);
     if (!deployToken) {
-      logGeneratedAdminToken(uiToken, 'PCP_ADMIN_TOKEN was not configured during first-run setup.');
+      logGeneratedAdminToken(uiToken, 'PCP_ADMIN_TOKEN was not configured during fallback setup initialization.');
     }
     await db.insert(appInstance).values({
       id: 'instance_1',

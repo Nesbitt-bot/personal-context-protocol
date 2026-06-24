@@ -4,11 +4,11 @@ PCP limits what an AI session token can do.
 
 ## Token Rules
 
-- UI token is created during setup and shown once.
+- UI token is created during deploy initialization or fallback setup.
 - Session tokens are generated per session.
 - Token values are stored as salted hashes.
 - Session token validation checks token hash, revocation flag, expiration field, and session scope.
-- Plaintext tokens must not be logged or returned after creation, except the PCP-generated zero-config first-login admin token. That generated token is printed once in deployment function logs and must be changed immediately after first login. User-supplied admin tokens and Settings-rotated tokens must never be printed.
+- Plaintext tokens must not be logged or returned after creation, except the PCP-generated zero-config first-login admin token. That generated token is printed once in build/start logs and must be changed immediately after first login. User-supplied admin tokens and Settings-rotated tokens must never be printed.
 
 ## AI Boundaries
 

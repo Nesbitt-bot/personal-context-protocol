@@ -27,11 +27,11 @@ Returns service status.
 
 ### GET `/setup/status`
 
-Ensures the database schema exists when `DATABASE_URL` is configured, then returns whether the app has been initialized.
+Ensures the database schema exists when `DATABASE_URL` is configured, then returns whether the app has been initialized. In normal Vercel and Docker deployments this is already true because deploy initialization runs during build or container start.
 
 ### POST `/setup/init`
 
-Ensures the database schema exists, initializes the app, and returns the UI token once. If `PCP_ADMIN_TOKEN` is configured, setup stores that token hash and returns no plaintext token. If `PCP_ADMIN_TOKEN` is not configured, setup generates a temporary first-login token, returns it once, and prints it once in deployment function logs so zero-config deployments can log in. If the app is initialized but the `ui_auth` credential row is missing, setup creates and returns one replacement token.
+Fallback initializer for cases where deploy initialization did not run. It ensures the database schema exists, initializes the app, and returns the UI token once. If `PCP_ADMIN_TOKEN` is configured, setup stores that token hash and returns no plaintext token. If `PCP_ADMIN_TOKEN` is not configured, setup generates a temporary first-login token, returns it once, and prints it once in server logs so zero-config deployments can still log in. If the app is initialized but the `ui_auth` credential row is missing, setup creates and returns one replacement token.
 
 Response:
 

@@ -2,7 +2,7 @@
 """
 Vercel deployment helper for Personal Context Protocol.
 
-This script helps you complete the one-time setup after creating a Vercel project:
+This script helps you complete the deploy setup after creating a Vercel project:
 1. Generate a secure PCP_INSTANCE_SECRET
 2. Provide instructions for connecting Neon database
 3. Show how to set environment variables in Vercel dashboard
@@ -73,12 +73,12 @@ def print_setup_instructions():
     print("2. Wait for build to complete")
     print()
     
-    print("Step 5: Initialize your database")
+    print("Step 5: Get the first-login token")
     print("-" * 50)
-    print(f"1. Visit: https://<your-app-name>.vercel.app")
-    print("2. Click 'Initialize Database'")
-    print("3. COPY THE UI TOKEN SHOWN (it will never be shown again)")
-    print("4. Click 'Continue to Dashboard'")
+    print("1. During redeploy, PCP creates the schema and admin credential automatically.")
+    print("2. If PCP_ADMIN_TOKEN is not configured, copy the generated admin token from the Vercel build logs.")
+    print("3. Visit: https://<your-app-name>.vercel.app/login")
+    print("4. Log in, then change the generated token immediately in Settings.")
     print()
     
     print("Step 6: Start using PCP")
