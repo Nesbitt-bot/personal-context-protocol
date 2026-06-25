@@ -38,6 +38,7 @@ export interface AgentProtocol {
     record_messages: string;
     record_compact: string;
     ingest_any: string;
+    read_messages: string;
     review: string;
   };
   allowed_actions: {
@@ -78,6 +79,7 @@ export function buildAgentProtocol(
       record_messages: `/api/v1/agent/sessions/${sessionId}/messages`,
       record_compact: `/api/v1/agent/sessions/${sessionId}/compact`,
       ingest_any: `/api/v1/agent/sessions/${sessionId}/ingest`,
+      read_messages: `/api/v1/agent/sessions/${sessionId}/review`,
       review: `/api/v1/sessions/${sessionId}/review`,
     },
     allowed_actions: {
@@ -116,6 +118,9 @@ export function buildAgentInstruction(
     accessToken,
     '',
     'First fetch the recording URL or protocol endpoint to discover upload routes.',
+    `Then fetch ${recordingUrl} (or the read_messages route from the protocol) to read any messages already recorded in this session, so you know the full conversation history.`,
+    '',
+    'Record ALL messages from this conversation — every user message and every assistant response, including this one. Do not record only the current exchange; include the full history. If the session already has messages (from your read_messages fetch), pick up from the next ordinal.',
     'Use Authorization: Bearer <access-token>.',
     'Record messages faithfully. If exact upload fails, retry ingest_any. If full upload is impossible, send a compact block.',
     `Recording mode: ${mode}. ${RECORDING_GUIDANCE[mode]}`,

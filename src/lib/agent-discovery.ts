@@ -7,9 +7,9 @@
  * requires the access token.
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from './db';
-import { sessions } from './schema';
+import { messages, sessions } from './schema';
 import { buildAgentProtocol, normalizeRecordingMode } from './agent-protocol';
 import { buildRecordingUrl, resolveAppBaseUrl } from './recording-url';
 import { agentErrorBody, type AgentErrorBody } from './agent-errors';
@@ -30,11 +30,24 @@ export async function buildDiscovery(
   const base = resolveAppBaseUrl(requestOrigin);
   const protocol = buildAgentProtocol(sessionId, { mode: normalizeRecordingMode(session.mode) });
 
+  // Include the session's existing message count so the agent knows whether
+  // it needs to read history and pick up from the next ordinal.
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(messages)
+    .where(eq(messages.sessionId, sessionId));
+
+  const existingCount = countRow ? countRow.count : 0;
+
   return {
     status: 200,
     body: {
       ...protocol,
       recording_url: base ? buildRecordingUrl(base, sessionId) : null,
+      existing_message_count: existingCount,
+      hint: existingCount > 0
+        ? `This session has ${existingCount} message(s). Fetch read_messages to review them, then continue recording from ordinal ${existingCount + 1}.`
+        : 'This session has no messages yet. Record the full conversation history.',
     },
   };
 }

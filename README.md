@@ -52,7 +52,7 @@ If you entered the wrong password: find the current token in your **most recent*
 
 ## Docker Compose Deployment
 
-Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.12; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
+Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.13; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
 
 ## Local Development
 

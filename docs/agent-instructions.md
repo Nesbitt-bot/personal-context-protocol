@@ -19,9 +19,17 @@ curl "$RECORDING_URL"
 curl "https://<domain>/api/v1/agent/resolve?url=$RECORDING_URL"
 ```
 
-The response includes `routes` (`record_messages`, `record_compact`,
-`ingest_any`, `review`), `allowed_actions`, `limits`, and `recording_mode` +
-`recording_guidance`. Honor the recording mode: in `wild` mode you may redact
+The response includes `routes` (`read_messages`, `record_messages`,
+`record_compact`, `ingest_any`), `allowed_actions`, `limits`,
+`existing_message_count`, a `hint`, and `recording_mode` + `recording_guidance`.
+
+**Important**: fetch `read_messages` to discover any messages already recorded in
+this session, so you know the full conversation history. Then record **ALL**
+messages from this conversation — every user message and every assistant
+response, including your own — not just the current exchange. If the session
+already has messages, pick up from the next ordinal by appending new ones.
+
+Honor the recording mode: in `wild` mode you may redact
 secrets/credentials you judge unsafe (use `<REDACTED>`); in `exact` mode record
 verbatim, including credentials, for faithful task migration. Authenticate every
 write with:

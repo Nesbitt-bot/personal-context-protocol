@@ -272,12 +272,14 @@ Resolves a recording URL to its protocol descriptor.
 
 ### GET `/api/v1/agent/sessions/:sessionId/protocol` (public)
 
-Returns the protocol descriptor: `auth`, `routes` (`record_messages`,
-`record_compact`, `ingest_any`, `review`), `allowed_actions` (note
+Returns the protocol descriptor: `auth`, `routes` (`read_messages`,
+`record_messages`, `record_compact`, `ingest_any`), `allowed_actions` (note
 `manage_topics: false`), `limits` (`max_messages_per_request: 50`,
-`max_content_chars: 100000`), and `recording_mode` + `recording_guidance`. The
-mode is `wild` (the agent may redact unsafe secrets) or `exact` (record
-verbatim, including credentials, for task migration).
+`max_content_chars: 100000`), `existing_message_count`, a `hint`, and
+`recording_mode` + `recording_guidance`. The mode is `wild` (the agent may
+redact unsafe secrets) or `exact` (record verbatim, including credentials, for
+task migration). Fetch `read_messages` to discover the full conversation history,
+then record ALL messages — not only the current exchange.
 
 ### POST `/api/v1/agent/sessions/:sessionId/messages`
 
@@ -297,10 +299,18 @@ Body (`summary` required):
 
 ### POST `/api/v1/agent/sessions/:sessionId/ingest`
 
-Forgiving ingestion. Accepts `{ messages }`, `<PCP_APPEND>...</PCP_APPEND>`,
+Forgiving ingestion. Accepts `{ messages }`, `{ messages, compaction }` (mixed),
+`<PCP_INGEST>...</PCP_INGEST>`, `<PCP_APPEND>...</PCP_APPEND>`,
 `<PCP_COMPACT>...</PCP_COMPACT>`, ChatML-like arrays, or raw transcript text, and
-normalizes into messages or a compaction. On failure it returns structured retry
-guidance (`code: "UNPARSEABLE_PAYLOAD"`), not a vague error.
+normalizes into messages, a compaction, or both. On failure it returns structured
+retry guidance (`code: "UNPARSEABLE_PAYLOAD"`), not a vague error.
+
+### GET `/api/v1/agent/sessions/:sessionId/review`
+
+Scoped message read (access token). Returns all messages already recorded in
+this session so the agent knows the full conversation history and can pick up
+from the next ordinal. This is the `read_messages` route from the protocol
+descriptor.
 
 ## AI Message Append (legacy)
 

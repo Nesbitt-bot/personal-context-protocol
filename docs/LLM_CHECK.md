@@ -122,6 +122,11 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-25 - Agent read-messages endpoint + full-history instruction (v0.1.13)
+  - Fixed root cause of agents failing to record context: protocol pointed review at admin endpoint (UI-token only), so agents couldn't read past messages. Instruction didn't tell agents to record ALL messages either.
+  - Added GET /api/v1/agent/sessions/:id/review (access-token scoped) so an agent reads its own session history and picks up from the correct ordinal
+  - Protocol descriptor now has read_messages route + existing_message_count + hint; instruction says "Record ALL messages — every user and assistant response, the full history"
+  - 93 tests pass; verified: agent review returns scoped history, recording picks up from correct ordinal
 - 2026-06-24 - Chat-bubble alignment + scroll (v0.1.12)
   - Rewrote MessageList with chat-bubble layout: user messages float right (sky-600 rounded-2xl), agent/assistant/system/tool/correction float left (white/grey rounded-2xl); compaction/system blocks span full width. Message bubbles capped at 75-85% width for readability. Role badge, ordinal, and pencil-edit inline in the bubble header.
   - Messages column now scrolls independently (flex-1 overflow-y-auto) with the ImportPanel pinned below; the outer flex container uses h-[calc(100vh-57px)] overflow-hidden to constrain it. Session detail page made a flex-col min-h-screen with the grid flex-1 + overflow-hidden for independent scroll.
