@@ -122,6 +122,10 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-24 - Chat-bubble alignment + scroll (v0.1.12)
+  - Rewrote MessageList with chat-bubble layout: user messages float right (sky-600 rounded-2xl), agent/assistant/system/tool/correction float left (white/grey rounded-2xl); compaction/system blocks span full width. Message bubbles capped at 75-85% width for readability. Role badge, ordinal, and pencil-edit inline in the bubble header.
+  - Messages column now scrolls independently (flex-1 overflow-y-auto) with the ImportPanel pinned below; the outer flex container uses h-[calc(100vh-57px)] overflow-hidden to constrain it. Session detail page made a flex-col min-h-screen with the grid flex-1 + overflow-hidden for independent scroll.
+  - Version 0.1.12; 92 tests pass.
 - 2026-06-24 - Compaction rendering, mixed ingest, and v0.1 hardening (v0.1.11)
   - Patch-bumped to 0.1.11
   - Compactions are now first-class readable content: `GET /api/v1/sessions/:id/compactions` + a `CompactionList` rendered system-prompt-style (labeled Summary/Timeline/Decisions/Requirements/Open questions/Artifacts/Warnings) in the workspace and session page; when a session has compactions but no messages the messages pane says "No raw messages recorded. This session has compact summaries."

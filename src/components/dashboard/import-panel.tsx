@@ -58,7 +58,7 @@ export function ImportPanel({ sessionId, onImported }: ImportPanelProps) {
   }
 
   return (
-    <section className="mt-5 rounded-md border border-slate-200 bg-slate-950 p-4 text-slate-100 shadow-sm dark:border-slate-800">
+    <section className="mt-3 shrink-0 rounded-md border border-slate-200 bg-slate-950 p-4 text-slate-100 shadow-sm dark:border-slate-800">
       <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
         <TerminalSquare size={15} /> Paste fallback to record
       </div>

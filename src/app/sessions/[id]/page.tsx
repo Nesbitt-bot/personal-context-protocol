@@ -224,8 +224,8 @@ export default function SessionDetail() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <div className="mx-auto max-w-6xl px-4 py-6">
+    <main className="flex min-h-screen flex-col bg-slate-50 text-slate-950">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col overflow-hidden px-4 py-6">
         <header className="mb-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
           <Link href="/dashboard" className="mb-4 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-950">
             <ArrowLeft size={16} /> Back to dashboard
@@ -318,10 +318,12 @@ export default function SessionDetail() {
           )}
         </section>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-            <MessageList sessionId={sessionId} messages={messages} onChanged={handleChanged} hasCompactions={compactionCount > 0} />
-            <CompactionList key={`${sessionId}:${refreshKey}`} sessionId={sessionId} onLoaded={setCompactionCount} />
+        <div className="grid flex-1 gap-5 overflow-hidden lg:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="flex min-h-0 flex-col overflow-hidden rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+              <MessageList sessionId={sessionId} messages={messages} onChanged={handleChanged} hasCompactions={compactionCount > 0} />
+              <CompactionList key={`${sessionId}:${refreshKey}`} sessionId={sessionId} onLoaded={setCompactionCount} />
+            </div>
             <ImportPanel sessionId={sessionId} onImported={handleChanged} />
           </section>
 

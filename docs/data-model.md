@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.11"
+  "version": "0.1.12"
 }
 ```
 
@@ -470,7 +470,7 @@ LIMIT 50;
 - Human admin may edit/delete messages (AI stays append-only); audited
   `message.edited` / `message.deleted`
 
-### v0.1.11 (compaction rendering + mixed ingest + hardening)
+### v0.1.12 (compaction rendering + mixed ingest + hardening)
 
 - Compactions rendered as first-class content; `<PCP_INGEST>` / mixed ingest
   records messages + a compaction; shared config validator; API doc-drift test

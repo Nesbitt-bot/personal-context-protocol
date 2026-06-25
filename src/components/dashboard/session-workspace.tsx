@@ -94,7 +94,7 @@ export function SessionWorkspace({
   }
   return (
     <section className="min-w-0 bg-white dark:bg-slate-950">
-      <div className="flex min-h-screen flex-col">
+      <div className="flex h-[calc(100vh-57px)] flex-col overflow-hidden">
         <header className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
           {error && (
             <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
@@ -256,10 +256,14 @@ export function SessionWorkspace({
           </div>
         )}
 
-        <div className="grid flex-1 grid-cols-1 gap-0 xl:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="min-w-0 px-5 py-5">
-            {selectedSession && <MessageList sessionId={selectedSession.id} messages={messages} onChanged={handleChanged} hasCompactions={compactionCount > 0} />}
-            {selectedSession && <CompactionList key={`${selectedSession.id}:${refreshKey}`} sessionId={selectedSession.id} onLoaded={setCompactionCount} />}
+        <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="flex min-h-0 flex-col px-5 pt-5">
+            {selectedSession && (
+              <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+                <MessageList sessionId={selectedSession.id} messages={messages} onChanged={handleChanged} hasCompactions={compactionCount > 0} />
+                <CompactionList key={`${selectedSession.id}:${refreshKey}`} sessionId={selectedSession.id} onLoaded={setCompactionCount} />
+              </div>
+            )}
             {selectedSession && <ImportPanel sessionId={selectedSession.id} onImported={handleChanged} />}
           </div>
 
