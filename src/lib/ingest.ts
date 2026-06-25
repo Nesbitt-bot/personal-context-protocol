@@ -209,12 +209,60 @@ function tryJson(text: string): unknown | undefined {
 }
 
 /**
+ * Extract the first complete JSON object or array found anywhere in `text`.
+ * Handles the common case where an agent pastes its entire response including
+ * prose like "Here is the fallback block:" before the actual JSON payload.
+ * Also strips trailing commas / minor formatting issues for robustness.
+ * Returns the parsed value and the cleaned JSON substring that was consumed.
+ */
+function extractFirstJson(text: string): { value: unknown; consumed: string } | null {
+  // Find the first JSON opening character.
+  const firstBrace = text.indexOf('{');
+  const firstBracket = text.indexOf('[');
+  let start = -1;
+  let closer: (c: string) => string = () => '';
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) { start = firstBrace; closer = () => '}'; }
+  else if (firstBracket !== -1) { start = firstBracket; closer = () => ']'; }
+  if (start === -1) return null;
+
+  // Walk characters tracking depth until we find the matching close.
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let end = -1;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) { escaped = false; continue; }
+      if (ch === '\\') { escaped = true; continue; }
+      if (ch === '"') { inString = false; }
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === '{' || ch === '[') { depth++; }
+    else if (ch === '}' || ch === ']') { depth--; }
+    if (depth === 0) { end = i + 1; break; }
+  }
+  if (end === -1) return null;
+
+  const jsonSubstring = text.slice(start, end);
+  // Try parsing. If it fails due to trailing commas, try to clean up.
+  let value = tryJson(jsonSubstring);
+  if (value === undefined) {
+    // Common fix: trailing commas in objects/arrays.
+    const cleaned = jsonSubstring.replace(/,(\s*[}\]])/g, '$1');
+    value = tryJson(cleaned);
+  }
+  if (value === undefined) return null;
+  return { value, consumed: jsonSubstring };
+}
+
+/**
  * Parse a raw request body (already read as text) into a normalized ingest
- * result. The order matters: explicit PCP tags win, then structured JSON, then
- * a best-effort transcript fallback. Only a genuinely empty body is an error.
- *
- * `maxMessages` caps how many messages are returned. The agent routes use the
- * protocol limit; the human paste-import allows a larger batch.
+ * result. The order matters: explicit PCP tags first, then any JSON found
+ * anywhere in the text (backward-compatible with older formats and raw agent
+ * responses), then a best-effort transcript fallback. Vacuously empty input
+ * is the only error.
  */
 export function parseIngestPayload(
   rawBody: string,
@@ -242,6 +290,17 @@ export function parseIngestPayload(
     return { kind: 'error', reason: 'PCP_COMPACT block had no summary or recognizable fields' };
   }
 
+  // 2b. Unclosed PCP_INGEST tag (agent forgot </PCP_INGEST>).
+  const partialIngest = text.indexOf('<PCP_INGEST>');
+  if (partialIngest !== -1) {
+    const partial = text.slice(partialIngest + 12).trim();
+    const json = extractFirstJson(partial) ?? { value: tryJson(partial), consumed: partial };
+    if (json.value !== undefined) {
+      const result = coerceCombined(json.value, limit);
+      if (result) return result;
+    }
+  }
+
   // 3. Explicit append tag.
   const appendTag = extractTag(text, 'PCP_APPEND');
   if (appendTag !== null) {
@@ -252,15 +311,23 @@ export function parseIngestPayload(
     return { kind: 'error', reason: 'PCP_APPEND block contained no messages' };
   }
 
-  // 4. Structured JSON body (incl. an agent wrapper object with a messages array,
-  // and/or a nested `compaction`).
+  // 4. Structured JSON at the start of the text.
   const json = tryJson(text);
   if (json !== undefined) {
     const combined = coerceCombined(json, limit);
     if (combined) return combined;
   }
 
-  // 4. Raw transcript / markdown fallback.
+  // 4b. Find the first complete JSON object/array ANYWHERE in the text.
+  // This is backward-compatible: the human may paste the agent's ENTIRE
+  // response including prose or instruction text before the JSON payload.
+  const extracted = extractFirstJson(text);
+  if (extracted !== null) {
+    const combined = coerceCombined(extracted.value, limit);
+    if (combined) return combined;
+  }
+
+  // 5. Raw transcript / markdown fallback.
   const transcript = parseTranscript(text);
   if (transcript.length) {
     return { kind: 'messages', messages: transcript.slice(0, limit) };

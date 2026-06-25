@@ -99,3 +99,30 @@ describe('import dedup', () => {
     }
   });
 });
+
+describe('backward-compatible extraction', () => {
+  it('finds JSON buried after prose (agent pasted entire response)', () => {
+    const text = 'Here is the fallback block you can paste:\n\n{"messages":[{"role":"user","content":"q"},{"role":"assistant","content":"a"}]}\n\nCopy this into the Import panel.';
+    const result = parseIngestPayload(text, { maxMessages: 500 });
+    expect(result.kind).toBe('messages');
+    if (result.kind === 'messages') expect(result.messages).toHaveLength(2);
+  });
+
+  it('finds a compact block buried in prose', () => {
+    const text = 'I could not upload. Here is the fallback:\n\n<PCP_COMPACT>{"summary":"done","decisions":["a","b"]}</PCP_COMPACT>';
+    const result = parseIngestPayload(text);
+    expect(result.kind).toBe('compact');
+  });
+
+  it('handles unclosed PCP_INGEST tag', () => {
+    const text = '<PCP_INGEST>{"messages":[{"role":"user","content":"x"}],"compaction":{"summary":"s"}}';
+    const result = parseIngestPayload(text);
+    expect(result.kind).toBe('mixed');
+  });
+
+  it('handles trailing commas in JSON (lenient parsing)', () => {
+    const text = '{"messages":[{"role":"user","content":"hi"},]}';
+    const result = parseIngestPayload(text, { maxMessages: 500 });
+    expect(result.kind).toBe('messages');
+  });
+});
