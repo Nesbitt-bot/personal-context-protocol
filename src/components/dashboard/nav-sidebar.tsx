@@ -67,6 +67,14 @@ export function NavSidebar({
   const activeSessions = useMemo(() => visibleSessions.filter((s) => !s.archived), [visibleSessions]);
   const archivedSessions = useMemo(() => visibleSessions.filter((s) => s.archived), [visibleSessions]);
   const uncategorizedActive = useMemo(() => activeSessions.filter((s) => !s.topic_id), [activeSessions]);
+  // Under each active topic, only show non-archived sessions. Archived ones go to Trash.
+  const byTopicActive = useMemo(() => {
+    const map = new Map<string, Session[]>();
+    for (const s of activeSessions) {
+      if (s.topic_id) map.set(s.topic_id, [...(map.get(s.topic_id) || []), s]);
+    }
+    return map;
+  }, [activeSessions]);
 
   function pressHandlers(items: ContextMenuItem[]) {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -178,8 +186,8 @@ export function NavSidebar({
         ) : (
           <>
             {renderGroup(UNCATEGORIZED, 'Uncategorized', <Inbox size={15} className="shrink-0 opacity-70" />, uncategorizedActive)}
-            {activeTopics.map((t) => renderGroup(t.id, t.title, <Folder size={15} className="shrink-0 opacity-70" />, byTopic.get(t.id) || [], topicItems(t)))}
-            {activeTopics.length === 0 && uncategorizedActive.length === 0 && (
+            {activeTopics.map((t) => renderGroup(t.id, t.title, <Folder size={15} className="shrink-0 opacity-70" />, byTopicActive.get(t.id) || [], topicItems(t)))}
+            {activeTopics.length === 0 && uncategorizedActive.length === 0 && activeSessions.length === 0 && (
               <div className="rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">Start a new session or topic.</div>
             )}
           </>

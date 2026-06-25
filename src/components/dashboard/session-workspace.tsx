@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Archive, Check, ChevronLeft, ChevronRight, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
+import { Archive, Check, ChevronLeft, ChevronRight, Edit3, Globe, KeyRound, ListChecks, Lock, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
 import { formatDate } from './format';
 import { ImportPanel } from './import-panel';
 import { MessageList } from './message-list';
 import { CompactionList } from './compaction-list';
+import { TokenDisplay } from './token-display';
 import { EventLog, Message, Session, Topic } from './types';
 
 interface SessionWorkspaceProps {
@@ -22,6 +23,7 @@ interface SessionWorkspaceProps {
   editTitle: string;
   editTopicId: string;
   generatedToken: string;
+  onClearGeneratedToken: () => void;
   onUiTokenInputChange: (token: string) => void;
   onSaveUiToken: () => void;
   onStartEditSession: () => void;
@@ -60,6 +62,7 @@ export function SessionWorkspace({
   editTitle,
   editTopicId,
   generatedToken,
+  onClearGeneratedToken,
   onUiTokenInputChange,
   onSaveUiToken,
   onStartEditSession,
@@ -82,6 +85,7 @@ export function SessionWorkspace({
   const [copiedPublic, setCopiedPublic] = useState(false);
   const [compactionCount, setCompactionCount] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [tokenDisplay, setTokenDisplay] = useState('');
 
   useEffect(() => {
     setCompactionCount(0);
@@ -251,19 +255,7 @@ export function SessionWorkspace({
         )}
 
         {generatedToken && (
-          <div className="border-b border-slate-200 bg-amber-50 px-5 py-4 dark:border-slate-800 dark:bg-amber-950/40">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-sm font-medium text-amber-900 dark:text-amber-200">Copy this token block now.</p>
-              <button
-                className="rounded-md border border-amber-200 bg-white px-3 py-1.5 text-sm text-amber-900 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-slate-950 dark:text-amber-200 dark:hover:bg-amber-950/60"
-                onClick={() => navigator.clipboard.writeText(generatedToken)}
-                type="button"
-              >
-                <span className="inline-flex items-center gap-2"><Clipboard size={15} /> Copy</span>
-              </button>
-            </div>
-            <pre className="max-h-44 overflow-auto rounded-md bg-white p-3 text-xs text-slate-800 dark:bg-slate-950 dark:text-slate-200">{generatedToken}</pre>
-          </div>
+          <TokenDisplay content={generatedToken} onClose={onClearGeneratedToken} />
         )}
 
         <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden xl:grid-cols-[minmax(0,1fr)_300px]">

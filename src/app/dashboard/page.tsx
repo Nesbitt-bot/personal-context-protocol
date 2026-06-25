@@ -353,7 +353,7 @@ function DashboardContent() {
           topics={topics.filter(t => !t.archived)} messages={messages} events={events}
           eventsOpen={eventsOpen} onToggleEvents={() => setEventsOpen(o => !o)}
           editingSession={editingSession} editTitle={editTitle} editTopicId={editTopicId}
-          generatedToken={generatedToken}
+          generatedToken={generatedToken} onClearGeneratedToken={() => setGeneratedToken('')}
           onUiTokenInputChange={setUiTokenInput} onSaveUiToken={saveUiToken}
           onStartEditSession={startEditSession} onEditTitleChange={setEditTitle}
           onEditTopicIdChange={setEditTopicId} onSaveSessionEdits={saveSessionEdits}
