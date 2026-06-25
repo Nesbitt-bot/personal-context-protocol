@@ -219,9 +219,14 @@ Archives a session.
 Lists token metadata for the session (never the secret): name, status
 (`active`, `expired`, `revoked`), `expires_at`, and `last_used_at`.
 
+### DELETE `/sessions/:sessionId/tokens`
+
+Permanently deletes a token from the database after a 3-second undo window.
+Body: `{ "token_id": "tok_..." }`.
+
 ### PATCH `/sessions/:sessionId/tokens`
 
-Renames and/or revokes an issued token. Body: `{ "token_id": "tok_...", "name":
+Renames a token. Body: `{ "token_id": "tok_...", "name": "New name" }`. Body: `{ "token_id": "tok_...", "name":
 "New name" }` to rename (names are kept distinct within the session), or
 `{ "token_id": "tok_...", "revoke": true }` to revoke. A revoked token is
 rejected on every subsequent request.

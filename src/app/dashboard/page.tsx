@@ -10,7 +10,7 @@ import { TokenModal } from '@/components/dashboard/token-modal';
 import { EventLog, Message, Session, Topic } from '@/components/dashboard/types';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
-import { buildAgentInstruction } from '@/lib/agent-protocol';
+import { buildAgentInstruction, buildExportInstruction, buildImportInstruction } from '@/lib/agent-protocol';
 
 function getUiToken() {
   if (typeof window === 'undefined') return null;
@@ -293,6 +293,32 @@ function DashboardContent() {
     } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create token', moduleProcess: 'session token administration / create token request', cause: `browser could not reach the token endpoint; ${errorCause(err)}` })); }
   }
 
+  async function createImportToken(session: Session) {
+    try {
+      const res = await fetch(`/api/v1/sessions/${session.id}/tokens`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ expires_in: '7d' }) });
+      const data = await readJsonResponse(res, { consequence: 'Unable to create token', moduleProcess: 'session token administration / create import token request', fallbackCause: 'create token endpoint did not return JSON' });
+      if (!res.ok || data.error || !data.access_token) { setError(data.error || 'Unable to create import token'); return; }
+      const url = `${window.location.origin}/r/${session.id}`;
+      const instruction = data.import_instruction || buildImportInstruction(url, data.access_token, session.mode || 'wild');
+      setGeneratedToken(instruction);
+      setStatus('Import token created. Agent will recall its past history and upload to PCP.');
+      await navigator.clipboard.writeText(instruction).catch(() => undefined);
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create import token', moduleProcess: 'session token administration / create import token', cause: errorCause(err) })); }
+  }
+
+  async function createExportToken(session: Session) {
+    try {
+      const res = await fetch(`/api/v1/sessions/${session.id}/tokens`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ expires_in: '7d' }) });
+      const data = await readJsonResponse(res, { consequence: 'Unable to create token', moduleProcess: 'session token administration / create export token request', fallbackCause: 'create token endpoint did not return JSON' });
+      if (!res.ok || data.error || !data.access_token) { setError(data.error || 'Unable to create export token'); return; }
+      const url = `${window.location.origin}/r/${session.id}`;
+      const instruction = data.export_instruction || buildExportInstruction(url, data.access_token, session.mode || 'wild');
+      setGeneratedToken(instruction);
+      setStatus('Export token created. Agent will read PCP history and record all new context.');
+      await navigator.clipboard.writeText(instruction).catch(() => undefined);
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create export token', moduleProcess: 'session token administration / create export token', cause: errorCause(err) })); }
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
       <SiteNav />
@@ -333,7 +359,7 @@ function DashboardContent() {
           onEditTopicIdChange={setEditTopicId} onSaveSessionEdits={saveSessionEdits}
           onCancelSessionEdits={() => setEditingSession(false)}
           onArchiveSelectedSession={archiveSelectedSession} onRestoreSelectedSession={restoreSelectedSession}
-          onGenerateToken={generateToken} onManageTokens={setTokenModalSession}
+          onGenerateToken={generateToken} onCreateImportToken={createImportToken} onCreateExportToken={createExportToken} onManageTokens={setTokenModalSession}
           onTogglePublic={togglePublic} onSetMode={setMode}
           onImported={() => selectedSession && loadSessionDetail(selectedSession.id)}
         />

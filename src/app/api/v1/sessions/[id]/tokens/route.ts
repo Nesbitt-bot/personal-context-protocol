@@ -7,7 +7,7 @@ import { logError } from '@/lib/logging';
 import { createTokenSchema, manageTokenSchema } from '@/lib/validations';
 import { DEFAULT_EXPIRATION, resolveExpiresAt, tokenStatus } from '@/lib/token-expiration';
 import { buildRecordingUrl, resolveAppBaseUrl } from '@/lib/recording-url';
-import { buildAgentInstruction, normalizeRecordingMode } from '@/lib/agent-protocol';
+import { buildAgentInstruction, buildExportInstruction, buildImportInstruction, normalizeRecordingMode } from '@/lib/agent-protocol';
 import { uniqueTokenName } from '@/lib/session-store';
 import { and, desc, eq } from 'drizzle-orm';
 
@@ -226,6 +226,8 @@ export async function POST(
       access_token: token,
       recording_url: recordingUrl,
       instruction: buildAgentInstruction(recordingUrl, token, mode),
+      import_instruction: buildImportInstruction(recordingUrl, token, mode),
+      export_instruction: buildExportInstruction(recordingUrl, token, mode),
       session_id: params.id,
       name,
       can_rename_session: can_rename_session || false,
@@ -247,6 +249,65 @@ export async function POST(
         error: 'Unable to create token: session token administration / create scoped token transaction - session lookup, token hash, token insert, or audit event insert failed',
         code: 'INTERNAL_ERROR',
       },
+      { status: 500 },
+    );
+  }
+}
+
+/** Permanently delete a token from the database (undo countdown completed). */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const authResult = await verifyUiToken(request);
+    if ('error' in authResult) {
+      return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const tokenId = typeof body.token_id === 'string' ? body.token_id.trim() : '';
+
+    if (!tokenId) {
+      return NextResponse.json(
+        { error: 'Unable to delete token: session token administration / token_id validation - token_id is required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const [token] = await db
+      .select({ id: sessionTokens.id, name: sessionTokens.name })
+      .from(sessionTokens)
+      .where(and(eq(sessionTokens.id, tokenId), eq(sessionTokens.sessionId, params.id)));
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unable to delete token: session token administration / token lookup - token not found for this session', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    await db.delete(sessionTokens).where(eq(sessionTokens.id, token.id));
+
+    await db.insert(events).values({
+      id: createId('evt'),
+      sessionId: params.id,
+      action: 'token.deleted',
+      actor: 'human',
+      detailsJson: { token_id: token.id, token_name: token.name },
+      createdAt: new Date(),
+    });
+
+    return NextResponse.json({ success: true, id: token.id, deleted: true });
+  } catch (error) {
+    logError({
+      consequence: 'Unable to delete token',
+      moduleProcess: 'session token administration / permanent token deletion',
+      cause: 'token lookup or delete failed',
+      error,
+    });
+    return NextResponse.json(
+      { error: 'Unable to delete token: session token administration / permanent token deletion - token lookup or delete failed', code: 'INTERNAL_ERROR' },
       { status: 500 },
     );
   }

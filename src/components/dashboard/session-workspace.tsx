@@ -32,6 +32,8 @@ interface SessionWorkspaceProps {
   onArchiveSelectedSession: () => void;
   onRestoreSelectedSession: () => void;
   onGenerateToken: (session: Session) => void;
+  onCreateImportToken: (session: Session) => void;
+  onCreateExportToken: (session: Session) => void;
   onManageTokens: (session: Session) => void;
   onTogglePublic: (session: Session, next: boolean) => void;
   onSetMode: (session: Session, mode: 'wild' | 'exact') => void;
@@ -68,6 +70,8 @@ export function SessionWorkspace({
   onArchiveSelectedSession,
   onRestoreSelectedSession,
   onGenerateToken,
+  onCreateImportToken,
+  onCreateExportToken,
   onManageTokens,
   onTogglePublic,
   onSetMode,
@@ -167,31 +171,37 @@ export function SessionWorkspace({
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" onClick={onStartEditSession} type="button">
+                <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" onClick={onStartEditSession} type="button" title="Edit session title and topic">
                   <span className="inline-flex items-center gap-2"><Edit3 size={16} /> Edit</span>
                 </button>
-                <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => onGenerateToken(selectedSession)} type="button">
+                <button className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700 hover:bg-sky-100 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300" onClick={() => onGenerateToken(selectedSession)} type="button" title="Create a default recording token for an agent">
                   <span className="inline-flex items-center gap-2"><KeyRound size={16} /> Token</span>
                 </button>
-                <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => onManageTokens(selectedSession)} type="button">
+                <button className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-700 hover:bg-violet-100 dark:border-violet-900/60 dark:bg-violet-950/40 dark:text-violet-300" onClick={() => onCreateImportToken(selectedSession)} type="button" title="Import: agent recalls all its past conversation history and uploads to PCP, then records follow-ups">
+                  <span className="inline-flex items-center gap-2"><KeyRound size={16} /> Import</span>
+                </button>
+                <button className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300" onClick={() => onCreateExportToken(selectedSession)} type="button" title="Export: agent reads all PCP history first, then records new context, chat history, and media URLs">
+                  <span className="inline-flex items-center gap-2"><KeyRound size={16} /> Export</span>
+                </button>
+                <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => onManageTokens(selectedSession)} type="button" title="Manage issued tokens: rename, delete">
                   <span className="inline-flex items-center gap-2"><ListChecks size={16} /> Tokens</span>
                 </button>
                 <button
                   className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
                   onClick={() => onTogglePublic(selectedSession, !selectedSession.public)}
                   type="button"
-                  title={selectedSession.public ? 'Make private' : 'Make public (read-only link)'}
+                  title={selectedSession.public ? 'Make this session private again' : 'Make this session publicly readable at /s/<id>'}
                 >
                   <span className="inline-flex items-center gap-2">
                     {selectedSession.public ? <><Lock size={16} /> Make private</> : <><Globe size={16} /> Make public</>}
                   </span>
                 </button>
                 {selectedSession.archived ? (
-                  <button className="rounded-md border border-emerald-200 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/40" onClick={onRestoreSelectedSession} type="button">
+                  <button className="rounded-md border border-emerald-200 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/40" onClick={onRestoreSelectedSession} type="button" title="Restore this session from trash">
                     <span className="inline-flex items-center gap-2"><RotateCcw size={16} /> Restore</span>
                   </button>
                 ) : (
-                  <button className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 dark:border-red-900/60 dark:text-red-200 dark:hover:bg-red-950/40" onClick={onArchiveSelectedSession} type="button">
+                  <button className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 dark:border-red-900/60 dark:text-red-200 dark:hover:bg-red-950/40" onClick={onArchiveSelectedSession} type="button" title="Move this session to trash">
                     <span className="inline-flex items-center gap-2"><Archive size={16} /> Remove</span>
                   </button>
                 )}

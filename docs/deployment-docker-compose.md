@@ -23,7 +23,7 @@ Bash:
 export PCP_VERSION="$(cat VERSION)"
 ```
 
-The default Compose image is `personal-context-protocol:0.1.14`. When `VERSION` changes, set `PCP_VERSION` to the new value before building so each release gets a distinct image tag.
+The default Compose image is `personal-context-protocol:0.1.15`. When `VERSION` changes, set `PCP_VERSION` to the new value before building so each release gets a distinct image tag.
 
 ## Start Locally
 
@@ -39,7 +39,7 @@ Compose provides local defaults for development. Override them when needed:
 
 | Name | Default | Purpose |
 |---|---|---|
-| `PCP_VERSION` | `0.1.14` | App image tag and Docker build version |
+| `PCP_VERSION` | `0.1.15` | App image tag and Docker build version |
 | `PCP_PORT` | `3000` | Host port mapped to the app container |
 | `PCP_APP_URL` | `http://localhost:3000` | Public app URL used by clients |
 | `PCP_INSTANCE_SECRET` | Local placeholder | 32+ character instance secret |
@@ -74,7 +74,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "database": "pending"
 }
 ```
