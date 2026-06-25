@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Clipboard, KeyRound, Link2, MessageSquare, Settings2 } from 'lucide-react';
+import { ArrowLeft, Clipboard, KeyRound, Link2, Settings2 } from 'lucide-react';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { buildAgentInstruction } from '@/lib/agent-protocol';
 import { ImportPanel } from '@/components/dashboard/import-panel';
+import { MessageList } from '@/components/dashboard/message-list';
 
 interface SessionRecord {
   id: string;
@@ -311,41 +312,7 @@ export default function SessionDetail() {
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <MessageSquare size={18} className="text-sky-600" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Messages</h2>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{messages.length}</span>
-            </div>
-
-            {messages.length === 0 ? (
-              <div className="rounded-md border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500">
-                No messages recorded yet.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <article
-                    key={message.id}
-                    className={`rounded-md border px-4 py-3 ${
-                      message.role === 'assistant'
-                        ? 'border-emerald-100 bg-emerald-50/60'
-                        : message.role === 'user'
-                          ? 'border-sky-100 bg-sky-50/70'
-                          : 'border-slate-200 bg-slate-50'
-                    }`}
-                  >
-                    <div className="mb-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-                      <span className="font-semibold uppercase tracking-wide">{message.role}</span>
-                      <span>#{message.ordinal}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-900">{message.content}</p>
-                    <p className="mt-3 text-xs text-slate-500">
-                      {(message.provider || 'unknown')}/{(message.base_model || message.BaseModel || 'unknown')} - {formatDate(message.observed_at || message.observedAt)}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            )}
+            <MessageList sessionId={sessionId} messages={messages} onChanged={loadSession} />
             <ImportPanel sessionId={sessionId} onImported={loadSession} />
           </section>
 

@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Archive, Check, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, MessageSquare, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
+import { Archive, Check, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
 import { formatDate } from './format';
 import { ImportPanel } from './import-panel';
+import { MessageList } from './message-list';
 import { EventLog, Message, Session, Topic } from './types';
 
 interface SessionWorkspaceProps {
@@ -35,12 +36,6 @@ interface SessionWorkspaceProps {
   onTogglePublic: (session: Session, next: boolean) => void;
   onSetMode: (session: Session, mode: 'wild' | 'exact') => void;
   onImported: () => void;
-}
-
-function messageTone(role: string) {
-  if (role === 'assistant') return 'border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/30';
-  if (role === 'user') return 'border-sky-100 bg-sky-50/70 dark:border-sky-900/60 dark:bg-sky-950/30';
-  return 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900';
 }
 
 /**
@@ -250,32 +245,7 @@ export function SessionWorkspace({
 
         <div className="grid flex-1 grid-cols-1 gap-0 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0 px-5 py-5">
-            <div className="mb-4 flex items-center gap-2">
-              <MessageSquare size={18} className="text-sky-600 dark:text-sky-300" />
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Messages</h3>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{messages.length}</span>
-            </div>
-
-            {messages.length === 0 ? (
-              <div className="rounded-md border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                No messages recorded yet.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <article key={message.id} className={`max-w-3xl rounded-md border px-4 py-3 shadow-sm ${messageTone(message.role)}`}>
-                    <div className="mb-2 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-                      <span className="font-semibold uppercase tracking-wide">{message.role}</span>
-                      <span>#{message.ordinal}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-900 dark:text-slate-100">{message.content}</p>
-                    <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                      {(message.provider || 'unknown')}/{(message.base_model || message.BaseModel || 'unknown')} - {formatDate(message.observed_at || message.observedAt)}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            )}
+            {selectedSession && <MessageList sessionId={selectedSession.id} messages={messages} onChanged={onImported} />}
             {selectedSession && <ImportPanel sessionId={selectedSession.id} onImported={onImported} />}
           </div>
 

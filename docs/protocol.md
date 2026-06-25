@@ -169,6 +169,18 @@ Body: `{ "payload": "<pasted text>" }` (or the raw pasted text). Response:
 
 Returns messages for review.
 
+### PATCH `/sessions/:id/messages/:messageId`
+
+Admin message correction (UI token). Edits a wrongly-recorded/imported message:
+`{ "content": "..." }`. The append-only rule applies to AI tokens only; this
+human-admin path is audited (`message.edited`).
+
+### POST `/sessions/:id/messages/delete`
+
+Admin bulk delete (UI token). Removes wrongly-recorded/imported messages:
+`{ "message_ids": ["msg_...", ...] }` (one or many). Only ids belonging to the
+session are deleted; audited (`message.deleted`).
+
 ### GET `/sessions/:id/events`
 
 Returns audit events for a session.

@@ -15,12 +15,18 @@ These rules extend the canonical [Trance-0/AGENTS.md](https://github.com/Trance-
 - Topic creation/rename/archive are admin-only operations
 - Backend may resolve `topic_id` internally from session, but never expose to AI
 
-### Messages are immutable
+### Messages are append-only for AI
 
-- Never UPDATE or DELETE existing messages
-- Corrections are appended as new messages with `role: "correction"` or `role: "system"`
+- AI tokens may only append; they never UPDATE or DELETE existing messages
+- AI corrections are appended as new messages with `role: "correction"` or `role: "system"`
 - Each message gets a monotonically increasing `ordinal` within its session
 - Corrections reference the original message via metadata if needed
+- Exception (human admin only): a UI-token admin may edit or delete a message to
+  fix a wrongly-recorded or wrongly-imported entry, via
+  `PATCH /api/v1/sessions/:id/messages/:messageId` and
+  `POST /api/v1/sessions/:id/messages/delete`. These are audited
+  (`message.edited`, `message.deleted`). This admin path does not relax the
+  AI-token rule above.
 
 ### Token scoping
 

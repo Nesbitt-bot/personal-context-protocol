@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.9"
+  "version": "0.1.10"
 }
 ```
 
@@ -194,7 +194,12 @@ Immutable conversation messages.
 - Index: `topic_id`
 - Index: `role`
 
-**Immutability**: Messages are NEVER updated or deleted. Corrections are new messages.
+**Immutability**: Messages are append-only **for AI tokens** — an agent can only
+append; it can never update or delete, and AI corrections are new messages. A
+**human admin** (UI token) may edit or delete a message to fix a wrongly-recorded
+or wrongly-imported entry (`PATCH`/`POST .../messages/delete`), which is audited
+(`message.edited`, `message.deleted`). Deletes are hard deletes; ordinal gaps are
+fine because new appends use `max(ordinal) + 1`.
 
 **Content**:
 - Store pure text/markdown only
@@ -263,6 +268,8 @@ Audit trail for all actions.
 - `token.created`
 - `token.revoked`
 - `message.appended`
+- `message.edited`
+- `message.deleted`
 - `compaction.recorded`
 - `token.revoked`
 - `token.renamed`
@@ -453,7 +460,7 @@ LIMIT 50;
 - `POST /api/v1/sessions/:id/import` records a pasted agent fallback block,
   skipping messages already present (dedup by role + content)
 
-### v0.1.9 (recording modes + token rename)
+### v0.1.10 (recording modes + token rename)
 
 - Added `sessions.mode` (`wild` default / `exact`, migration 007) surfaced to the
   agent; token rename via PATCH; auto-distinct token names on creation

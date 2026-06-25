@@ -122,6 +122,11 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-24 - Admin message edit/delete with multi-select (v0.1.10)
+  - Patch-bumped to 0.1.10
+  - Added admin (UI-token) message correction: `PATCH /api/v1/sessions/:id/messages/:messageId` (edit) and `POST /api/v1/sessions/:id/messages/delete` (bulk delete, ownership-checked); audited `message.edited` / `message.deleted`. AI tokens remain strictly append-only; documented the human-admin exception in data-model and docs/AGENTS.md
+  - New shared `MessageList` component (replaces the two inline renderers): inline edit, multi-select with select-all + shift-click range select, bulk delete, and auto-fold long messages to 5 lines (`line-clamp-5`) while selecting
+  - Verified live: edit fixes a wrong import; bulk delete removes selected (ordinals keep gaps); cross-session ids rejected (deleted=0); edit without UI token → 401; agent append continues from max(ordinal)+1 after deletes. 53 tests pass
 - 2026-06-24 - Session recording modes + token rename (v0.1.9)
   - Patch-bumped to 0.1.9
   - Added `sessions.mode` (`wild` default / `exact`, migration 007). The mode is surfaced to the agent in the protocol descriptor (`recording_mode` + `recording_guidance`) and the generated instruction: wild = may redact unsafe secrets, exact = verbatim incl. credentials for task migration. Workspace has a Wild/Exact toggle

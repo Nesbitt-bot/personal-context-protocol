@@ -67,6 +67,15 @@ export const updateSessionSchema = z.object({
   || value.mode !== undefined
 ), 'At least one session field is required');
 
+// Admin message correction (human only — AI tokens remain append-only).
+export const editMessageSchema = z.object({
+  content: z.string().min(1).max(MAX_CONTENT_CHARS),
+});
+
+export const deleteMessagesSchema = z.object({
+  message_ids: z.array(z.string().min(1)).min(1).max(1000),
+});
+
 // Token management: rename and/or revoke an issued token.
 export const manageTokenSchema = z.object({
   token_id: z.string().min(1),
