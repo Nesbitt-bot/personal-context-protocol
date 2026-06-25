@@ -122,6 +122,11 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-25 - Session URL routing, scroll-to-bottom, overflow fix (v0.1.14)
+  - Dashboard now uses URL-driven session selection: clicking a session pushes /dashboard?session=<id>, making every session shareable while the sidebar stays visible. Removed the standalone /sessions/[id] page (redirects); removed "Open page" button.
+  - Fixed y-overflow scroll: the main container uses h-[calc(100vh-57px)] overflow-hidden with flex-1 overflow-y-auto on the message column. Long single messages no longer break the viewport.
+  - Added scroll-to-bottom button (ArrowDown) that appears when the user scrolls up past ~8 messages; auto-scrolls to latest on session load.
+  - 93 tests pass; build clean.
 - 2026-06-25 - Agent read-messages endpoint + full-history instruction (v0.1.13)
   - Fixed root cause of agents failing to record context: protocol pointed review at admin endpoint (UI-token only), so agents couldn't read past messages. Instruction didn't tell agents to record ALL messages either.
   - Added GET /api/v1/agent/sessions/:id/review (access-token scoped) so an agent reads its own session history and picks up from the correct ordinal

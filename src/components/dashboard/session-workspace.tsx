@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Archive, Check, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
 import { formatDate } from './format';
@@ -192,9 +191,6 @@ export function SessionWorkspace({
                     <span className="inline-flex items-center gap-2"><Archive size={16} /> Remove</span>
                   </button>
                 )}
-                <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" href={`/sessions/${selectedSession.id}`}>
-                  Open page
-                </Link>
               </div>
             </div>
           ) : (

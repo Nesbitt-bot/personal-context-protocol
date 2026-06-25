@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Check, MessageSquare, Pencil, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowDown, Check, MessageSquare, Pencil, Trash2, X } from 'lucide-react';
 import { formatDate } from './format';
 import { Message } from './types';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
@@ -37,6 +37,34 @@ export function MessageList({ sessionId, messages, onChanged, hasCompactions = f
   const [editText, setEditText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [atBottom, setAtBottom] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const isNearBottom = (el: HTMLElement) => el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) { el.scrollTop = el.scrollHeight; setAtBottom(true); }
+  }, []);
+
+  // Auto-scroll to latest messages on first load / when messages change and the user IS already at the bottom.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && atBottom && messages.length > 0) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [messages, atBottom]);
+
+  // Scroll to bottom when switching sessions (sessionId changes).
+  useEffect(() => {
+    scrollToBottom();
+  }, [sessionId]);
+
+  // Track whether the user has scrolled up.
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (el) setAtBottom(isNearBottom(el));
+  }
 
   function authHeaders(): Record<string, string> {
     return { Authorization: `Bearer ${localStorage.getItem('ui_token')}` };
@@ -185,7 +213,17 @@ export function MessageList({ sessionId, messages, onChanged, hasCompactions = f
       {selectMode && <p className="mb-3 text-xs text-slate-400">Shift-click to select a range. Messages are folded to 5 lines while selecting.</p>}
 
       {/* Scrollable message list */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="relative min-h-0 flex-1 overflow-y-auto" ref={scrollRef} onScroll={handleScroll}>
+        {!atBottom && messages.length > 8 && (
+          <button
+            className="sticky bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-md hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            onClick={scrollToBottom}
+            type="button"
+          >
+            <ArrowDown size={14} className="mr-1.5 inline-block" />
+            Latest messages
+          </button>
+        )}
         {messages.length === 0 ? (
           <div className="rounded-md border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
             {hasCompactions ? 'No raw messages recorded. This session has compact summaries.' : 'No messages recorded yet.'}

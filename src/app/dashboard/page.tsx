@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { SiteNav } from '@/components/site-nav';
 import { NavSidebar } from '@/components/dashboard/nav-sidebar';
@@ -18,17 +18,20 @@ function getUiToken() {
 }
 
 /**
- * Dashboard coordinates API calls and renders a ChatGPT-style nav (collapsible
- * topic groups with nested sessions, plus an Uncategorized group) alongside the
- * session workspace.
+ * Dashboard content. Wrapped in Suspense so useSearchParams works without
+ * blocking SSR. Reads `?session=<id>` from the URL to select a session;
+ * clicking a session in the nav pushes `/dashboard?session=<id>` so every
+ * session has a shareable URL and the sidebar always stays visible.
  */
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSessionId = searchParams.get('session') || '';
   const [topics, setTopics] = useState<Topic[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [events, setEvents] = useState<EventLog[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [selectedSessionId, setSelectedSessionId] = useState(urlSessionId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editingSession, setEditingSession] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -43,6 +46,11 @@ export default function Dashboard() {
   const [hasUiToken, setHasUiToken] = useState(false);
   const [uiTokenSource, setUiTokenSource] = useState<string | null>(null);
   const [tokenModalSession, setTokenModalSession] = useState<Session | null>(null);
+
+  // Sync URL param to state on mount and when URL changes
+  useEffect(() => {
+    setSelectedSessionId(urlSessionId);
+  }, [urlSessionId]);
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) || null;
   const selectedTopic = topics.find((topic) => topic.id === selectedSession?.topic_id) || null;
@@ -62,7 +70,6 @@ export default function Dashboard() {
     }
   }, [selectedSessionId]);
 
-  /** Reads the admin credential provenance to warn when a deploy token is in use. */
   async function loadAuthState() {
     const uiToken = getUiToken();
     if (!uiToken) return;
@@ -70,9 +77,7 @@ export default function Dashboard() {
       const res = await fetch('/api/v1/auth/check', { headers: { Authorization: `Bearer ${uiToken}` } });
       const data = await res.json().catch(() => ({}));
       if (res.ok && typeof data.ui_token_source === 'string') setUiTokenSource(data.ui_token_source);
-    } catch {
-      // Non-fatal: the warning banner is advisory only.
-    }
+    } catch { /* advisory only */ }
   }
 
   function saveUiToken() {
@@ -95,57 +100,34 @@ export default function Dashboard() {
     });
   }
 
+  function selectSession(sid: string) {
+    setSelectedSessionId(sid);
+    router.push(`/dashboard?session=${encodeURIComponent(sid)}`, { scroll: false });
+  }
+
   function authHeaders(): Record<string, string> {
     return { Authorization: `Bearer ${getUiToken()}` };
   }
 
-  /** Loads topics and every session in one pass, then groups them in the nav. */
   async function loadAll() {
     setLoading(true);
     try {
       const uiToken = getUiToken();
-      if (!uiToken) {
-        setHasUiToken(false);
-        router.replace('/login?next=/dashboard');
-        return;
-      }
-
+      if (!uiToken) { setHasUiToken(false); router.replace('/login?next=/dashboard'); return; }
       const [topicsRes, sessionsRes] = await Promise.all([
         fetch('/api/v1/topics', { headers: authHeaders() }),
         fetch('/api/v1/sessions', { headers: authHeaders() }),
       ]);
-      const topicsData = await readJsonResponse(topicsRes, {
-        consequence: 'Unable to load topics',
-        moduleProcess: 'topic administration / list topics request',
-        fallbackCause: 'topics endpoint did not return JSON',
-      });
-      const sessionsData = await readJsonResponse(sessionsRes, {
-        consequence: 'Unable to load sessions',
-        moduleProcess: 'session administration / list sessions request',
-        fallbackCause: 'sessions endpoint did not return JSON',
-      });
-
-      if (!topicsRes.ok || topicsData.error) {
-        setError(topicsData.error || 'Unable to load topics: topic administration / list topics request - API response did not include topics');
-        return;
-      }
-      if (!sessionsRes.ok || sessionsData.error) {
-        setError(sessionsData.error || 'Unable to load sessions: session administration / list sessions request - API response did not include sessions');
-        return;
-      }
-
+      const topicsData = await readJsonResponse(topicsRes, { consequence: 'Unable to load topics', moduleProcess: 'topic administration / list topics request', fallbackCause: 'topics endpoint did not return JSON' });
+      const sessionsData = await readJsonResponse(sessionsRes, { consequence: 'Unable to load sessions', moduleProcess: 'session administration / list sessions request', fallbackCause: 'sessions endpoint did not return JSON' });
+      if (!topicsRes.ok || topicsData.error) { setError(topicsData.error || 'Unable to load topics'); return; }
+      if (!sessionsRes.ok || sessionsData.error) { setError(sessionsData.error || 'Unable to load sessions'); return; }
       setTopics(topicsData.topics || []);
       setSessions(sessionsData.sessions || []);
       setError('');
     } catch (err) {
-      setError(diagnosticMessage({
-        consequence: 'Unable to load workspace',
-        moduleProcess: 'dashboard / initial data load',
-        cause: `browser could not reach the topics or sessions endpoint or parse its response; ${errorCause(err)}`,
-      }));
-    } finally {
-      setLoading(false);
-    }
+      setError(diagnosticMessage({ consequence: 'Unable to load workspace', moduleProcess: 'dashboard / initial data load', cause: `browser could not reach the topics or sessions endpoint; ${errorCause(err)}` }));
+    } finally { setLoading(false); }
   }
 
   async function loadSessionDetail(sessionId: string) {
@@ -154,89 +136,39 @@ export default function Dashboard() {
         fetch(`/api/v1/sessions/${sessionId}/review`, { headers: authHeaders() }),
         fetch(`/api/v1/sessions/${sessionId}/events`, { headers: authHeaders() }),
       ]);
-      const reviewData = await readJsonResponse(reviewRes, {
-        consequence: 'Unable to load messages',
-        moduleProcess: 'session review / message list request',
-        fallbackCause: 'session review endpoint did not return JSON',
-      });
-      const eventsData = await readJsonResponse(eventsRes, {
-        consequence: 'Unable to load events',
-        moduleProcess: 'session review / event list request',
-        fallbackCause: 'session events endpoint did not return JSON',
-      });
-
-      if (!reviewRes.ok || reviewData.error) {
-        setError(reviewData.error || 'Unable to load messages: session review / message list request - API response did not include messages');
-        return;
-      }
-      if (!eventsRes.ok || eventsData.error) {
-        setError(eventsData.error || 'Unable to load events: session review / event list request - API response did not include events');
-        return;
-      }
-
+      const reviewData = await readJsonResponse(reviewRes, { consequence: 'Unable to load messages', moduleProcess: 'session review / message list request', fallbackCause: 'session review endpoint did not return JSON' });
+      const eventsData = await readJsonResponse(eventsRes, { consequence: 'Unable to load events', moduleProcess: 'session review / event list request', fallbackCause: 'session events endpoint did not return JSON' });
+      if (!reviewRes.ok || reviewData.error) { setError(reviewData.error || 'Unable to load messages'); return; }
+      if (!eventsRes.ok || eventsData.error) { setError(eventsData.error || 'Unable to load events'); return; }
       setMessages(reviewData.messages || []);
       setEvents(eventsData.events || []);
       setError('');
     } catch (err) {
-      setError(diagnosticMessage({
-        consequence: 'Unable to load session data',
-        moduleProcess: 'session review / load selected session',
-        cause: `browser could not reach session review endpoints or parse their responses; ${errorCause(err)}`,
-      }));
+      setError(diagnosticMessage({ consequence: 'Unable to load session data', moduleProcess: 'session review / load selected session', cause: `browser could not reach session review endpoints; ${errorCause(err)}` }));
     }
   }
 
   async function createTopic() {
     try {
       const res = await fetch('/api/v1/topics', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: '{}' });
-      const data = await readJsonResponse(res, {
-        consequence: 'Unable to create topic',
-        moduleProcess: 'topic administration / create topic request',
-        fallbackCause: 'create topic endpoint did not return JSON',
-      });
-      if (!res.ok || data.error) {
-        setError(data.error || 'Unable to create topic: topic administration / create topic request - API response did not include success');
-        return;
-      }
+      const data = await readJsonResponse(res, { consequence: 'Unable to create topic', moduleProcess: 'topic administration / create topic request', fallbackCause: 'create topic endpoint did not return JSON' });
+      if (!res.ok || data.error) { setError(data.error || 'Unable to create topic'); return; }
       setExpanded((prev) => new Set(prev).add(data.id));
       setStatus(`Topic created: ${data.title}`);
       await loadAll();
-    } catch (err) {
-      setError(diagnosticMessage({
-        consequence: 'Unable to create topic',
-        moduleProcess: 'topic administration / create topic request',
-        cause: `browser could not reach /api/v1/topics or parse its response; ${errorCause(err)}`,
-      }));
-    }
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create topic', moduleProcess: 'topic administration / create topic request', cause: `browser could not reach the topics endpoint; ${errorCause(err)}` })); }
   }
 
   async function createSession(topicId: string | null) {
     try {
-      const res = await fetch('/api/v1/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify(topicId ? { topic_id: topicId } : {}),
-      });
-      const data = await readJsonResponse(res, {
-        consequence: 'Unable to create session',
-        moduleProcess: 'session administration / create session request',
-        fallbackCause: 'create session endpoint did not return JSON',
-      });
-      if (!res.ok || data.error) {
-        setError(data.error || 'Unable to create session: session administration / create session request - API response did not include success');
-        return;
-      }
+      const res = await fetch('/api/v1/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(topicId ? { topic_id: topicId } : {}) });
+      const data = await readJsonResponse(res, { consequence: 'Unable to create session', moduleProcess: 'session administration / create session request', fallbackCause: 'create session endpoint did not return JSON' });
+      if (!res.ok || data.error) { setError(data.error || 'Unable to create session'); return; }
       setExpanded((prev) => new Set(prev).add(topicId ?? '__none__'));
-      setSelectedSessionId(data.id);
+      selectSession(data.id);
       setStatus(`Session created: ${data.title}`);
       await loadAll();
-    } catch (err) {
-      setError(diagnosticMessage({
-        consequence: 'Unable to create session',
-        moduleProcess: 'session administration / create session request',
-        cause: `browser could not reach /api/v1/sessions or parse its response; ${errorCause(err)}`,
-      }));
-    }
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create session', moduleProcess: 'session administration / create session request', cause: `browser could not reach the sessions endpoint; ${errorCause(err)}` })); }
   }
 
   async function renameTopic(topicId: string) {
@@ -246,166 +178,61 @@ export default function Dashboard() {
     const trimmed = title.trim();
     if (!trimmed) return;
     try {
-      const res = await fetch(`/api/v1/topics/${topicId}/rename`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ title: trimmed }),
-      });
+      const res = await fetch(`/api/v1/topics/${topicId}/rename`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ title: trimmed }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) {
-        setError(data.error || 'Unable to rename topic: topic administration / rename topic request - API response did not include success');
-        return;
-      }
+      if (!res.ok || data.error) { setError(data.error || 'Unable to rename topic'); return; }
       await loadAll();
-    } catch (err) {
-      setError(diagnosticMessage({
-        consequence: 'Unable to rename topic',
-        moduleProcess: 'topic administration / rename topic request',
-        cause: `browser could not reach the rename endpoint or parse its response; ${errorCause(err)}`,
-      }));
-    }
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to rename topic', moduleProcess: 'topic administration / rename topic request', cause: `browser could not reach the rename endpoint; ${errorCause(err)}` })); }
   }
 
   async function removeTopic(topicId: string) {
     if (!window.confirm('Remove this topic? Its sessions move to Uncategorized.')) return;
     try {
-      // Move the topic's active sessions to Uncategorized so none are lost.
       const orphaned = sessions.filter((session) => session.topic_id === topicId && !session.archived);
-      await Promise.all(
-        orphaned.map((session) =>
-          fetch(`/api/v1/sessions/${session.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', ...authHeaders() },
-            body: JSON.stringify({ topic_id: null }),
-          }),
-        ),
-      );
+      await Promise.all(orphaned.map((session) => fetch(`/api/v1/sessions/${session.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ topic_id: null }) })));
       const res = await fetch(`/api/v1/topics/${topicId}/archive`, { method: 'POST', headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) {
-        setError(data.error || 'Unable to remove topic: topic administration / archive topic request - API response did not indicate success');
-        return;
-      }
+      if (!res.ok || data.error) { setError(data.error || 'Unable to remove topic'); return; }
       setStatus('Topic removed. Its sessions moved to Uncategorized.');
       await loadAll();
-    } catch (err) {
-      setError(diagnosticMessage({
-        consequence: 'Unable to remove topic',
-        moduleProcess: 'topic administration / remove topic request',
-        cause: `browser could not reach the archive endpoint or parse its response; ${errorCause(err)}`,
-      }));
-    }
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to remove topic', moduleProcess: 'topic administration / remove topic request', cause: `browser could not reach the archive endpoint; ${errorCause(err)}` })); }
   }
 
   async function updateSession(sessionId: string, fields: { title?: string; topic_id?: string | null; archived?: boolean; public?: boolean; mode?: 'wild' | 'exact' }) {
     try {
-      const res = await fetch(`/api/v1/sessions/${sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify(fields),
-      });
-      const data = await readJsonResponse(res, {
-        consequence: 'Unable to update session',
-        moduleProcess: 'session administration / update session request',
-        fallbackCause: 'update session endpoint did not return JSON',
-      });
-      if (!res.ok || data.error) {
-        setError(data.error || 'Unable to update session: session administration / update session request - API response did not include success');
-        return false;
-      }
+      const res = await fetch(`/api/v1/sessions/${sessionId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(fields) });
+      const data = await readJsonResponse(res, { consequence: 'Unable to update session', moduleProcess: 'session administration / update session request', fallbackCause: 'update session endpoint did not return JSON' });
+      if (!res.ok || data.error) { setError(data.error || 'Unable to update session'); return false; }
       await loadAll();
       return true;
-    } catch (err) {
-      setError(diagnosticMessage({
-        consequence: 'Unable to update session',
-        moduleProcess: 'session administration / update session request',
-        cause: `browser could not reach /api/v1/sessions/${sessionId} or parse its response; ${errorCause(err)}`,
-      }));
-      return false;
-    }
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to update session', moduleProcess: 'session administration / update session request', cause: `browser could not reach the session endpoint; ${errorCause(err)}` })); return false; }
   }
 
   async function removeSession(sessionId: string) {
     if (!window.confirm('Remove this session? It is archived and can be restored from Show archived.')) return;
     const ok = await updateSession(sessionId, { archived: true });
-    if (ok && selectedSessionId === sessionId) setSelectedSessionId('');
+    if (ok && selectedSessionId === sessionId) { setSelectedSessionId(''); router.push('/dashboard', { scroll: false }); }
     if (ok) setStatus('Session removed.');
   }
 
-  function startEditSession() {
-    if (!selectedSession) return;
-    setEditTitle(selectedSession.title);
-    setEditTopicId(selectedSession.topic_id || '');
-    setEditingSession(true);
-  }
-
-  async function saveSessionEdits() {
-    const title = editTitle.trim();
-    if (!selectedSession || !title) return;
-    const ok = await updateSession(selectedSession.id, { title, topic_id: editTopicId || null });
-    if (ok) {
-      setEditingSession(false);
-      setStatus('Session updated');
-    }
-  }
-
-  async function archiveSelectedSession() {
-    if (!selectedSession) return;
-    if (await updateSession(selectedSession.id, { archived: true })) {
-      setStatus('Session archived');
-    }
-  }
-
-  async function togglePublic(session: Session, next: boolean) {
-    if (await updateSession(session.id, { public: next })) {
-      setStatus(next ? 'Session is now public (read-only link).' : 'Session is now private.');
-    }
-  }
-
-  async function setMode(session: Session, mode: 'wild' | 'exact') {
-    if (await updateSession(session.id, { mode })) {
-      setStatus(mode === 'exact'
-        ? 'Recording mode: exact — agents are told to record verbatim, including credentials.'
-        : 'Recording mode: wild — agents may redact secrets they judge unsafe.');
-    }
-  }
-
-  async function restoreSelectedSession() {
-    if (!selectedSession) return;
-    if (await updateSession(selectedSession.id, { archived: false })) {
-      setStatus('Session restored');
-    }
-  }
+  function startEditSession() { if (!selectedSession) return; setEditTitle(selectedSession.title); setEditTopicId(selectedSession.topic_id || ''); setEditingSession(true); }
+  async function saveSessionEdits() { const title = editTitle.trim(); if (!selectedSession || !title) return; if (await updateSession(selectedSession.id, { title, topic_id: editTopicId || null })) { setEditingSession(false); setStatus('Session updated'); } }
+  async function archiveSelectedSession() { if (!selectedSession) return; if (await updateSession(selectedSession.id, { archived: true })) setStatus('Session archived'); }
+  async function togglePublic(session: Session, next: boolean) { if (await updateSession(session.id, { public: next })) setStatus(next ? 'Session is now public (read-only link).' : 'Session is now private.'); }
+  async function setMode(session: Session, mode: 'wild' | 'exact') { if (await updateSession(session.id, { mode })) setStatus(mode === 'exact' ? 'Recording mode: exact — agents are told to record verbatim.' : 'Recording mode: wild — agents may redact secrets.'); }
+  async function restoreSelectedSession() { if (!selectedSession) return; if (await updateSession(selectedSession.id, { archived: false })) setStatus('Session restored'); }
 
   async function generateToken(session: Session) {
     try {
-      const res = await fetch(`/api/v1/sessions/${session.id}/tokens`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ expires_in: '7d' }),
-      });
-      const data = await readJsonResponse(res, {
-        consequence: 'Unable to create token',
-        moduleProcess: 'session token administration / create token request',
-        fallbackCause: 'create token endpoint did not return JSON',
-      });
-      if (!res.ok || data.error || !data.access_token) {
-        setError(data.error || 'Unable to create token: session token administration / create token request - API response did not include access token');
-        return;
-      }
-      // Build from the page origin so the recording URL matches where the UI is open.
+      const res = await fetch(`/api/v1/sessions/${session.id}/tokens`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ expires_in: '7d' }) });
+      const data = await readJsonResponse(res, { consequence: 'Unable to create token', moduleProcess: 'session token administration / create token request', fallbackCause: 'create token endpoint did not return JSON' });
+      if (!res.ok || data.error || !data.access_token) { setError(data.error || 'Unable to create token'); return; }
       const url = `${window.location.origin}/r/${session.id}`;
       const instruction = buildAgentInstruction(url, data.access_token, session.mode || 'wild');
       setGeneratedToken(instruction);
-      setStatus('Recording URL + access token created. Copy them now; the token will not be shown again.');
+      setStatus('Recording URL + access token created. Copy now; the token will not be shown again.');
       await navigator.clipboard.writeText(instruction).catch(() => undefined);
-    } catch (err) {
-      setError(diagnosticMessage({
-        consequence: 'Unable to create token',
-        moduleProcess: 'session token administration / create token request',
-        cause: `browser could not reach /api/v1/sessions/${session.id}/tokens or parse its response; ${errorCause(err)}`,
-      }));
-    }
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create token', moduleProcess: 'session token administration / create token request', cause: `browser could not reach the token endpoint; ${errorCause(err)}` })); }
   }
 
   return (
@@ -415,70 +242,50 @@ export default function Dashboard() {
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
           <div className="mx-auto flex max-w-7xl items-start gap-2">
             <span>
-              You are signed in with a <strong>deploy-generated</strong> admin token. A fresh token is generated on every deploy, so do not reuse an old deploy token. Set your own stable token in{' '}
-              <Link href="/settings" className="font-medium underline">Settings</Link>, or define the{' '}
-              <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50">PCP_ADMIN_TOKEN</code> environment variable (32+ chars) and redeploy.
+              You are signed in with a <strong>deploy-generated</strong> admin token. A fresh token is generated on every deploy. Set your own in{' '}
+              <Link href="/settings" className="font-medium underline">Settings</Link>, or define <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50">PCP_ADMIN_TOKEN</code> and redeploy.
             </span>
           </div>
         </div>
       )}
-      <div className="grid min-h-[calc(100vh-57px)] grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid h-[calc(100vh-57px)] grid-cols-1 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
         <NavSidebar
-          topics={topics}
-          sessions={sessions}
-          loading={loading}
-          selectedSessionId={selectedSessionId}
-          expanded={expanded}
-          query={query}
-          showArchived={showArchived}
-          onToggleExpand={toggleExpand}
-          onQueryChange={setQuery}
+          topics={topics} sessions={sessions} loading={loading}
+          selectedSessionId={selectedSessionId} expanded={expanded}
+          query={query} showArchived={showArchived}
+          onToggleExpand={toggleExpand} onQueryChange={setQuery}
           onShowArchivedChange={setShowArchived}
-          onSelectSession={setSelectedSessionId}
-          onCreateSession={createSession}
-          onCreateTopic={createTopic}
-          onRefresh={loadAll}
-          onRenameTopic={renameTopic}
-          onRemoveTopic={removeTopic}
+          onSelectSession={selectSession} onCreateSession={createSession}
+          onCreateTopic={createTopic} onRefresh={loadAll}
+          onRenameTopic={renameTopic} onRemoveTopic={removeTopic}
           onRemoveSession={removeSession}
         />
         <SessionWorkspace
-          error={error}
-          status={status}
-          hasUiToken={hasUiToken}
-          uiTokenInput={uiTokenInput}
-          selectedTopic={selectedTopic}
-          selectedSession={selectedSession}
-          topics={topics}
-          messages={messages}
-          events={events}
-          editingSession={editingSession}
-          editTitle={editTitle}
-          editTopicId={editTopicId}
+          error={error} status={status} hasUiToken={hasUiToken} uiTokenInput={uiTokenInput}
+          selectedTopic={selectedTopic} selectedSession={selectedSession}
+          topics={topics} messages={messages} events={events}
+          editingSession={editingSession} editTitle={editTitle} editTopicId={editTopicId}
           generatedToken={generatedToken}
-          onUiTokenInputChange={setUiTokenInput}
-          onSaveUiToken={saveUiToken}
-          onStartEditSession={startEditSession}
-          onEditTitleChange={setEditTitle}
-          onEditTopicIdChange={setEditTopicId}
-          onSaveSessionEdits={saveSessionEdits}
+          onUiTokenInputChange={setUiTokenInput} onSaveUiToken={saveUiToken}
+          onStartEditSession={startEditSession} onEditTitleChange={setEditTitle}
+          onEditTopicIdChange={setEditTopicId} onSaveSessionEdits={saveSessionEdits}
           onCancelSessionEdits={() => setEditingSession(false)}
-          onArchiveSelectedSession={archiveSelectedSession}
-          onRestoreSelectedSession={restoreSelectedSession}
-          onGenerateToken={generateToken}
-          onManageTokens={setTokenModalSession}
-          onTogglePublic={togglePublic}
-          onSetMode={setMode}
+          onArchiveSelectedSession={archiveSelectedSession} onRestoreSelectedSession={restoreSelectedSession}
+          onGenerateToken={generateToken} onManageTokens={setTokenModalSession}
+          onTogglePublic={togglePublic} onSetMode={setMode}
           onImported={() => selectedSession && loadSessionDetail(selectedSession.id)}
         />
       </div>
-      {tokenModalSession && (
-        <TokenModal
-          sessionId={tokenModalSession.id}
-          sessionTitle={tokenModalSession.title}
-          onClose={() => setTokenModalSession(null)}
-        />
-      )}
+      {tokenModalSession && <TokenModal sessionId={tokenModalSession.id} sessionTitle={tokenModalSession.title} onClose={() => setTokenModalSession(null)} />}
     </main>
+  );
+}
+
+/** Suspense wrapper required by Next.js for useSearchParams in App Router. */
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">Loading dashboard...</main>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
