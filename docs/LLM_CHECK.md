@@ -122,6 +122,14 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-25 - Trash model, drag-to-move, events toggle, scroll fixes (v0.1.14)
+  - Replaced archive with trashcan: NavSidebar shows a Trash section with archived items, restore/delete-permanently context menu, and "Empty trash" for bulk permanent deletion. New DELETE endpoints for sessions and topics. Topic archive POST now accepts {archived:false} to restore.
+  - Drag-to-move sessions: drag a session item onto a topic group; the topic auto-expands on hover and the session moves.
+  - Events sidebar auto-hides: a toggle button on the right edge (ChevronLeft/Right) shows/hides events. Defaults to hidden.
+  - Fixed workspace height: double h-[calc(100vh-57px)] removed (workspace now h-full inside the dashboard grid). Scroll-to-bottom button threshold lowered to 3 messages.
+  - Topic dropdown in session edit now filters out archived topics.
+  - Added docs/versions/ directory with per-release notes (v0.1.12–v0.1.14).
+  - Bark notification sent on dev completion. 94 tests pass.
 - 2026-06-25 - Session URL routing, scroll-to-bottom, overflow fix (v0.1.14)
   - Dashboard now uses URL-driven session selection: clicking a session pushes /dashboard?session=<id>, making every session shareable while the sidebar stays visible. Removed the standalone /sessions/[id] page (redirects); removed "Open page" button.
   - Fixed y-overflow scroll: the main container uses h-[calc(100vh-57px)] overflow-hidden with flex-1 overflow-y-auto on the message column. Long single messages no longer break the viewport.

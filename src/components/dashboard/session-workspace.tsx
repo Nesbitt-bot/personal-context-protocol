@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Archive, Check, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
+import { Archive, Check, ChevronLeft, ChevronRight, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
 import { formatDate } from './format';
 import { ImportPanel } from './import-panel';
 import { MessageList } from './message-list';
@@ -36,6 +36,8 @@ interface SessionWorkspaceProps {
   onTogglePublic: (session: Session, next: boolean) => void;
   onSetMode: (session: Session, mode: 'wild' | 'exact') => void;
   onImported: () => void;
+  eventsOpen?: boolean;
+  onToggleEvents?: () => void;
 }
 
 /**
@@ -70,6 +72,8 @@ export function SessionWorkspace({
   onTogglePublic,
   onSetMode,
   onImported,
+  eventsOpen = false,
+  onToggleEvents,
 }: SessionWorkspaceProps) {
   const [copiedPublic, setCopiedPublic] = useState(false);
   const [compactionCount, setCompactionCount] = useState(0);
@@ -93,7 +97,7 @@ export function SessionWorkspace({
   }
   return (
     <section className="min-w-0 bg-white dark:bg-slate-950">
-      <div className="flex h-[calc(100vh-57px)] flex-col overflow-hidden">
+      <div className="flex h-full flex-col overflow-hidden">
         <header className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
           {error && (
             <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
@@ -263,22 +267,35 @@ export function SessionWorkspace({
             {selectedSession && <ImportPanel sessionId={selectedSession.id} onImported={handleChanged} />}
           </div>
 
-          <aside className="border-t border-slate-200 bg-slate-50 px-5 py-5 dark:border-slate-800 dark:bg-slate-900/70 xl:border-l xl:border-t-0">
-            <div className="mb-4 flex items-center gap-2">
-              <Settings2 size={18} className="text-slate-500 dark:text-slate-400" />
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Events</h3>
-            </div>
-            <div className="space-y-3">
-              {events.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">No events yet.</p>
-              ) : events.map((event) => (
-                <div key={event.id} className="rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                  <p className="font-medium text-slate-800 dark:text-slate-100">{event.action}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{event.actor} - {formatDate(event.created_at || event.createdAt)}</p>
+          {/* Collapsible events panel */}
+          <div className="relative border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70 xl:border-l xl:border-t-0">
+            <button
+              className="absolute -left-5 top-1/2 z-10 -translate-y-1/2 rounded-full border border-slate-200 bg-white p-1 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+              onClick={onToggleEvents}
+              type="button"
+              title={eventsOpen ? 'Hide events' : 'Show events'}
+            >
+              {eventsOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            </button>
+            {eventsOpen && (
+              <aside className="px-5 py-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <Settings2 size={18} className="text-slate-500 dark:text-slate-400" />
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Events</h3>
                 </div>
-              ))}
-            </div>
-          </aside>
+                <div className="space-y-3">
+                  {events.length === 0 ? (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">No events yet.</p>
+                  ) : events.map((event) => (
+                    <div key={event.id} className="rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                      <p className="font-medium text-slate-800 dark:text-slate-100">{event.action}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{event.actor} - {formatDate(event.created_at || event.createdAt)}</p>
+                    </div>
+                  ))}
+                </div>
+              </aside>
+            )}
+          </div>
         </div>
       </div>
     </section>

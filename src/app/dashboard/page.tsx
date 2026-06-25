@@ -46,6 +46,7 @@ function DashboardContent() {
   const [hasUiToken, setHasUiToken] = useState(false);
   const [uiTokenSource, setUiTokenSource] = useState<string | null>(null);
   const [tokenModalSession, setTokenModalSession] = useState<Session | null>(null);
+  const [eventsOpen, setEventsOpen] = useState(false);
 
   // Sync URL param to state on mount and when URL changes
   useEffect(() => {
@@ -209,10 +210,67 @@ function DashboardContent() {
   }
 
   async function removeSession(sessionId: string) {
-    if (!window.confirm('Remove this session? It is archived and can be restored from Show archived.')) return;
+    if (!window.confirm('Move this session to trash?')) return;
     const ok = await updateSession(sessionId, { archived: true });
     if (ok && selectedSessionId === sessionId) { setSelectedSessionId(''); router.push('/dashboard', { scroll: false }); }
-    if (ok) setStatus('Session removed.');
+    if (ok) setStatus('Session moved to trash.');
+  }
+
+  async function restoreSession(sessionId: string) {
+    if (await updateSession(sessionId, { archived: false })) setStatus('Session restored.');
+  }
+
+  async function deleteSession(sessionId: string) {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!window.confirm(`Permanently delete "${session?.title || 'session'}" and all its messages? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/v1/sessions/${sessionId}`, { method: 'DELETE', headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) { setError(data.error || 'Unable to delete session permanently'); return; }
+      if (selectedSessionId === sessionId) { setSelectedSessionId(''); router.push('/dashboard', { scroll: false }); }
+      setStatus('Session permanently deleted.');
+      await loadAll();
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to delete session', moduleProcess: 'session administration / permanent delete', cause: errorCause(err) })); }
+  }
+
+  async function restoreTopic(topicId: string) {
+    try {
+      const res = await fetch(`/api/v1/topics/${topicId}/archive`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ archived: false }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) { setError(data.error || 'Unable to restore topic'); return; }
+      setStatus('Topic restored.');
+      await loadAll();
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to restore topic', moduleProcess: 'topic administration / restore', cause: errorCause(err) })); }
+  }
+
+  async function deleteTopic(topicId: string) {
+    const topic = topics.find((t) => t.id === topicId);
+    if (!window.confirm(`Permanently delete "${topic?.title || 'topic'}"? Its sessions will move to Uncategorized.`)) return;
+    try {
+      const res = await fetch(`/api/v1/topics/${topicId}/archive`, { method: 'DELETE', headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) { setError(data.error || 'Unable to delete topic'); return; }
+      setStatus('Topic permanently deleted.');
+      await loadAll();
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to delete topic', moduleProcess: 'topic administration / permanent delete', cause: errorCause(err) })); }
+  }
+
+  async function emptyTrash() {
+    if (!window.confirm('Permanently delete ALL archived sessions and topics? This cannot be undone.')) return;
+    try {
+      const res = await fetch('/api/v1/trash/empty', { method: 'POST', headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) { setError(data.error || 'Unable to empty trash'); return; }
+      setStatus(`Trash emptied: ${data.sessions_deleted} sessions, ${data.topics_deleted} topics deleted.`);
+      await loadAll();
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to empty trash', moduleProcess: 'trash administration / empty trash', cause: errorCause(err) })); }
+  }
+
+  async function moveSession(sessionId: string, topicId: string | null) {
+    if (await updateSession(sessionId, { topic_id: topicId })) {
+      setExpanded((prev) => new Set(prev).add(topicId ?? '__none__'));
+      setStatus('Session moved.');
+    }
   }
 
   function startEditSession() { if (!selectedSession) return; setEditTitle(selectedSession.title); setEditTopicId(selectedSession.topic_id || ''); setEditingSession(true); }
@@ -258,12 +316,16 @@ function DashboardContent() {
           onSelectSession={selectSession} onCreateSession={createSession}
           onCreateTopic={createTopic} onRefresh={loadAll}
           onRenameTopic={renameTopic} onRemoveTopic={removeTopic}
-          onRemoveSession={removeSession}
+          onRestoreTopic={restoreTopic} onDeleteTopic={deleteTopic}
+          onRemoveSession={removeSession} onRestoreSession={restoreSession}
+          onDeleteSession={deleteSession} onEmptyTrash={emptyTrash}
+          onMoveSession={moveSession}
         />
         <SessionWorkspace
           error={error} status={status} hasUiToken={hasUiToken} uiTokenInput={uiTokenInput}
           selectedTopic={selectedTopic} selectedSession={selectedSession}
-          topics={topics} messages={messages} events={events}
+          topics={topics.filter(t => !t.archived)} messages={messages} events={events}
+          eventsOpen={eventsOpen} onToggleEvents={() => setEventsOpen(o => !o)}
           editingSession={editingSession} editTitle={editTitle} editTopicId={editTopicId}
           generatedToken={generatedToken}
           onUiTokenInputChange={setUiTokenInput} onSaveUiToken={saveUiToken}

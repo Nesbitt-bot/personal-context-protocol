@@ -88,7 +88,22 @@ Body:
 
 ### POST `/topics/:id/archive`
 
-Archives a topic.
+Archives or restores a topic. Body (optional): `{ "archived": false }` to
+restore from trash. When omitted, the topic is archived (`archived: true`).
+
+### DELETE `/topics/:id`
+
+Permanently deletes a topic from trash. Sessions under it move to Uncategorized.
+
+### DELETE `/sessions/:id`
+
+Permanently deletes a session and all its child data (messages, tokens,
+compactions, events).
+
+### POST `/trash/empty`
+
+Permanently deletes ALL archived sessions and topics. Returns
+`{ sessions_deleted, topics_deleted }`.
 
 ## Admin Sessions
 

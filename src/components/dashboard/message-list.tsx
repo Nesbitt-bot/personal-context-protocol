@@ -214,7 +214,7 @@ export function MessageList({ sessionId, messages, onChanged, hasCompactions = f
 
       {/* Scrollable message list */}
       <div className="relative min-h-0 flex-1 overflow-y-auto" ref={scrollRef} onScroll={handleScroll}>
-        {!atBottom && messages.length > 8 && (
+        {!atBottom && messages.length > 3 && (
           <button
             className="sticky bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-md hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             onClick={scrollToBottom}
