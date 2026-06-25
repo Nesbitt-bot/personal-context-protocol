@@ -47,6 +47,41 @@ describe('import dedup', () => {
     expect(skipped).toBe(2);
   });
 
+  it('parses a compact-only PCP_COMPACT block', () => {
+    const result = parseIngestPayload('<PCP_COMPACT>{"summary":"did stuff","decisions":["a"]}</PCP_COMPACT>');
+    expect(result.kind).toBe('compact');
+    if (result.kind === 'compact') expect(result.compact.summary).toBe('did stuff');
+  });
+
+  it('parses a PCP_INGEST block with messages AND a compaction (mixed)', () => {
+    const block = `<PCP_INGEST>${JSON.stringify({
+      messages: [{ role: 'user', content: 'q' }, { role: 'assistant', content: 'a' }],
+      compaction: { summary: 'session summary', open_questions: ['next?'] },
+    })}</PCP_INGEST>`;
+    const result = parseIngestPayload(block);
+    expect(result.kind).toBe('mixed');
+    if (result.kind === 'mixed') {
+      expect(result.messages).toHaveLength(2);
+      expect(result.compact.summary).toBe('session summary');
+    }
+  });
+
+  it('treats a JSON object with messages and a nested compaction as mixed', () => {
+    const result = parseIngestPayload(JSON.stringify({
+      messages: [{ role: 'user', content: 'hi' }],
+      compaction: { summary: 's' },
+    }));
+    expect(result.kind).toBe('mixed');
+  });
+
+  it('does not misread a plain { messages } with a stray summary as mixed', () => {
+    const result = parseIngestPayload(JSON.stringify({
+      messages: [{ role: 'user', content: 'hi' }],
+      summary: 'not a compaction',
+    }));
+    expect(result.kind).toBe('messages');
+  });
+
   it('parses an agent wrapper object (extra fields + messages array)', () => {
     const agentBlock = JSON.stringify({
       protocol: 'personal-context-protocol',

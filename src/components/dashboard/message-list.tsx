@@ -10,6 +10,7 @@ interface MessageListProps {
   sessionId: string;
   messages: Message[];
   onChanged: () => void;
+  hasCompactions?: boolean;
 }
 
 function tone(role: string) {
@@ -27,7 +28,7 @@ const observedOf = (m: Message) => m.observed_at || m.observedAt;
  * messages here. Multi-select supports select-all and shift-click range select,
  * and folds long messages to 5 lines while selecting.
  */
-export function MessageList({ sessionId, messages, onChanged }: MessageListProps) {
+export function MessageList({ sessionId, messages, onChanged, hasCompactions = false }: MessageListProps) {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lastIndex, setLastIndex] = useState<number | null>(null);
@@ -173,7 +174,7 @@ export function MessageList({ sessionId, messages, onChanged }: MessageListProps
 
       {messages.length === 0 ? (
         <div className="rounded-md border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-          No messages recorded yet.
+          {hasCompactions ? 'No raw messages recorded. This session has compact summaries.' : 'No messages recorded yet.'}
         </div>
       ) : (
         <div className="space-y-4">

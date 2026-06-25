@@ -41,6 +41,7 @@ export interface NormalizedCompact {
 export type IngestResult =
   | { kind: 'messages'; messages: NormalizedMessage[] }
   | { kind: 'compact'; compact: NormalizedCompact }
+  | { kind: 'mixed'; messages: NormalizedMessage[]; compact: NormalizedCompact }
   | { kind: 'error'; reason: string };
 
 const ROLE_LINE = /^\s*(user|assistant|system|tool|human|ai|bot|function|correction)\s*:\s*/i;
@@ -143,6 +144,31 @@ function coerceCompact(value: unknown): NormalizedCompact | null {
   return compact;
 }
 
+/**
+ * Coerce a JSON value that may carry messages and/or a compaction into a single
+ * result. A nested `compaction` field wins; otherwise the whole object is treated
+ * as a compaction only when there are no messages (so a plain `{ messages }`
+ * with a stray `summary` is not misread as mixed).
+ */
+function coerceCombined(value: unknown, limit: number): IngestResult | null {
+  if (value === undefined || value === null) return null;
+  const messages = coerceMessages(value);
+  const record = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
+  let compact: NormalizedCompact | null = null;
+  if (record.compaction !== undefined && record.compaction !== null) {
+    compact = coerceCompact(record.compaction);
+  } else if (!messages) {
+    compact = coerceCompact(value);
+  }
+
+  const sliced = messages ? messages.slice(0, limit) : null;
+  if (sliced && compact && compact.summary) return { kind: 'mixed', messages: sliced, compact };
+  if (sliced) return { kind: 'messages', messages: sliced };
+  if (compact && compact.summary) return { kind: 'compact', compact };
+  return null;
+}
+
 /** Best-effort transcript parse: split on `Role:` line markers. */
 export function parseTranscript(text: string): NormalizedMessage[] {
   const lines = text.split(/\r?\n/);
@@ -200,7 +226,15 @@ export function parseIngestPayload(
     return { kind: 'error', reason: 'empty request body' };
   }
 
-  // 1. Explicit compact tag.
+  // 1. Canonical combined block: messages and/or a nested compaction.
+  const ingestTag = extractTag(text, 'PCP_INGEST');
+  if (ingestTag !== null) {
+    const result = coerceCombined(tryJson(ingestTag), limit);
+    if (result) return result;
+    return { kind: 'error', reason: 'PCP_INGEST block contained no messages or compaction' };
+  }
+
+  // 2. Explicit compact tag.
   const compactTag = extractTag(text, 'PCP_COMPACT');
   if (compactTag !== null) {
     const compact = coerceCompact(tryJson(compactTag) ?? compactTag);
@@ -208,7 +242,7 @@ export function parseIngestPayload(
     return { kind: 'error', reason: 'PCP_COMPACT block had no summary or recognizable fields' };
   }
 
-  // 2. Explicit append tag.
+  // 3. Explicit append tag.
   const appendTag = extractTag(text, 'PCP_APPEND');
   if (appendTag !== null) {
     const messages = coerceMessages(tryJson(appendTag));
@@ -218,13 +252,12 @@ export function parseIngestPayload(
     return { kind: 'error', reason: 'PCP_APPEND block contained no messages' };
   }
 
-  // 3. Structured JSON body (incl. an agent wrapper object with a messages array).
+  // 4. Structured JSON body (incl. an agent wrapper object with a messages array,
+  // and/or a nested `compaction`).
   const json = tryJson(text);
   if (json !== undefined) {
-    const messages = coerceMessages(json);
-    if (messages) return { kind: 'messages', messages: messages.slice(0, limit) };
-    const compact = coerceCompact(json);
-    if (compact && compact.summary) return { kind: 'compact', compact };
+    const combined = coerceCombined(json, limit);
+    if (combined) return combined;
   }
 
   // 4. Raw transcript / markdown fallback.

@@ -33,26 +33,33 @@ export async function POST(
       return NextResponse.json({ ...body, reason: parsed.reason }, { status });
     }
 
-    if (parsed.kind === 'compact') {
+    if (parsed.kind === 'compact' || parsed.kind === 'mixed') {
       const validation = createCompactSchema.safeParse(parsed.compact);
       if (!validation.success) {
         const { status, body } = agentErrorBody('VALIDATION_ERROR');
         return NextResponse.json({ ...body, details: validation.error.errors }, { status });
       }
-      const result = await recordCompaction({
+      const stored = await recordCompaction({
         sessionId: params.id,
         compact: parsed.compact,
         actor: `ai:${authResult.tokenId}`,
       });
-      if (!result.ok) {
-        const { status, body } = agentErrorBody(result.code);
+      if (!stored.ok) {
+        const { status, body } = agentErrorBody(stored.code);
         return NextResponse.json(body, { status });
       }
-      return NextResponse.json({ ...result, ingested_as: 'compact' });
+      if (parsed.kind === 'compact') {
+        return NextResponse.json({ ...stored, ingested_as: 'compact' });
+      }
+      // mixed: also append the messages below.
     }
 
-    // parsed.kind === 'messages'
-    const validation = appendMessagesSchema.safeParse({ messages: parsed.messages });
+    const messagesToAppend = parsed.kind === 'mixed' || parsed.kind === 'messages' ? parsed.messages : [];
+    if (messagesToAppend.length === 0) {
+      return NextResponse.json({ ok: true, ingested_as: 'compact' });
+    }
+
+    const validation = appendMessagesSchema.safeParse({ messages: messagesToAppend });
     if (!validation.success) {
       const { status, body } = agentErrorBody('VALIDATION_ERROR', {
         next_steps: ['Keep each message under max_content_chars and send at most max_messages_per_request per call.'],
@@ -70,7 +77,7 @@ export async function POST(
       const { status, body } = agentErrorBody(result.code);
       return NextResponse.json(body, { status });
     }
-    return NextResponse.json({ ...result, ingested_as: 'messages' });
+    return NextResponse.json({ ...result, ingested_as: parsed.kind === 'mixed' ? 'mixed' : 'messages' });
   } catch (error) {
     logError({
       consequence: 'Unable to ingest content',

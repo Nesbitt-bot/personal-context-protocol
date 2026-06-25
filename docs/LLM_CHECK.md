@@ -122,6 +122,14 @@ Append what this round actually did below:
   - Bumped release metadata to 0.1.1 for the current change round
   - Added `npm run notify:bark` with app name/version prefixes and passive Bark delivery
   - Added a Bark env example and checklist rules for version bumps and notification secrecy
+- 2026-06-24 - Compaction rendering, mixed ingest, and v0.1 hardening (v0.1.11)
+  - Patch-bumped to 0.1.11
+  - Compactions are now first-class readable content: `GET /api/v1/sessions/:id/compactions` + a `CompactionList` rendered system-prompt-style (labeled Summary/Timeline/Decisions/Requirements/Open questions/Artifacts/Warnings) in the workspace and session page; when a session has compactions but no messages the messages pane says "No raw messages recorded. This session has compact summaries."
+  - Ingest supports messages + compaction together: new `mixed` kind + `<PCP_INGEST>` tag; agent ingest and human import both record messages and a compaction. Import response is now `{ ok, imported: { messages, compactions }, skipped, notice }`
+  - Hardening — startup validation: shared `validateRuntimeConfig` (missing + malformed: DATABASE_URL scheme, secret length, non-absolute PCP_APP_URL like `${VERCEL_URL}`); surfaced secret-free in setup/status and the home setup card
+  - Hardening — API docs sync: a drift test asserts every route under src/app/api/v1 is documented in protocol.md (params normalized)
+  - Tests: config validator (7), ingest mixed/compact (4 new), API-doc drift (per-route). 92 tests pass
+  - Verified live: compact-only import stores a compaction (0 messages, correct notice) and renders; mixed PCP_INGEST records 2 messages + 1 compaction; setup/status returns config_issues
 - 2026-06-24 - Admin message edit/delete with multi-select (v0.1.10)
   - Patch-bumped to 0.1.10
   - Added admin (UI-token) message correction: `PATCH /api/v1/sessions/:id/messages/:messageId` (edit) and `POST /api/v1/sessions/:id/messages/delete` (bulk delete, ownership-checked); audited `message.edited` / `message.deleted`. AI tokens remain strictly append-only; documented the human-admin exception in data-model and docs/AGENTS.md

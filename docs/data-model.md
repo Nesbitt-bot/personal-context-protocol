@@ -35,7 +35,7 @@ Single-row table tracking the application instance.
   "id": "instance_1",
   "created_at": "2026-06-22T22:45:00Z",
   "initialized_at": "2026-06-22T22:50:00Z",
-  "version": "0.1.10"
+  "version": "0.1.11"
 }
 ```
 
@@ -460,7 +460,17 @@ LIMIT 50;
 - `POST /api/v1/sessions/:id/import` records a pasted agent fallback block,
   skipping messages already present (dedup by role + content)
 
-### v0.1.10 (recording modes + token rename)
+### v0.1.9 (recording modes + token rename)
 
 - Added `sessions.mode` (`wild` default / `exact`, migration 007) surfaced to the
   agent; token rename via PATCH; auto-distinct token names on creation
+
+### v0.1.10 (message correction)
+
+- Human admin may edit/delete messages (AI stays append-only); audited
+  `message.edited` / `message.deleted`
+
+### v0.1.11 (compaction rendering + mixed ingest + hardening)
+
+- Compactions rendered as first-class content; `<PCP_INGEST>` / mixed ingest
+  records messages + a compaction; shared config validator; API doc-drift test

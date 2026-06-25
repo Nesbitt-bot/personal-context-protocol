@@ -62,7 +62,9 @@ export async function POST(
       );
     }
 
-    if (result.kind === 'compact') {
+    // Record a compaction when present (compact-only or mixed).
+    let compactionsImported = 0;
+    if (result.kind === 'compact' || result.kind === 'mixed') {
       const stored = await recordCompaction({ sessionId: params.id, compact: result.compact, actor: 'human:import' });
       if (!stored.ok) {
         return NextResponse.json(
@@ -70,40 +72,53 @@ export async function POST(
           { status: FAILURE_STATUS[stored.code] || 500 },
         );
       }
-      return NextResponse.json({ success: true, imported_as: 'compact', compaction: stored.compaction });
+      compactionsImported = 1;
     }
 
-    // result.kind === 'messages' — append only the messages not already present.
-    const existing = await db
-      .select({ role: messages.role, content: messages.content })
-      .from(messages)
-      .where(eq(messages.sessionId, params.id));
+    // Append only the messages not already present (compact-only has none).
+    const incoming = result.kind === 'messages' || result.kind === 'mixed' ? result.messages : [];
+    let messagesImported = 0;
+    let skipped = 0;
 
-    const { fresh, skipped } = dedupeNewMessages(result.messages, existing);
+    if (incoming.length > 0) {
+      const existing = await db
+        .select({ role: messages.role, content: messages.content })
+        .from(messages)
+        .where(eq(messages.sessionId, params.id));
 
-    if (fresh.length === 0) {
-      return NextResponse.json({ success: true, imported_as: 'messages', imported: 0, skipped, note: 'Everything in the paste was already recorded.' });
+      const deduped = dedupeNewMessages(incoming, existing);
+      skipped = deduped.skipped;
+
+      if (deduped.fresh.length > 0) {
+        const appended = await appendMessagesToSession({
+          sessionId: params.id,
+          messages: deduped.fresh,
+          canRenameSession: true,
+          actor: 'human:import',
+        });
+        if (!appended.ok) {
+          return NextResponse.json(
+            { error: `Unable to import messages: session import / ${appended.code}`, code: appended.code },
+            { status: FAILURE_STATUS[appended.code] || 500 },
+          );
+        }
+        messagesImported = appended.messages.length;
+      }
     }
 
-    const appended = await appendMessagesToSession({
-      sessionId: params.id,
-      messages: fresh,
-      canRenameSession: true,
-      actor: 'human:import',
-    });
-
-    if (!appended.ok) {
-      return NextResponse.json(
-        { error: `Unable to import messages: session import / ${appended.code}`, code: appended.code },
-        { status: FAILURE_STATUS[appended.code] || 500 },
-      );
-    }
+    const notice = compactionsImported > 0 && messagesImported === 0
+      ? 'Imported a compact summary. No raw messages were included.'
+      : messagesImported === 0 && incoming.length > 0
+        ? 'Everything in the paste was already recorded.'
+        : `Imported ${messagesImported} message(s)${compactionsImported ? ' and a compact summary' : ''}.`;
 
     return NextResponse.json({
       success: true,
-      imported_as: 'messages',
-      imported: appended.messages.length,
+      ok: true,
+      session_id: params.id,
+      imported: { messages: messagesImported, compactions: compactionsImported },
       skipped,
+      notice,
     });
   } catch (error) {
     logError({

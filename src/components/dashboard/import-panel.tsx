@@ -38,13 +38,12 @@ export function ImportPanel({ sessionId, onImported }: ImportPanelProps) {
         setError(data.error ? `${data.error}${data.hint ? ` — ${data.hint}` : ''}` : 'Unable to import: session import / request - the server did not accept the paste.');
         return;
       }
-      if (data.imported_as === 'compact') {
-        setResult('Imported a compaction block.');
-      } else if (data.imported === 0) {
-        setResult(`Nothing new — ${data.skipped} message(s) were already recorded.`);
-      } else {
-        setResult(`Imported ${data.imported} message(s); skipped ${data.skipped} duplicate(s).`);
-      }
+      const imported = data.imported || { messages: 0, compactions: 0 };
+      const parts: string[] = [];
+      if (imported.messages) parts.push(`${imported.messages} message(s)`);
+      if (imported.compactions) parts.push(`${imported.compactions} compaction(s)`);
+      if (data.skipped) parts.push(`skipped ${data.skipped} duplicate(s)`);
+      setResult(data.notice || (parts.length ? `Imported ${parts.join('; ')}.` : 'Nothing new to import.'));
       setText('');
       onImported();
     } catch (err) {

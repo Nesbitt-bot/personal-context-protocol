@@ -26,6 +26,7 @@ export default function HomePage() {
   const [error, setError] = useState('');
   const [errorDocsUrl, setErrorDocsUrl] = useState('');
   const [setupMessage, setSetupMessage] = useState('');
+  const [configIssues, setConfigIssues] = useState<Array<{ key: string; severity: string; problem: string }>>([]);
 
   useEffect(() => {
     checkStatus();
@@ -40,6 +41,7 @@ export default function HomePage() {
         fallbackCause: 'setup status endpoint did not return JSON',
       });
       setInitialized(data.initialized);
+      setConfigIssues(Array.isArray(data.config_issues) ? data.config_issues : []);
       if (data.error) {
         setError(data.error);
         setErrorDocsUrl(data.docs_url || '');
@@ -146,6 +148,20 @@ export default function HomePage() {
               <h2 className="text-xl font-semibold">Setup status</h2>
             </div>
           </div>
+
+          {configIssues.length > 0 && (
+            <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+              <p className="mb-1 font-medium">Deployment configuration</p>
+              <ul className="list-disc space-y-0.5 pl-5">
+                {configIssues.map((issue) => (
+                  <li key={issue.key}>
+                    <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50">{issue.key}</code> {issue.problem}
+                    {issue.severity === 'warning' ? ' (warning)' : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {error && (
             <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">

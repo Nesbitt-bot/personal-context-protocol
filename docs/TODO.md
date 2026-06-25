@@ -84,10 +84,10 @@ Shipped within the v0.1 line (still gated on v0.1 Remaining Hardening before v0.
 
 ## v0.1 Remaining Hardening
 
-- [ ] **Startup validation**
-  - [ ] Add shared configuration validator for `DATABASE_URL`, `PCP_INSTANCE_SECRET`, and `PCP_APP_URL`
-  - [ ] Validate malformed values, not only missing values
-  - [ ] Surface deployment configuration errors in the setup UI without exposing secrets
+- [x] **Startup validation**
+  - [x] Add shared configuration validator for `DATABASE_URL`, `PCP_INSTANCE_SECRET`, and `PCP_APP_URL`
+  - [x] Validate malformed values, not only missing values
+  - [x] Surface deployment configuration errors in the setup UI without exposing secrets
 
 - [ ] **Setup integration tests**
   - [ ] Missing `DATABASE_URL`
@@ -102,11 +102,11 @@ Shipped within the v0.1 line (still gated on v0.1 Remaining Hardening before v0.
   - [ ] Add automated checks that logs never include plaintext admin or session tokens
 
 - [ ] **API docs sync**
-  - [ ] Generate or validate docs against `src/app/api/v1`
+  - [x] Generate or validate docs against `src/app/api/v1` (drift test)
   - [ ] Add CI route/doc drift check
   - [ ] Keep README endpoint list in sync with protocol docs
 
-- [ ] **Agent import visibility and compaction rendering**
+- [x] **Agent import visibility and compaction rendering**
 
   * Context: A user pasted a valid `PCP_COMPACT` block into the import flow. The UI reported `Imported a compaction block`, but the session message view showed no readable conversation content.
   * Trigger: Import a `PCP_COMPACT` payload that contains `summary`, `timeline`, `decisions`, or `requirements`, but no `messages` array.
@@ -132,12 +132,12 @@ Shipped within the v0.1 line (still gated on v0.1 Remaining Hardening before v0.
     ```
   * Implementation tasks:
 
-    * [ ] Add or verify a `compactions` table/model.
-    * [ ] Render compactions in the session workspace.
-    * [ ] Make `PCP_COMPACT` with no messages store a compaction, not fake message rows.
-    * [ ] Make `PCP_COMPACT` with a `messages` array import both messages and the compaction.
-    * [ ] Add an audit event for compact import.
-    * [ ] Add tests for compact-only import and compact-with-messages import.
+    * [x] Add or verify a `compactions` table/model.
+    * [x] Render compactions in the session workspace.
+    * [x] Make `PCP_COMPACT` with no messages store a compaction, not fake message rows.
+    * [x] Make `PCP_COMPACT` (and `PCP_INGEST`) with a `messages` array import both messages and the compaction.
+    * [x] Add an audit event for compact import (compaction.recorded).
+    * [x] Add tests for compact-only import and compact-with-messages import.
 
 * [ ] **Canonical agent fallback format**
 

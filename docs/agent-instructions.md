@@ -73,11 +73,32 @@ curl -X POST "https://<domain>/api/v1/agent/sessions/<sessionId>/compact" \
   -d '{ "summary": "What happened", "decisions": ["..."], "open_questions": ["..."] }'
 ```
 
+## Canonical fallback block
+
+When direct upload fails but you can reconstruct the conversation, emit a single
+`<PCP_INGEST>` block. It carries messages and/or a compaction, and the human can
+paste it into the session UI (Import) if you cannot POST it yourself:
+
+```text
+<PCP_INGEST>
+{
+  "messages": [
+    { "role": "user|assistant|system|tool", "content": "...", "observed_at": "ISO timestamp", "provider": "unknown", "base_model": "unknown" }
+  ],
+  "compaction": null
+}
+</PCP_INGEST>
+```
+
+When message-level reconstruction is impossible, send a `<PCP_COMPACT>` block
+(summary + optional timeline/decisions/requirements/open_questions/artifacts/
+warnings) instead. Both are accepted by `ingest_any` and by the human Import box.
+
 ## Forgiving ingest (fallback)
 
 If exact upload fails, post whatever you have to `ingest_any` and the server will
-normalize it (JSON, `<PCP_APPEND>`/`<PCP_COMPACT>` blocks, ChatML arrays, or raw
-transcript):
+normalize it (JSON, `<PCP_INGEST>`/`<PCP_APPEND>`/`<PCP_COMPACT>` blocks, ChatML
+arrays, or raw transcript):
 
 ```bash
 curl -X POST "https://<domain>/api/v1/agent/sessions/<sessionId>/ingest" \

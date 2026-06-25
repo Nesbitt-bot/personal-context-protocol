@@ -185,6 +185,14 @@ session are deleted; audited (`message.deleted`).
 
 Returns audit events for a session.
 
+### GET `/sessions/:id/compactions`
+
+Returns the durable compaction summaries for a session (additional records that
+never replace raw messages). The workspace renders these as readable,
+system-prompt-style cards. If a session has compactions but no messages, the
+messages pane shows "No raw messages recorded. This session has compact
+summaries."
+
 ### POST `/sessions/:id/archive`
 
 Archives a session.

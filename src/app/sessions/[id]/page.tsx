@@ -8,6 +8,7 @@ import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { buildAgentInstruction } from '@/lib/agent-protocol';
 import { ImportPanel } from '@/components/dashboard/import-panel';
 import { MessageList } from '@/components/dashboard/message-list';
+import { CompactionList } from '@/components/dashboard/compaction-list';
 
 interface SessionRecord {
   id: string;
@@ -81,8 +82,15 @@ export default function SessionDetail() {
   const [accessToken, setAccessToken] = useState('');
   const [instruction, setInstruction] = useState('');
   const [recordingUrl, setRecordingUrl] = useState('');
+  const [compactionCount, setCompactionCount] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  function handleChanged() {
+    loadSession();
+    setRefreshKey((key) => key + 1);
+  }
 
   useEffect(() => {
     if (sessionId) {
@@ -312,8 +320,9 @@ export default function SessionDetail() {
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-            <MessageList sessionId={sessionId} messages={messages} onChanged={loadSession} />
-            <ImportPanel sessionId={sessionId} onImported={loadSession} />
+            <MessageList sessionId={sessionId} messages={messages} onChanged={handleChanged} hasCompactions={compactionCount > 0} />
+            <CompactionList key={`${sessionId}:${refreshKey}`} sessionId={sessionId} onLoaded={setCompactionCount} />
+            <ImportPanel sessionId={sessionId} onImported={handleChanged} />
           </section>
 
           <aside className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">

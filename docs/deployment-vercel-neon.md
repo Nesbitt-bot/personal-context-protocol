@@ -36,7 +36,7 @@ openssl rand -hex 32
 `PCP_ADMIN_TOKEN` is optional. When it is missing, deploy initialization creates the admin credential automatically and logs the generated token with a banner like:
 
 ```text
-personal-context-protocol v0.1.10 - generated deployment admin token
+personal-context-protocol v0.1.11 - generated deployment admin token
 Admin token: <generated-token>
 Log in with this token, then change it immediately in Settings.
 ```
@@ -88,7 +88,7 @@ by minting a fresh token each deploy and printing it once.
 
 ## Docker Compose Alternative
 
-Docker Compose deployment is documented in [deployment-docker-compose.md](deployment-docker-compose.md). It builds the app image with the versioned tag `personal-context-protocol:0.1.10` by default, generates a local `.env` when needed, and runs Postgres locally.
+Docker Compose deployment is documented in [deployment-docker-compose.md](deployment-docker-compose.md). It builds the app image with the versioned tag `personal-context-protocol:0.1.11` by default, generates a local `.env` when needed, and runs Postgres locally.
 
 ## Local Development
 
@@ -128,7 +128,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "database": "pending"
 }
 ```

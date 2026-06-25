@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Archive, Check, Clipboard, Edit3, Globe, KeyRound, ListChecks, Lock, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
 import { formatDate } from './format';
 import { ImportPanel } from './import-panel';
 import { MessageList } from './message-list';
+import { CompactionList } from './compaction-list';
 import { EventLog, Message, Session, Topic } from './types';
 
 interface SessionWorkspaceProps {
@@ -72,6 +73,18 @@ export function SessionWorkspace({
   onImported,
 }: SessionWorkspaceProps) {
   const [copiedPublic, setCopiedPublic] = useState(false);
+  const [compactionCount, setCompactionCount] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    setCompactionCount(0);
+  }, [selectedSession?.id]);
+
+  // Reload messages/events (parent) and refetch compactions after a change.
+  function handleChanged() {
+    onImported();
+    setRefreshKey((key) => key + 1);
+  }
 
   function copyPublicLink(sessionId: string) {
     const url = `${window.location.origin}/s/${sessionId}`;
@@ -245,8 +258,9 @@ export function SessionWorkspace({
 
         <div className="grid flex-1 grid-cols-1 gap-0 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0 px-5 py-5">
-            {selectedSession && <MessageList sessionId={selectedSession.id} messages={messages} onChanged={onImported} />}
-            {selectedSession && <ImportPanel sessionId={selectedSession.id} onImported={onImported} />}
+            {selectedSession && <MessageList sessionId={selectedSession.id} messages={messages} onChanged={handleChanged} hasCompactions={compactionCount > 0} />}
+            {selectedSession && <CompactionList key={`${selectedSession.id}:${refreshKey}`} sessionId={selectedSession.id} onLoaded={setCompactionCount} />}
+            {selectedSession && <ImportPanel sessionId={selectedSession.id} onImported={handleChanged} />}
           </div>
 
           <aside className="border-t border-slate-200 bg-slate-50 px-5 py-5 dark:border-slate-800 dark:bg-slate-900/70 xl:border-l xl:border-t-0">
