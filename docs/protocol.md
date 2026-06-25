@@ -379,6 +379,26 @@ Read-only view of a session and its messages when the session is marked
 private session's existence is not leaked. Tokens are never exposed. The `/s/:id`
 page renders this.
 
+## Agent Schemas (public)
+
+These endpoints return machine-readable JSON schemas so an agent can generate
+correct payloads without guessing or searching the web. The name "Personal
+Context Protocol" has been reused by unrelated projects — use ONLY these
+definitions, not web search results.
+
+### GET `/agent/schema/message`
+
+Returns the JSON schema for the `POST record_messages` payload.
+
+### GET `/agent/schema/compact`
+
+Returns the JSON schema for the `POST record_compact` payload.
+
+### GET `/agent/schema/ingest`
+
+Returns the JSON schema for the `POST ingest_any` canonical fallback block,
+including `<PCP_INGEST>` and `<PCP_COMPACT>` usage.
+
 ## Recording URL origin
 
 The browser UI builds the recording URL from `window.location.origin` (where the

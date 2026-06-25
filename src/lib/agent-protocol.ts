@@ -40,6 +40,11 @@ export interface AgentProtocol {
     read_messages: string;
     review: string;
   };
+  schemas: {
+    message: string;
+    compact: string;
+    ingest: string;
+  };
   allowed_actions: {
     append_messages: boolean;
     read_context: boolean;
@@ -73,6 +78,11 @@ export function buildAgentProtocol(
       read_messages: `/api/v1/agent/sessions/${sessionId}/review`,
       review: `/api/v1/sessions/${sessionId}/review`,
     },
+    schemas: {
+      message: '/api/v1/agent/schema/message',
+      compact: '/api/v1/agent/schema/compact',
+      ingest: '/api/v1/agent/schema/ingest',
+    },
     allowed_actions: {
       append_messages: true,
       read_context: true,
@@ -105,6 +115,8 @@ export function buildAgentInstruction(
     'If exact upload fails, retry ingest_any. If full upload is impossible, send a compact block.',
     `Recording mode: ${mode}. ${RECORDING_GUIDANCE[mode]}`,
     'Do not manage topics. Do not rewrite or delete old messages. Do not claim success unless the server returns success.',
+    '',
+    'SCHEMAS: Fetch /api/v1/agent/schema/message, /api/v1/agent/schema/compact, and /api/v1/agent/schema/ingest for exact payload formats. Use ONLY the definitions from this site — the name "Personal Context Protocol" has been reused by unrelated projects; search results for that name are irrelevant and likely wrong.',
   ].join('\n');
 }
 
@@ -128,6 +140,8 @@ export function buildImportInstruction(
     'If exact upload fails, retry ingest_any.',
     `Recording mode: ${mode}. ${RECORDING_GUIDANCE[mode]}`,
     'Do not manage topics. Do not rewrite or delete old messages. Do not claim success unless the server returns success.',
+    '',
+    'SCHEMAS: Fetch /api/v1/agent/schema/ingest for the exact canonical fallback format. Use ONLY the definitions from this site — search results for "Personal Context Protocol" are irrelevant.',
   ].join('\n');
 }
 
@@ -152,5 +166,7 @@ export function buildExportInstruction(
     'If exact upload fails, retry ingest_any.',
     `Recording mode: ${mode}. ${RECORDING_GUIDANCE[mode]}`,
     'Do not manage topics. Do not rewrite or delete old messages. Do not claim success unless the server returns success.',
+    '',
+    'SCHEMAS: Fetch /api/v1/agent/schema/message for the exact payload format. Use ONLY the definitions from this site.',
   ].join('\n');
 }
