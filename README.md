@@ -24,21 +24,42 @@ Personal Context Protocol stores AI conversation context in user-managed topics 
   tokens can be revoked from a modal, and a session can be made public for a
   read-only shared view at `/s/<sessionId>`.
 
-## Quick Deploy
+## Deploy
 
-1. Click **Deploy to Vercel** and import this repo.
-2. Create a Neon project and copy the Postgres connection string.
-3. Set Vercel environment variables:
+PCP ships two fully supported, equally maintained deployment paths. They produce
+the same app and use the same idempotent schema bootstrap — pick whichever fits
+your hosting. **Vercel + Neon is recommended** for a hosted, zero-ops setup;
+**Docker Compose** is the equal alternative for self-hosting or local runs.
+
+Both require the same environment variables:
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | Neon Postgres connection string |
+| `DATABASE_URL` | Postgres connection string (Neon, or the Compose `db` service) |
 | `PCP_INSTANCE_SECRET` | Random secret, 32+ characters |
-| `PCP_APP_URL` | Your Vercel URL |
+| `PCP_APP_URL` | Your app's public URL (optional; the request origin is used otherwise) |
 | `PCP_ADMIN_TOKEN` | Optional 32+ character admin/reset token. Leave unset for zero-config first login. |
 
-4. Redeploy the Vercel project. The build initializes the empty database and creates the admin credential.
-5. Log in with `PCP_ADMIN_TOKEN` if configured. Otherwise, use the generated first-login token printed once in Vercel build logs, then change it immediately in **Settings**.
+### Option A — Vercel + Neon (recommended)
+
+1. Click **Deploy to Vercel** and import this repo.
+2. Create a Neon project and copy the Postgres connection string.
+3. Set the environment variables above in the Vercel project.
+4. Deploy. The build initializes the empty database and creates the admin credential.
+5. Log in with `PCP_ADMIN_TOKEN` if configured. Otherwise use the generated first-login
+   token printed once in Vercel build logs, then change it immediately in **Settings**.
+
+Full guide: [Deployment: Vercel + Neon](docs/deployment-vercel-neon.md).
+
+### Option B — Docker Compose
+
+1. Set the environment variables above (or run `npm run docker:up`, which generates a
+   local `.env` with sensible defaults, including a Postgres `db` service).
+2. `npm run docker:up` builds the image, starts Postgres, initializes the app, and
+   prints the first-login token when `PCP_ADMIN_TOKEN` is unset.
+3. Log in the same way as Option A.
+
+Full guide: [Deployment: Docker Compose](docs/deployment-docker-compose.md).
 
 ## Admin Token Recovery
 
@@ -49,10 +70,6 @@ The admin credential has one of three sources, with precedence **environment > u
 - **user** — after login, use **Settings** to set a custom token. That marks the credential user-managed so deploys stop rotating it. Settings rotation is disabled while `PCP_ADMIN_TOKEN` is configured because the env var owns the credential.
 
 If you entered the wrong password: find the current token in your **most recent** deploy logs (banner containing `Admin token:`), or set `PCP_ADMIN_TOKEN` and redeploy. The login page links to the [admin token recovery guide](https://nesbitt-bot.github.io/personal-context-protocol/deployment-vercel-neon.html#admin-token-recovery).
-
-## Docker Compose Deployment
-
-Docker Compose can run the app and Postgres locally. The image tag defaults to personal-context-protocol:0.1.15; run `npm run docker:up` to generate `.env`, start Postgres, initialize the app, and print the first-login token when needed. See [Docker Compose deployment](docs/deployment-docker-compose.md).
 
 ## Local Development
 

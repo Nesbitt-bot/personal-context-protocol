@@ -1,16 +1,18 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { SiteNav } from '@/components/site-nav';
 import { NavSidebar } from '@/components/dashboard/nav-sidebar';
 import { SessionWorkspace } from '@/components/dashboard/session-workspace';
 import { TokenModal } from '@/components/dashboard/token-modal';
+import { CreateModal, TopicCreateValues, SessionCreateValues } from '@/components/dashboard/create-modal';
 import { EventLog, Message, Session, Topic } from '@/components/dashboard/types';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { buildAgentInstruction, buildExportInstruction, buildImportInstruction } from '@/lib/agent-protocol';
+import { DEFAULT_SESSION_TITLE, DEFAULT_TOPIC_TITLE, generateUniqueTitle } from '@/lib/naming';
 
 function getUiToken() {
   if (typeof window === 'undefined') return null;
@@ -47,6 +49,38 @@ function DashboardContent() {
   const [uiTokenSource, setUiTokenSource] = useState<string | null>(null);
   const [tokenModalSession, setTokenModalSession] = useState<Session | null>(null);
   const [eventsOpen, setEventsOpen] = useState(false);
+  const [createModal, setCreateModal] = useState<{ kind: 'topic' } | { kind: 'session'; topicId: string | null } | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const sidebarWidthRef = useRef(320);
+
+  // Restore the saved sidebar width on mount.
+  useEffect(() => {
+    const saved = Number(localStorage.getItem('pcp_sidebar_w'));
+    if (saved >= 220 && saved <= 620) { setSidebarWidth(saved); sidebarWidthRef.current = saved; }
+  }, []);
+
+  // Drag the border between the nav sidebar and the workspace.
+  function startResize(event: React.MouseEvent) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startW = sidebarWidthRef.current;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    function onMove(moveEvent: MouseEvent) {
+      const next = Math.min(620, Math.max(220, startW + moveEvent.clientX - startX));
+      sidebarWidthRef.current = next;
+      setSidebarWidth(next);
+    }
+    function onUp() {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      try { localStorage.setItem('pcp_sidebar_w', String(sidebarWidthRef.current)); } catch { /* ignore */ }
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
 
   // Sync URL param to state on mount and when URL changes
   useEffect(() => {
@@ -149,9 +183,14 @@ function DashboardContent() {
     }
   }
 
-  async function createTopic() {
+  // Open the create dialog (prefilled). The actual POST happens on submit.
+  function openCreateTopic() { setCreateModal({ kind: 'topic' }); }
+  function openCreateSession(topicId: string | null) { setCreateModal({ kind: 'session', topicId }); }
+
+  async function submitCreateTopic(values: TopicCreateValues) {
+    setCreateModal(null);
     try {
-      const res = await fetch('/api/v1/topics', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: '{}' });
+      const res = await fetch('/api/v1/topics', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ title: values.title, description: values.description || undefined }) });
       const data = await readJsonResponse(res, { consequence: 'Unable to create topic', moduleProcess: 'topic administration / create topic request', fallbackCause: 'create topic endpoint did not return JSON' });
       if (!res.ok || data.error) { setError(data.error || 'Unable to create topic'); return; }
       setExpanded((prev) => new Set(prev).add(data.id));
@@ -160,12 +199,13 @@ function DashboardContent() {
     } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create topic', moduleProcess: 'topic administration / create topic request', cause: `browser could not reach the topics endpoint; ${errorCause(err)}` })); }
   }
 
-  async function createSession(topicId: string | null) {
+  async function submitCreateSession(values: SessionCreateValues) {
+    setCreateModal(null);
     try {
-      const res = await fetch('/api/v1/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(topicId ? { topic_id: topicId } : {}) });
+      const res = await fetch('/api/v1/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ title: values.title, topic_id: values.topic_id || undefined, mode: values.mode }) });
       const data = await readJsonResponse(res, { consequence: 'Unable to create session', moduleProcess: 'session administration / create session request', fallbackCause: 'create session endpoint did not return JSON' });
       if (!res.ok || data.error) { setError(data.error || 'Unable to create session'); return; }
-      setExpanded((prev) => new Set(prev).add(topicId ?? '__none__'));
+      setExpanded((prev) => new Set(prev).add(values.topic_id ?? '__none__'));
       selectSession(data.id);
       setStatus(`Session created: ${data.title}`);
       await loadAll();
@@ -332,21 +372,34 @@ function DashboardContent() {
           </div>
         </div>
       )}
-      <div className="grid h-[calc(100vh-57px)] grid-cols-1 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div
+        className="grid h-[calc(100vh-57px)] grid-cols-1 overflow-hidden lg:grid-cols-[var(--pcp-sidebar-w)_6px_minmax(0,1fr)]"
+        style={{ ['--pcp-sidebar-w' as string]: `${sidebarWidth}px` } as React.CSSProperties}
+      >
         <NavSidebar
           topics={topics} sessions={sessions} loading={loading}
           selectedSessionId={selectedSessionId} expanded={expanded}
           query={query} showArchived={showArchived}
           onToggleExpand={toggleExpand} onQueryChange={setQuery}
           onShowArchivedChange={setShowArchived}
-          onSelectSession={selectSession} onCreateSession={createSession}
-          onCreateTopic={createTopic} onRefresh={loadAll}
+          onSelectSession={selectSession} onCreateSession={openCreateSession}
+          onCreateTopic={openCreateTopic} onRefresh={loadAll}
           onRenameTopic={renameTopic} onRemoveTopic={removeTopic}
           onRestoreTopic={restoreTopic} onDeleteTopic={deleteTopic}
           onRemoveSession={removeSession} onRestoreSession={restoreSession}
           onDeleteSession={deleteSession} onEmptyTrash={emptyTrash}
           onMoveSession={moveSession}
         />
+        {/* Drag handle to resize the sidebar / message panel split (desktop only) */}
+        <div
+          className="group hidden cursor-col-resize items-center justify-center border-x border-transparent bg-slate-100 hover:bg-sky-200 dark:bg-slate-800 dark:hover:bg-sky-800 lg:flex"
+          onMouseDown={startResize}
+          title="Drag to resize"
+          role="separator"
+          aria-orientation="vertical"
+        >
+          <div className="h-8 w-0.5 rounded bg-slate-300 group-hover:bg-sky-500 dark:bg-slate-600" />
+        </div>
         <SessionWorkspace
           error={error} status={status} hasUiToken={hasUiToken} uiTokenInput={uiTokenInput}
           selectedTopic={selectedTopic} selectedSession={selectedSession}
@@ -365,6 +418,27 @@ function DashboardContent() {
         />
       </div>
       {tokenModalSession && <TokenModal sessionId={tokenModalSession.id} sessionTitle={tokenModalSession.title} onClose={() => setTokenModalSession(null)} />}
+      {createModal?.kind === 'topic' && (
+        <CreateModal
+          kind="topic"
+          defaultTitle={generateUniqueTitle(DEFAULT_TOPIC_TITLE, topics.map((t) => t.title))}
+          onCancel={() => setCreateModal(null)}
+          onCreateTopic={submitCreateTopic}
+        />
+      )}
+      {createModal?.kind === 'session' && (
+        <CreateModal
+          kind="session"
+          defaultTitle={generateUniqueTitle(
+            DEFAULT_SESSION_TITLE,
+            sessions.filter((s) => (s.topic_id ?? null) === createModal.topicId).map((s) => s.title),
+          )}
+          topics={topics.filter((t) => !t.archived)}
+          defaultTopicId={createModal.topicId}
+          onCancel={() => setCreateModal(null)}
+          onCreateSession={submitCreateSession}
+        />
+      )}
     </main>
   );
 }

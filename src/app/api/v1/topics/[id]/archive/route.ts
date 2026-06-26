@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { verifyUiToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
-import { events, sessions, topics } from '@/lib/schema';
+import { events, messages, sessions, topics } from '@/lib/schema';
 import { createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
 import { eq } from 'drizzle-orm';
@@ -59,13 +59,19 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unable to delete topic: topic administration / topic lookup - topic not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    // Move sessions to Uncategorized before deleting the topic.
-    await db.update(sessions).set({ topicId: null, updatedAt: new Date() }).where(eq(sessions.topicId, params.id));
-    await db.delete(topics).where(eq(topics.id, params.id));
-
-    await db.insert(events).values({
-      id: createId('evt'), topicId: null, action: 'topic.deleted', actor: 'human',
-      detailsJson: { topic_id: params.id, title: existing.title }, createdAt: new Date()
+    // Clear every foreign-key reference to this topic before deleting it.
+    // Sessions move to Uncategorized; the denormalized topic on messages and the
+    // topic on past events are nulled (both columns are nullable). Without this,
+    // deleting the topic fails with a foreign-key violation.
+    await db.transaction(async (tx) => {
+      await tx.update(sessions).set({ topicId: null, updatedAt: new Date() }).where(eq(sessions.topicId, params.id));
+      await tx.update(messages).set({ topicId: null }).where(eq(messages.topicId, params.id));
+      await tx.update(events).set({ topicId: null }).where(eq(events.topicId, params.id));
+      await tx.delete(topics).where(eq(topics.id, params.id));
+      await tx.insert(events).values({
+        id: createId('evt'), topicId: null, action: 'topic.deleted', actor: 'human',
+        detailsJson: { topic_id: params.id, title: existing.title }, createdAt: new Date()
+      });
     });
 
     return NextResponse.json({ success: true, id: params.id, deleted: true });

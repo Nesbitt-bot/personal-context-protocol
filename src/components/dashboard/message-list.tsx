@@ -297,10 +297,15 @@ export function MessageList({ sessionId, messages, onChanged, hasCompactions = f
                       <p className={`break-words text-sm leading-6 ${isUser ? 'text-white' : 'text-slate-900 dark:text-slate-100'} ${selectMode ? 'line-clamp-5' : 'whitespace-pre-wrap'}`}>{message.content}</p>
                     )}
 
-                    {/* Meta footer */}
-                    {!isEditing && (
-                      <p className={`mt-2 text-xs ${isUser ? 'text-sky-200/70' : 'text-slate-500 dark:text-slate-400'}`}>
+                    {/* Meta footer — only for non-user messages (user/human has no LLM provider) */}
+                    {!isEditing && !isUser && (
+                      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                         {(message.provider || 'unknown')}/{modelOf(message)} &middot; {formatDate(observedOf(message))}
+                      </p>
+                    )}
+                    {!isEditing && isUser && (
+                      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                        {formatDate(observedOf(message))}
                       </p>
                     )}
                   </article>

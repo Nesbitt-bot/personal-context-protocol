@@ -258,8 +258,19 @@ export function SessionWorkspace({
           <TokenDisplay content={generatedToken} onClose={onClearGeneratedToken} />
         )}
 
-        <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden xl:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="flex min-h-0 flex-col px-5 pt-5">
+        <div className={`grid flex-1 grid-cols-1 gap-0 overflow-hidden ${eventsOpen ? 'xl:grid-cols-[minmax(0,1fr)_300px]' : ''}`}>
+          <div className="relative flex min-h-0 flex-col px-5 pt-5">
+            {/* Events reopen button when panel is hidden */}
+            {!eventsOpen && onToggleEvents && (
+              <button
+                className="absolute right-2 top-16 z-10 rounded-full border border-slate-200 bg-white p-1 pr-[5px] shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                onClick={onToggleEvents}
+                type="button"
+                title="Show events"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            )}
             {selectedSession && (
               <div className="min-h-0 flex-1 overflow-y-auto pb-3">
                 <MessageList sessionId={selectedSession.id} messages={messages} onChanged={handleChanged} hasCompactions={compactionCount > 0} />
@@ -269,17 +280,19 @@ export function SessionWorkspace({
             {selectedSession && <ImportPanel sessionId={selectedSession.id} onImported={handleChanged} />}
           </div>
 
-          {/* Collapsible events panel */}
-          <div className="relative border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70 xl:border-l xl:border-t-0">
-            <button
-              className="absolute -left-5 top-1/2 z-10 -translate-y-1/2 rounded-full border border-slate-200 bg-white p-1 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
-              onClick={onToggleEvents}
-              type="button"
-              title={eventsOpen ? 'Hide events' : 'Show events'}
-            >
-              {eventsOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            </button>
-            {eventsOpen && (
+          {/* Collapsible events panel. When closed, the entire column disappears so
+              messages span the full width. The toggle is on the right edge of the
+              messages column. */}
+          {eventsOpen && (
+            <div className="relative border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70 xl:border-l xl:border-t-0">
+              <button
+                className="absolute -left-5 top-1/2 z-10 -translate-y-1/2 rounded-full border border-slate-200 bg-white p-1 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                onClick={onToggleEvents}
+                type="button"
+                title="Hide events"
+              >
+                <ChevronRight size={16} />
+              </button>
               <aside className="px-5 py-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Settings2 size={18} className="text-slate-500 dark:text-slate-400" />
@@ -296,8 +309,8 @@ export function SessionWorkspace({
                   ))}
                 </div>
               </aside>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
