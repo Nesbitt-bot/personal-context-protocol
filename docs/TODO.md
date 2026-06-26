@@ -82,6 +82,23 @@ Shipped within the v0.1 line (still gated on v0.1 Remaining Hardening before v0.
 - [x] **Message correction** (v0.1.10): human admin edit/delete (append-only still enforced for AI);
   multi-select with select-all + shift-range; long messages fold to 5 lines in select mode
 
+## v0.1.21 Completed — Consent-framed token prompts + layout scroll fix
+
+- [x] **Refusal-aware token prompts** — `buildAgentInstruction` /
+  `buildImportInstruction` / `buildExportInstruction` rewritten through a shared
+  consent-framed builder: states the request is first-party (user's own
+  instance, user's own credential), gates direct upload behind the agent
+  actually having a web/MCP tool, and offers "produce import JSON for the user
+  to paste" as a preferred non-refusal fallback. Removed the injection-prone
+  phrasing ("discover upload routes", "recall ALL past history", "upload every
+  message", "transmit the token as content")
+- [x] **Dashboard scroll fix** — added the `min-h-0` chain so nested
+  flex/grid scrollers are no longer clipped by the fixed-height
+  (`calc(100vh-57px)`) `overflow:hidden` page grid: workspace section + inner
+  column, the messages/events grid row, and an independent scroller on the
+  events column. Messages region and pinned Import composer/footer are now
+  reachable
+
 ## v0.1.20 Completed — Refusal-aware fallback, export, dry-run
 
 - [x] **Generated prompts** — Wild/Strict copy-paste fallback (no token, no

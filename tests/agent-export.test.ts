@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildIngestSchemaDescriptor, buildFallbackInstruction, buildMcpInstruction, buildCompactFallbackInstruction } from '../src/lib/agent-schema';
 import { buildIngestExport, buildCompactExport, redactSecrets } from '../src/lib/ingest-export';
 import { dryRunIngest } from '../src/lib/ingest';
-import { displayMode, normalizeRecordingMode } from '../src/lib/agent-protocol';
+import { buildAgentInstruction, buildImportInstruction, buildExportInstruction, displayMode, normalizeRecordingMode } from '../src/lib/agent-protocol';
 
 describe('ingest schema endpoint descriptor', () => {
   const d = buildIngestSchemaDescriptor();
@@ -73,6 +73,26 @@ describe('generated prompts', () => {
     expect(p).toMatch(/compact summary/i);
     expect(p).toMatch(/Do not upload anything directly/i);
     expect(p).toContain('/api/v1/agent/schema/ingest');
+  });
+
+  it('default/import/export prompts are refusal-aware (consent + capability gate, no injection phrasing)', () => {
+    const prompts = [
+      buildAgentInstruction('https://host/r/ses_1', 'tok_x', 'wild'),
+      buildImportInstruction('https://host/r/ses_1', 'tok_x', 'wild'),
+      buildExportInstruction('https://host/r/ses_1', 'tok_x', 'wild'),
+    ];
+    for (const p of prompts) {
+      // Consent + capability gate present.
+      expect(p).toMatch(/first-party request from your own user/i);
+      expect(p).toMatch(/produce a PCP import JSON object/i);
+      expect(p).toMatch(/do not refuse/i);
+      // Injection-prone phrasing removed.
+      expect(p).not.toMatch(/discover (the |arbitrary )?upload routes/i);
+      expect(p).not.toMatch(/recall ALL/i);
+      expect(p).not.toMatch(/upload every message/i);
+      // Still capability-aware (token present for tool-capable agents).
+      expect(p).toContain('tok_x');
+    }
   });
 
   it('fallback prompts never contain a token-like secret', () => {

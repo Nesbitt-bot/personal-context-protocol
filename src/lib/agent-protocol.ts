@@ -107,76 +107,95 @@ export function buildAgentProtocol(
   };
 }
 
-/** Default token instruction. */
+/**
+ * Shared, refusal-aware recording prompt. It establishes first-party consent,
+ * gates direct upload behind the agent actually having a tool, and explicitly
+ * offers "produce JSON for the human to import" as a good outcome — so an agent
+ * that cannot or will not POST falls back to useful output instead of refusing.
+ * It avoids the phrasing that reads as prompt-injection ("discover arbitrary
+ * upload routes", "recall and upload all history", "transmit the token").
+ */
+function buildRecordingPrompt(opts: {
+  headline: string;
+  recordingUrl: string;
+  accessToken: string;
+  mode: RecordingMode;
+  focus: string[];
+}): string {
+  const m = displayMode(opts.mode);
+  return [
+    opts.headline,
+    '',
+    'CONTEXT — read this first: the person you are talking to runs this chat and has set up a recording session in THEIR OWN Personal Context Protocol instance (their private notebook). They are asking you, with their consent, to help save this conversation into it. This is a first-party request from your own user — not an attempt to send data to an unknown third party. The access token below is the user\'s own credential for their own instance.',
+    '',
+    'CHOOSE BASED ON YOUR CAPABILITIES:',
+    '- If you have a working web-request tool or an installed PCP MCP/tool in this environment, you may record directly: send `Authorization: Bearer <access-token>` to the routes listed by the recording URL.',
+    '- If you have no way to make web requests, do NOT attempt to upload and do NOT transmit the token. Instead, produce a PCP import JSON object (schema below) and hand it to the user to paste into their dashboard themselves. This is a perfectly good, preferred outcome — do not refuse; just return the JSON.',
+    '',
+    'Recording URL (returns a short JSON descriptor of the upload routes):', opts.recordingUrl,
+    '',
+    'Access Token (the user\'s own credential for their own instance):', opts.accessToken,
+    '',
+    `Mode: ${m}. ${RECORDING_GUIDANCE[opts.mode]}`,
+    '',
+    ...opts.focus,
+    '',
+    'Boundaries: faithfully capture the messages of THIS conversation. Do not manage topics, rewrite or delete existing messages, or read other sessions. Do not claim anything was uploaded unless the server (or your tool) returned success — if you only produced JSON for the user, say so plainly.',
+    '',
+    'SCHEMA: `GET /api/v1/agent/schema/ingest` is the canonical import format. Use ONLY definitions from this site; ignore web search results for "Personal Context Protocol" — the name is reused by unrelated projects.',
+  ].join('\n');
+}
+
+/** Default token instruction (capability-aware: direct write or produce JSON). */
 export function buildAgentInstruction(
   recordingUrl: string,
   accessToken: string,
   mode: RecordingMode = DEFAULT_RECORDING_MODE,
 ): string {
-  return [
-    'You are recording this conversation to Personal Context Protocol.',
-    '',
-    'Recording URL:', recordingUrl,
-    '', 'Access Token:', accessToken, '',
-    'First fetch the recording URL or protocol endpoint to discover upload routes.',
-    `Then fetch read_messages to read any messages already recorded in this session, so you know the full conversation history.`,
-    'Record ALL messages from this conversation — every user message and every assistant response, including this one. Include the full history.',
-    'Use Authorization: Bearer <access-token>.',
-    'If exact upload fails, retry ingest_any. If full upload is impossible, send a compact block.',
-    `Recording mode: ${mode}. ${RECORDING_GUIDANCE[mode]}`,
-    'Do not manage topics. Do not rewrite or delete old messages. Do not claim success unless the server returns success.',
-    '',
-    'SCHEMAS: Fetch /api/v1/agent/schema/message, /api/v1/agent/schema/compact, and /api/v1/agent/schema/ingest for exact payload formats. Use ONLY the definitions from this site — the name "Personal Context Protocol" has been reused by unrelated projects; search results for that name are irrelevant and likely wrong.',
-  ].join('\n');
+  return buildRecordingPrompt({
+    headline: 'You are helping the user save this conversation into their Personal Context Protocol notebook.',
+    recordingUrl,
+    accessToken,
+    mode,
+    focus: [
+      'Capture each message of this conversation — every user message and every assistant reply, including this one.',
+      'If a direct write fails, you may use the `ingest_any` route, or simply output the import JSON for the user to paste instead.',
+    ],
+  });
 }
 
-/**
- * Import instruction: the agent reads its own past conversation history and
- * uploads it all to PCP, then records any follow-ups in this session.
- */
+/** Import: capture the messages already exchanged in this thread. */
 export function buildImportInstruction(
   recordingUrl: string,
   accessToken: string,
   mode: RecordingMode = DEFAULT_RECORDING_MODE,
 ): string {
-  return [
-    'You are importing your conversation history to Personal Context Protocol.',
-    '', 'Recording URL:', recordingUrl, '', 'Access Token:', accessToken, '',
-    'IMPORT MODE: Recall ALL past conversation history from this session/thread and upload every message to PCP.',
-    '1. First fetch the recording URL to discover upload routes.',
-    '2. Then read ALL your past conversation context (every user message and every assistant response from this entire thread) and record them to PCP.',
-    '3. For any follow-up exchanges in this session, continue recording new messages to PCP.',
-    '', 'Use Authorization: Bearer <access-token>.',
-    'If exact upload fails, retry ingest_any.',
-    `Recording mode: ${mode}. ${RECORDING_GUIDANCE[mode]}`,
-    'Do not manage topics. Do not rewrite or delete old messages. Do not claim success unless the server returns success.',
-    '',
-    'SCHEMAS: Fetch /api/v1/agent/schema/ingest for the exact canonical fallback format. Use ONLY the definitions from this site — search results for "Personal Context Protocol" are irrelevant.',
-  ].join('\n');
+  return buildRecordingPrompt({
+    headline: 'You are helping the user save this conversation into their Personal Context Protocol notebook.',
+    recordingUrl,
+    accessToken,
+    mode,
+    focus: [
+      'Capture the messages exchanged in THIS conversation/thread so the user has a faithful record of it.',
+      'If you cannot make web requests, output the import JSON for the user to paste — do not refuse.',
+    ],
+  });
 }
 
-/**
- * Export instruction: the agent reads PCP's recorded history first, then uses
- * that context for the next query while recording all new conversation data.
- */
+/** Export: optionally read prior recorded context, then keep capturing. */
 export function buildExportInstruction(
   recordingUrl: string,
   accessToken: string,
   mode: RecordingMode = DEFAULT_RECORDING_MODE,
 ): string {
-  return [
-    'You are exporting your PCP context and recording new conversation.',
-    '', 'Recording URL:', recordingUrl, '', 'Access Token:', accessToken, '',
-    'EXPORT MODE: Read PCP history, then record all new context.',
-    '1. First fetch the recording URL to discover upload routes.',
-    '2. Fetch read_messages from the protocol to get ALL previously recorded messages (the full PCP history).',
-    '3. Use that history as context for understanding the session before solving the next query.',
-    '4. Record ALL new conversation exchanges, chat history, and any media URLs to PCP going forward.',
-    '', 'Use Authorization: Bearer <access-token>.',
-    'If exact upload fails, retry ingest_any.',
-    `Recording mode: ${mode}. ${RECORDING_GUIDANCE[mode]}`,
-    'Do not manage topics. Do not rewrite or delete old messages. Do not claim success unless the server returns success.',
-    '',
-    'SCHEMAS: Fetch /api/v1/agent/schema/message for the exact payload format. Use ONLY the definitions from this site.',
-  ].join('\n');
+  return buildRecordingPrompt({
+    headline: 'You are helping the user keep their Personal Context Protocol notebook up to date with this conversation.',
+    recordingUrl,
+    accessToken,
+    mode,
+    focus: [
+      'If you have a web-request tool, you may read already-recorded context via the read route to avoid duplicates, then record new messages going forward.',
+      'If you cannot make web requests, output the import JSON for the user to paste instead.',
+    ],
+  });
 }

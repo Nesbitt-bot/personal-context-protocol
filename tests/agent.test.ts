@@ -95,7 +95,9 @@ describe('agent protocol', () => {
     expect(exact.recording_mode).toBe('exact');
     expect(exact.recording_guidance).toMatch(/verbatim/i);
     const instruction = buildAgentInstruction('https://host/r/ses_1', 'tok', 'exact');
-    expect(instruction).toContain('Recording mode: exact');
+    // Mode is surfaced under its public display name (exact -> strict) with verbatim guidance.
+    expect(instruction).toContain('Mode: strict');
+    expect(instruction).toMatch(/verbatim/i);
   });
 });
 

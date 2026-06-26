@@ -56,6 +56,24 @@ Run this checklist before declaring any modification round complete.
 
 Append what this round actually did below:
 
+- 2026-06-26 - Consent-framed token prompts + dashboard scroll fix (v0.1.21)
+  - Rewrote the three token instruction builders (`buildAgentInstruction` /
+    `buildImportInstruction` / `buildExportInstruction`) through a shared
+    consent-framed `buildRecordingPrompt`. Agents were refusing the prior text
+    as prompt-injection because it read like exfiltration ("fetch the recording
+    URL to discover upload routes", "recall ALL past conversation history",
+    "upload every message", token presented as page content). New framing:
+    states this is a first-party request (user's own instance, user's own
+    credential), gates direct upload behind the agent having a real web/MCP
+    tool, and offers "produce import JSON for the user to paste" as a preferred
+    non-refusal fallback. Mode now shown under its display name (exact→strict).
+  - Layout: added the `min-h-0` chain so the nested message/events scrollers are
+    no longer clipped by the fixed-height `h-[calc(100vh-57px)] overflow-hidden`
+    page grid (workspace section + inner column, the messages/events grid row,
+    and an independent scroller on the events column). The pinned Import
+    composer and footer are reachable again.
+  - typecheck clean; 122 tests pass (added a refusal-safe wording assertion,
+    updated the exact-mode instruction test to the strict display name); build clean.
 - [Round date] - Initial rewrite to Next.js + Neon
   - Created project structure
   - Set up AGENTS.md, CLAUDE.md, CODEX.md
