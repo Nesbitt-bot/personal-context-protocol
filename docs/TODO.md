@@ -82,6 +82,23 @@ Shipped within the v0.1 line (still gated on v0.1 Remaining Hardening before v0.
 - [x] **Message correction** (v0.1.10): human admin edit/delete (append-only still enforced for AI);
   multi-select with select-all + shift-range; long messages fold to 5 lines in select mode
 
+## v0.1.20 Completed — Refusal-aware fallback, export, dry-run
+
+- [x] **Generated prompts** — Wild/Strict copy-paste fallback (no token, no
+  upload, produce review-able JSON) and MCP/tool direct-upload prompt; refusal-
+  prone phrasing removed from fallback prompts
+- [x] **Terminology** — `exact` surfaced as `strict` in UI/docs (display alias;
+  stored value unchanged); `normalizeRecordingMode` accepts `strict`
+- [x] **Schema endpoint** — `GET /api/v1/agent/schema/ingest` returns the spec
+  shape (wild + strict modes, `ingest_example`, `compact_example`, limits)
+- [x] **Export** — Import/Export panel: copy/download PCP_INGEST + PCP_COMPACT
+  JSON (`.json` / `.md`); wild redacts secrets, strict preserves stored text
+  exactly (with a warning); mode badge
+- [x] **Dry-run** — `POST /api/v1/agent/sessions/:id/ingest-dry-run` validates
+  without storing; actionable structured errors
+- [x] **Ingest response** — `{ imported: { messages, compactions, events,
+  duplicates_skipped }, notice }` on agent ingest and human import
+
 ## v0.1 Remaining Hardening
 
 - [x] **Startup validation**

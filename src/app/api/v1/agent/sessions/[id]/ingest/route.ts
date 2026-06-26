@@ -1,18 +1,23 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { verifySessionToken } from '@/lib/middleware';
+import { db } from '@/lib/db';
+import { messages } from '@/lib/schema';
 import { appendMessagesToSession, recordCompaction } from '@/lib/recording-store';
 import { appendMessagesSchema, createCompactSchema } from '@/lib/validations';
 import { parseIngestPayload } from '@/lib/ingest';
+import { dedupeNewMessages } from '@/lib/import-merge';
 import { agentErrorBody, mapAuthFailure } from '@/lib/agent-errors';
 import { logError } from '@/lib/logging';
+import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Forgiving agent ingestion: `POST /api/v1/agent/sessions/<id>/ingest`. Accepts
- * { messages }, <PCP_APPEND>/<PCP_COMPACT> blocks, ChatML-like arrays, or raw
- * transcript text, and normalizes into messages or a compaction. On failure it
- * returns structured retry guidance, not a vague error.
+ * raw JSON `{ messages }` or `{ summary }`, `<PCP_INGEST>`/`<PCP_COMPACT>`/legacy
+ * `<PCP_APPEND>` blocks, ChatML-like arrays, or transcript text, and normalizes
+ * into messages and/or a compaction. Already-recorded messages are skipped.
+ * On failure it returns structured retry guidance, not a vague error.
  */
 export async function POST(
   request: NextRequest,
@@ -33,51 +38,72 @@ export async function POST(
       return NextResponse.json({ ...body, reason: parsed.reason }, { status });
     }
 
+    const actor = `ai:${authResult.tokenId}`;
+    let compactionsImported = 0;
+
+    // Record a compaction when present (compact-only or mixed).
     if (parsed.kind === 'compact' || parsed.kind === 'mixed') {
       const validation = createCompactSchema.safeParse(parsed.compact);
       if (!validation.success) {
         const { status, body } = agentErrorBody('VALIDATION_ERROR');
         return NextResponse.json({ ...body, details: validation.error.errors }, { status });
       }
-      const stored = await recordCompaction({
-        sessionId: params.id,
-        compact: parsed.compact,
-        actor: `ai:${authResult.tokenId}`,
-      });
+      const stored = await recordCompaction({ sessionId: params.id, compact: parsed.compact, actor });
       if (!stored.ok) {
         const { status, body } = agentErrorBody(stored.code);
         return NextResponse.json(body, { status });
       }
-      if (parsed.kind === 'compact') {
-        return NextResponse.json({ ...stored, ingested_as: 'compact' });
+      compactionsImported = 1;
+    }
+
+    // Append message rows not already present (compact-only has none).
+    const incoming = parsed.kind === 'mixed' || parsed.kind === 'messages' ? parsed.messages : [];
+    let messagesImported = 0;
+    let duplicatesSkipped = 0;
+
+    if (incoming.length > 0) {
+      const existing = await db
+        .select({ role: messages.role, content: messages.content })
+        .from(messages)
+        .where(eq(messages.sessionId, params.id));
+      const deduped = dedupeNewMessages(incoming, existing);
+      duplicatesSkipped = deduped.skipped;
+
+      if (deduped.fresh.length > 0) {
+        const validation = appendMessagesSchema.safeParse({ messages: deduped.fresh });
+        if (!validation.success) {
+          const { status, body } = agentErrorBody('VALIDATION_ERROR', {
+            next_steps: ['Keep each message under max_content_chars and send at most max_messages_per_request per call.'],
+          });
+          return NextResponse.json({ ...body, details: validation.error.errors }, { status });
+        }
+        const result = await appendMessagesToSession({
+          sessionId: params.id,
+          messages: validation.data.messages,
+          canRenameSession: authResult.canRenameSession,
+          actor,
+        });
+        if (!result.ok) {
+          const { status, body } = agentErrorBody(result.code);
+          return NextResponse.json(body, { status });
+        }
+        messagesImported = result.messages.length;
       }
-      // mixed: also append the messages below.
     }
 
-    const messagesToAppend = parsed.kind === 'mixed' || parsed.kind === 'messages' ? parsed.messages : [];
-    if (messagesToAppend.length === 0) {
-      return NextResponse.json({ ok: true, ingested_as: 'compact' });
-    }
+    const events = (messagesImported > 0 ? 1 : 0) + compactionsImported;
+    const notice = compactionsImported > 0 && messagesImported === 0
+      ? 'Imported a compact summary. No raw messages were included.'
+      : messagesImported === 0 && incoming.length > 0
+        ? 'Everything in the payload was already recorded.'
+        : 'Imported message-level fallback JSON.';
 
-    const validation = appendMessagesSchema.safeParse({ messages: messagesToAppend });
-    if (!validation.success) {
-      const { status, body } = agentErrorBody('VALIDATION_ERROR', {
-        next_steps: ['Keep each message under max_content_chars and send at most max_messages_per_request per call.'],
-      });
-      return NextResponse.json({ ...body, details: validation.error.errors }, { status });
-    }
-
-    const result = await appendMessagesToSession({
-      sessionId: params.id,
-      messages: validation.data.messages,
-      canRenameSession: authResult.canRenameSession,
-      actor: `ai:${authResult.tokenId}`,
+    return NextResponse.json({
+      ok: true,
+      session_id: params.id,
+      imported: { messages: messagesImported, compactions: compactionsImported, events, duplicates_skipped: duplicatesSkipped },
+      notice,
     });
-    if (!result.ok) {
-      const { status, body } = agentErrorBody(result.code);
-      return NextResponse.json(body, { status });
-    }
-    return NextResponse.json({ ...result, ingested_as: parsed.kind === 'mixed' ? 'mixed' : 'messages' });
   } catch (error) {
     logError({
       consequence: 'Unable to ingest content',

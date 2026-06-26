@@ -24,8 +24,18 @@ export const RECORDING_GUIDANCE: Record<RecordingMode, string> = {
     'Recording mode is "exact". Record messages verbatim, including credentials and sensitive values, because this session is being captured for faithful future task migration. Do not redact or paraphrase.',
 };
 
+/**
+ * Normalize an input mode to the stored value. `strict` is the public/UI name
+ * for the stored `exact` mode (kept for backward compatibility).
+ */
 export function normalizeRecordingMode(value: unknown): RecordingMode {
-  return value === 'exact' ? 'exact' : 'wild';
+  return value === 'exact' || value === 'strict' ? 'exact' : 'wild';
+}
+
+/** Public/UI display name for a stored mode: `exact` is shown as `strict`. */
+export type DisplayMode = 'wild' | 'strict';
+export function displayMode(mode: RecordingMode): DisplayMode {
+  return mode === 'exact' ? 'strict' : 'wild';
 }
 
 export interface AgentProtocol {

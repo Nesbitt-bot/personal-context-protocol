@@ -14,7 +14,7 @@
  * result; the route turns `{ kind: 'error' }` into structured retry guidance.
  */
 
-import { MAX_MESSAGES_PER_REQUEST } from './agent-protocol';
+import { MAX_CONTENT_CHARS, MAX_MESSAGES_PER_REQUEST } from './agent-protocol';
 
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool' | 'correction';
 
@@ -334,4 +334,75 @@ export function parseIngestPayload(
   }
 
   return { kind: 'error', reason: 'body did not match any supported format' };
+}
+
+export interface DryRunResult {
+  valid: boolean;
+  would_import?: { messages: number; compactions: number };
+  warnings?: string[];
+  code?: string;
+  message?: string;
+  next_steps?: string[];
+}
+
+const SCHEMA_HINT = 'Use GET /api/v1/agent/schema/ingest for the current schema.';
+
+/**
+ * Validate a fallback payload without storing anything. Returns the count it
+ * would import, or a structured, actionable error. Pure so it is unit-testable
+ * and reusable by the dry-run route.
+ */
+export function dryRunIngest(rawBody: string): DryRunResult {
+  // Precise structural check: when a top-level `messages` array is present,
+  // point at the first message that is missing usable content.
+  const obj = (() => {
+    const direct = tryJson((rawBody || '').trim());
+    if (direct !== undefined) return direct;
+    return extractFirstJson(rawBody || '')?.value;
+  })();
+  if (obj && typeof obj === 'object' && Array.isArray((obj as { messages?: unknown }).messages)) {
+    const list = (obj as { messages: unknown[] }).messages;
+    for (let i = 0; i < list.length; i += 1) {
+      const item = list[i] as { content?: unknown } | null;
+      const content = item && typeof item === 'object' ? item.content : item;
+      if (typeof content !== 'string' || !content.trim()) {
+        return {
+          valid: false,
+          code: 'INVALID_INGEST_SCHEMA',
+          message: `The payload is missing messages[${i}].content.`,
+          next_steps: ['Add content to each message.', SCHEMA_HINT],
+        };
+      }
+    }
+  }
+
+  const parsed = parseIngestPayload(rawBody, { maxMessages: 500 });
+  if (parsed.kind === 'error') {
+    return {
+      valid: false,
+      code: 'INVALID_INGEST_SCHEMA',
+      message: `The payload could not be parsed as a PCP ingest fallback: ${parsed.reason}.`,
+      next_steps: [
+        'Send { "messages": [ { "role": "user", "content": "..." } ] } or wrap it in <PCP_INGEST>...</PCP_INGEST>.',
+        SCHEMA_HINT,
+      ],
+    };
+  }
+
+  const messages = parsed.kind === 'messages' || parsed.kind === 'mixed' ? parsed.messages : [];
+  const tooLong = messages.find((message) => message.content.length > MAX_CONTENT_CHARS);
+  if (tooLong) {
+    return {
+      valid: false,
+      code: 'INVALID_INGEST_SCHEMA',
+      message: `A message exceeds the ${MAX_CONTENT_CHARS} character limit.`,
+      next_steps: ['Split long messages into smaller ones.', SCHEMA_HINT],
+    };
+  }
+
+  return {
+    valid: true,
+    would_import: { messages: messages.length, compactions: parsed.kind === 'compact' || parsed.kind === 'mixed' ? 1 : 0 },
+    warnings: [],
+  };
 }

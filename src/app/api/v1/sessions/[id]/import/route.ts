@@ -112,11 +112,12 @@ export async function POST(
         ? 'Everything in the paste was already recorded.'
         : `Imported ${messagesImported} message(s)${compactionsImported ? ' and a compact summary' : ''}.`;
 
+    const events = (messagesImported > 0 ? 1 : 0) + compactionsImported;
     return NextResponse.json({
       success: true,
       ok: true,
       session_id: params.id,
-      imported: { messages: messagesImported, compactions: compactionsImported },
+      imported: { messages: messagesImported, compactions: compactionsImported, events, duplicates_skipped: skipped },
       skipped,
       notice,
     });

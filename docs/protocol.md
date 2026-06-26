@@ -319,11 +319,29 @@ Body (`summary` required):
 
 ### POST `/api/v1/agent/sessions/:sessionId/ingest`
 
-Forgiving ingestion. Accepts `{ messages }`, `{ messages, compaction }` (mixed),
-`<PCP_INGEST>...</PCP_INGEST>`, `<PCP_APPEND>...</PCP_APPEND>`,
-`<PCP_COMPACT>...</PCP_COMPACT>`, ChatML-like arrays, or raw transcript text, and
-normalizes into messages, a compaction, or both. On failure it returns structured
-retry guidance (`code: "UNPARSEABLE_PAYLOAD"`), not a vague error.
+Forgiving ingestion. Accepts raw JSON with top-level `messages` or `summary`,
+`{ messages, compaction }` (mixed), `<PCP_INGEST>...</PCP_INGEST>`,
+`<PCP_APPEND>...</PCP_APPEND>`, `<PCP_COMPACT>...</PCP_COMPACT>`, ChatML-like
+arrays, or raw transcript text. Messages already present are skipped. On failure
+it returns structured retry guidance (`code: "UNPARSEABLE_PAYLOAD"`), not a vague
+error. Response:
+
+```json
+{
+  "ok": true,
+  "session_id": "ses_...",
+  "imported": { "messages": 12, "compactions": 0, "events": 1, "duplicates_skipped": 0 },
+  "notice": "Imported message-level fallback JSON."
+}
+```
+
+### POST `/api/v1/agent/sessions/:sessionId/ingest-dry-run`
+
+Validates a fallback payload **without storing** anything. Returns
+`{ ok, valid, would_import: { messages, compactions }, warnings }` when valid, or
+a structured `{ ok: false, valid: false, code: "INVALID_INGEST_SCHEMA",
+retryable, message, next_steps }` when invalid (for example, a message missing
+`content`).
 
 ### GET `/api/v1/agent/sessions/:sessionId/review`
 
@@ -396,8 +414,12 @@ Returns the JSON schema for the `POST record_compact` payload.
 
 ### GET `/agent/schema/ingest`
 
-Returns the JSON schema for the `POST ingest_any` canonical fallback block,
-including `<PCP_INGEST>` and `<PCP_COMPACT>` usage.
+The canonical fallback schema (public, no token). Returns `{ ok, schema_version,
+schema_name, accepted_content_types, accepted_wrappers, limits, modes, ingest_example,
+compact_example }`. `modes` defines `wild` (redaction allowed) and `strict`
+(exact preservation requested). This is the single source of truth shared with
+the generated copy-paste fallback prompts — agents should use ONLY these
+definitions, not web search results for "Personal Context Protocol".
 
 ## Recording URL origin
 

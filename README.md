@@ -23,6 +23,13 @@ Personal Context Protocol stores AI conversation context in user-managed topics 
 - The admin dashboard previews sessions, events, token status, and exports;
   tokens can be revoked from a modal, and a session can be made public for a
   read-only shared view at `/s/<sessionId>`.
+- For agents that **refuse direct upload**, the session **Import / Export** panel
+  generates copy-paste fallback prompts (Wild = redaction allowed, Strict = exact
+  preservation) that ask the agent only to produce review-able JSON — no token,
+  no upload — which the human pastes back. Agents with a PCP MCP/tool integration
+  get a direct-upload (MCP) prompt instead. Export recorded messages/compactions
+  as PCP JSON (`.json` / `.md`), and validate fallback payloads with the
+  `ingest-dry-run` endpoint.
 
 ## Deploy
 

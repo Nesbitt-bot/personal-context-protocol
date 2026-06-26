@@ -12,6 +12,7 @@ import { EventLog, Message, Session, Topic } from '@/components/dashboard/types'
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { buildAgentInstruction, buildExportInstruction, buildImportInstruction } from '@/lib/agent-protocol';
+import { buildMcpInstruction } from '@/lib/agent-schema';
 import { DEFAULT_SESSION_TITLE, DEFAULT_TOPIC_TITLE, generateUniqueTitle } from '@/lib/naming';
 
 function getUiToken() {
@@ -346,6 +347,19 @@ function DashboardContent() {
     } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create import token', moduleProcess: 'session token administration / create import token', cause: errorCause(err) })); }
   }
 
+  async function copyMcpPrompt(session: Session) {
+    try {
+      const res = await fetch(`/api/v1/sessions/${session.id}/tokens`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ expires_in: '7d' }) });
+      const data = await readJsonResponse(res, { consequence: 'Unable to create token', moduleProcess: 'session token administration / create MCP token request', fallbackCause: 'create token endpoint did not return JSON' });
+      if (!res.ok || data.error || !data.access_token) { setError(data.error || 'Unable to create MCP token'); return; }
+      const url = `${window.location.origin}/r/${session.id}`;
+      const instruction = buildMcpInstruction(url, data.access_token, (session.mode as 'wild' | 'exact') || 'wild');
+      setGeneratedToken(instruction);
+      setStatus('MCP/tool prompt created (contains the one-time token). For agents with an installed PCP tool.');
+      await navigator.clipboard.writeText(instruction).catch(() => undefined);
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create MCP token', moduleProcess: 'session token administration / create MCP token', cause: errorCause(err) })); }
+  }
+
   async function createExportToken(session: Session) {
     try {
       const res = await fetch(`/api/v1/sessions/${session.id}/tokens`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ expires_in: '7d' }) });
@@ -413,7 +427,7 @@ function DashboardContent() {
           onCancelSessionEdits={() => setEditingSession(false)}
           onArchiveSelectedSession={archiveSelectedSession} onRestoreSelectedSession={restoreSelectedSession}
           onGenerateToken={generateToken} onCreateImportToken={createImportToken} onCreateExportToken={createExportToken} onManageTokens={setTokenModalSession}
-          onTogglePublic={togglePublic} onSetMode={setMode}
+          onTogglePublic={togglePublic} onSetMode={setMode} onCopyMcpPrompt={copyMcpPrompt}
           onImported={() => selectedSession && loadSessionDetail(selectedSession.id)}
         />
       </div>

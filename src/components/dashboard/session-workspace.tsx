@@ -6,6 +6,7 @@ import { formatDate } from './format';
 import { ImportPanel } from './import-panel';
 import { MessageList } from './message-list';
 import { CompactionList } from './compaction-list';
+import { ImportExportPanel } from './import-export-panel';
 import { TokenDisplay } from './token-display';
 import { EventLog, Message, Session, Topic } from './types';
 
@@ -39,6 +40,7 @@ interface SessionWorkspaceProps {
   onManageTokens: (session: Session) => void;
   onTogglePublic: (session: Session, next: boolean) => void;
   onSetMode: (session: Session, mode: 'wild' | 'exact') => void;
+  onCopyMcpPrompt: (session: Session) => void;
   onImported: () => void;
   eventsOpen?: boolean;
   onToggleEvents?: () => void;
@@ -78,6 +80,7 @@ export function SessionWorkspace({
   onManageTokens,
   onTogglePublic,
   onSetMode,
+  onCopyMcpPrompt,
   onImported,
   eventsOpen = false,
   onToggleEvents,
@@ -275,6 +278,13 @@ export function SessionWorkspace({
               <div className="min-h-0 flex-1 overflow-y-auto pb-3">
                 <MessageList sessionId={selectedSession.id} messages={messages} onChanged={handleChanged} hasCompactions={compactionCount > 0} />
                 <CompactionList key={`${selectedSession.id}:${refreshKey}`} sessionId={selectedSession.id} onLoaded={setCompactionCount} />
+                <ImportExportPanel
+                  sessionId={selectedSession.id}
+                  sessionTitle={selectedSession.title}
+                  mode={(selectedSession.mode as 'wild' | 'exact') || 'wild'}
+                  messages={messages}
+                  onCopyMcpPrompt={() => onCopyMcpPrompt(selectedSession)}
+                />
               </div>
             )}
             {selectedSession && <ImportPanel sessionId={selectedSession.id} onImported={handleChanged} />}
