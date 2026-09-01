@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { logError } from '@/lib/logging';
 import { ADMIN_TOKEN_RECOVERY_URL, DEPLOYMENT_GUIDE_URL, configuredAdminToken } from '@/lib/admin-token';
+import { resolveScopedToken } from '@/lib/scoped-token';
 
 /**
  * Verify UI token and return session info
@@ -202,4 +203,32 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
       status: 500,
     } as const;
   }
+}
+
+/**
+ * Verify a scoped token (the global token manager layer). On success returns
+ * the resolved token with its scope and permissions so routes can enforce
+ * least privilege without touching the admin credential.
+ */
+export async function verifyScopedToken(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return {
+      error: 'Unable to authenticate: scoped token validation / bearer header validation - missing or invalid authorization header',
+      code: 'UNAUTHORIZED',
+      status: 401,
+    } as const;
+  }
+
+  const token = authHeader.substring(7);
+  const resolved = await resolveScopedToken(token);
+  if (!resolved) {
+    return {
+      error: 'Unable to authenticate: scoped token validation / token resolution - invalid, revoked, or expired scoped token',
+      code: 'UNAUTHORIZED',
+      status: 401,
+    } as const;
+  }
+
+  return { success: true, token: resolved } as const;
 }
