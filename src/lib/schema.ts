@@ -1,4 +1,4 @@
-﻿import { pgTable, text, timestamp, boolean, integer, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, integer, jsonb } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { APP_VERSION } from './version';
 
@@ -66,6 +66,25 @@ export const sessionTokens = pgTable('session_tokens', {
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
   tokenPrefix: text('token_prefix'), // First 16 chars for quick lookup
+});
+
+// Scoped tokens: the unified token layer managed by the global token manager.
+// `scope` bounds the token ('global' = full, 'folder' = one topic, 'session' =
+// one session); `permissionsJson` carries fine-grained flags (see scoped-token.ts).
+export const scopedTokens = pgTable('scoped_tokens', {
+  id: text('id').primaryKey(),
+  tokenHash: text('token_hash').notNull(),
+  salt: text('salt').notNull(),
+  tokenPrefix: text('token_prefix'),
+  name: text('name').notNull(),
+  scope: text('scope', { enum: ['global', 'folder', 'session'] }).notNull(),
+  folderId: text('folder_id').references(() => topics.id),
+  sessionId: text('session_id').references(() => sessions.id),
+  permissionsJson: jsonb('permissions_json').default({}),
+  revoked: boolean('revoked').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
 });
 
 // Messages

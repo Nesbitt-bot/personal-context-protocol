@@ -108,3 +108,43 @@ export const errorResponseSchema = z.object({
 export const successResponseSchema = z.object({
   success: z.literal(true),
 });
+
+// Scoped token schemas (global token manager). A folder-scoped token must name
+// a folder_id; a session-scoped token must name a session_id.
+export const scopedPermissionsSchema = z.object({
+  create_folders: z.boolean().optional(),
+  delete_folders: z.boolean().optional(),
+  create_sessions: z.boolean().optional(),
+  delete_sessions: z.boolean().optional(),
+  mint_tokens: z.boolean().optional(),
+  rename_sessions: z.boolean().optional(),
+  read_all: z.boolean().optional(),
+});
+
+export const createScopedTokenSchema = z
+  .object({
+    name: z.string().min(1).max(100),
+    scope: z.enum(['global', 'folder', 'session']),
+    folder_id: z.string().min(1).optional(),
+    session_id: z.string().min(1).optional(),
+    permissions: scopedPermissionsSchema.optional(),
+    expires_in: z.enum(EXPIRATION_CHOICES).optional(),
+  })
+  .refine(
+    (value) => (value.scope === 'folder' ? Boolean(value.folder_id) : true),
+    { message: 'folder scope requires folder_id' },
+  )
+  .refine(
+    (value) => (value.scope === 'session' ? Boolean(value.session_id) : true),
+    { message: 'session scope requires session_id' },
+  );
+
+export const manageScopedTokenSchema = z
+  .object({
+    token_id: z.string().min(1),
+    name: z.string().min(1).max(100).optional(),
+    revoke: z.boolean().optional(),
+  })
+  .refine((value) => value.name !== undefined || value.revoke === true, {
+    message: 'Provide a new name or revoke: true',
+  });

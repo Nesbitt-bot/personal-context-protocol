@@ -157,6 +157,24 @@ function schemaStatements(version) {
     'CREATE INDEX IF NOT EXISTS events_session_id_idx ON events(session_id)',
     'CREATE INDEX IF NOT EXISTS events_created_at_idx ON events(created_at)',
     'CREATE INDEX IF NOT EXISTS compactions_session_id_idx ON compactions(session_id)',
+    `CREATE TABLE IF NOT EXISTS scoped_tokens (
+      id text PRIMARY KEY,
+      token_hash text NOT NULL,
+      salt text NOT NULL,
+      token_prefix text,
+      name text NOT NULL,
+      scope text NOT NULL CHECK (scope IN ('global', 'folder', 'session')),
+      folder_id text REFERENCES topics(id),
+      session_id text REFERENCES sessions(id),
+      permissions_json jsonb DEFAULT '{}',
+      revoked boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz,
+      last_used_at timestamptz
+    )`,
+    'CREATE INDEX IF NOT EXISTS scoped_tokens_prefix_idx ON scoped_tokens(token_prefix)',
+    'CREATE INDEX IF NOT EXISTS scoped_tokens_folder_idx ON scoped_tokens(folder_id)',
+    'CREATE INDEX IF NOT EXISTS scoped_tokens_session_idx ON scoped_tokens(session_id)',
   ];
 }
 

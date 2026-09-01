@@ -1,4 +1,4 @@
-﻿import { db } from '@/lib/db';
+import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
 import { APP_VERSION } from '@/lib/version';
 
@@ -120,6 +120,24 @@ const SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS events_session_id_idx ON events(session_id)',
   'CREATE INDEX IF NOT EXISTS events_created_at_idx ON events(created_at)',
   'CREATE INDEX IF NOT EXISTS compactions_session_id_idx ON compactions(session_id)',
+  `CREATE TABLE IF NOT EXISTS scoped_tokens (
+    id text PRIMARY KEY,
+    token_hash text NOT NULL,
+    salt text NOT NULL,
+    token_prefix text,
+    name text NOT NULL,
+    scope text NOT NULL CHECK (scope IN ('global', 'folder', 'session')),
+    folder_id text REFERENCES topics(id),
+    session_id text REFERENCES sessions(id),
+    permissions_json jsonb DEFAULT '{}',
+    revoked boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz,
+    last_used_at timestamptz
+  )`,
+  'CREATE INDEX IF NOT EXISTS scoped_tokens_prefix_idx ON scoped_tokens(token_prefix)',
+  'CREATE INDEX IF NOT EXISTS scoped_tokens_folder_idx ON scoped_tokens(folder_id)',
+  'CREATE INDEX IF NOT EXISTS scoped_tokens_session_idx ON scoped_tokens(session_id)',
 ];
 
 /**
@@ -180,6 +198,12 @@ export async function ensureDatabaseSchema() {
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
     VALUES ('007_session_mode', 'session_recording_mode')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('008_scoped_tokens', 'unified_scoped_token_layer')
     ON CONFLICT (version) DO NOTHING
   `);
 }
