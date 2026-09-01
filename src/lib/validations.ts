@@ -148,3 +148,10 @@ export const manageScopedTokenSchema = z
   .refine((value) => value.name !== undefined || value.revoke === true, {
     message: 'Provide a new name or revoke: true',
   });
+
+// Session-to-session link. `label` is optional and free-text (e.g. "records",
+// "continuation", "fork").
+export const createSessionLinkSchema = z.object({
+  to_session_id: z.string().min(1),
+  label: z.string().max(100).optional(),
+});

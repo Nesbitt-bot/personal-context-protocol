@@ -87,6 +87,18 @@ export const scopedTokens = pgTable('scoped_tokens', {
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
 });
 
+// Session-to-session links: an undirected, optionally labelled relationship so
+// a model (or human) can connect related conversations (e.g. a DSH session and
+// the PCP session that records it). `sessionA`/`sessionB` are stored in a
+// normalized order (A <= B) by the write path.
+export const sessionLinks = pgTable('session_links', {
+  id: text('id').primaryKey(),
+  sessionA: text('session_a').notNull().references(() => sessions.id),
+  sessionB: text('session_b').notNull().references(() => sessions.id),
+  label: text('label'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Messages
 export const messages = pgTable('messages', {
   id: text('id').primaryKey(),

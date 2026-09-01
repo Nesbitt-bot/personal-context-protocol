@@ -138,6 +138,16 @@ const SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS scoped_tokens_prefix_idx ON scoped_tokens(token_prefix)',
   'CREATE INDEX IF NOT EXISTS scoped_tokens_folder_idx ON scoped_tokens(folder_id)',
   'CREATE INDEX IF NOT EXISTS scoped_tokens_session_idx ON scoped_tokens(session_id)',
+  `CREATE TABLE IF NOT EXISTS session_links (
+    id text PRIMARY KEY,
+    session_a text NOT NULL REFERENCES sessions(id),
+    session_b text NOT NULL REFERENCES sessions(id),
+    label text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (session_a, session_b)
+  )`,
+  'CREATE INDEX IF NOT EXISTS session_links_a_idx ON session_links(session_a)',
+  'CREATE INDEX IF NOT EXISTS session_links_b_idx ON session_links(session_b)',
 ];
 
 /**
@@ -204,6 +214,12 @@ export async function ensureDatabaseSchema() {
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
     VALUES ('008_scoped_tokens', 'unified_scoped_token_layer')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('009_session_links', 'session_to_session_links')
     ON CONFLICT (version) DO NOTHING
   `);
 }
