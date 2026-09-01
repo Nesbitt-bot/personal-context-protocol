@@ -8,6 +8,7 @@ import { MessageList } from './message-list';
 import { CompactionList } from './compaction-list';
 import { ImportExportPanel } from './import-export-panel';
 import { TokenDisplay } from './token-display';
+import { LinkedSessions } from './linked-sessions';
 import { EventLog, Message, Session, Topic } from './types';
 
 interface SessionWorkspaceProps {
@@ -220,6 +221,12 @@ export function SessionWorkspace({
             </div>
           )}
         </header>
+
+        {selectedSession && (
+          <div className="border-b border-slate-200 px-5 py-3 dark:border-slate-800">
+            <LinkedSessions sessionId={selectedSession.id} />
+          </div>
+        )}
 
         {editingSession && selectedSession && (
           <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/70">
