@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, integer, jsonb, uniqueIndex } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { APP_VERSION } from './version';
 
@@ -27,17 +27,21 @@ export const uiAuth = pgTable('ui_auth', {
 // Topics
 export const topics = pgTable('topics', {
   id: text('id').primaryKey(),
+  externalKey: text('external_key'),
   title: text('title').notNull(),
   description: text('description'),
   archived: boolean('archived').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  externalKeyIdx: uniqueIndex('topics_external_key_idx').on(table.externalKey),
+}));
 
 // Sessions. `topicId` is nullable: a session may be uncategorized (no topic).
 // `public` exposes a read-only view without the admin UI token.
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
+  externalKey: text('external_key'),
   topicId: text('topic_id').references(() => topics.id),
   title: text('title').notNull(),
   // Recording mode the agent is told to honor: 'wild' (default) lets the agent
@@ -49,7 +53,9 @@ export const sessions = pgTable('sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   lastMessageAt: timestamp('last_message_at', { withTimezone: true }),
-});
+}, (table) => ({
+  externalKeyIdx: uniqueIndex('sessions_external_key_idx').on(table.externalKey),
+}));
 
 // Session tokens
 export const sessionTokens = pgTable('session_tokens', {

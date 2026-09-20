@@ -4,8 +4,9 @@ import { verifyScopedToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
 import { topics } from '@/lib/schema';
 import { logError } from '@/lib/logging';
-import { createSessionRecord, mintSessionTokenRecord } from '@/lib/manager-store';
+import { createSessionRecord, findSessionByExternalKey, mintSessionTokenRecord } from '@/lib/manager-store';
 import { buildRecordingUrl, resolveAppBaseUrl } from '@/lib/recording-url';
+import { normalizeExternalKey } from '@/lib/external-key';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,44 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim() : undefined;
     const mode: 'wild' | 'exact' = body.mode === 'exact' ? 'exact' : 'wild';
+    let externalKey: string | null;
+    try {
+      externalKey = normalizeExternalKey(body.external_key);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: `Unable to create session: scoped token manager / external key validation - ${error instanceof Error ? error.message : 'invalid external_key'}`,
+          code: 'VALIDATION_ERROR',
+        },
+        { status: 400 },
+      );
+    }
+
+    // An external key makes the create idempotent: a sync worker that retries
+    // after a network failure must reuse its session rather than fork a new one.
+    if (externalKey) {
+      const existing = await findSessionByExternalKey(externalKey);
+      if (existing) {
+        if (tok.scope === 'folder' && existing.topicId !== tok.folderId) {
+          return NextResponse.json({ error: 'Unable to create session: scoped token permissions / folder scope check - existing session is outside this folder', code: 'FORBIDDEN' }, { status: 403 });
+        }
+        let accessToken: string | null = null;
+        if (tok.permissions.mint_tokens) {
+          const minted = await mintSessionTokenRecord({ sessionId: existing.id, name: 'session-manager', canRename: true, expiresIn: 'never' });
+          if (minted) accessToken = minted.token;
+        }
+        return NextResponse.json({
+          success: true,
+          created: false,
+          session_id: existing.id,
+          title: existing.title,
+          folder_id: existing.topicId,
+          mode: existing.mode,
+          access_token: accessToken,
+          recording_url: buildRecordingUrl(resolveAppBaseUrl(request.nextUrl.origin), existing.id),
+        });
+      }
+    }
 
     let folderId: string | null = null;
     if (tok.scope === 'folder') {
@@ -58,7 +97,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { sessionId, title: finalTitle } = await createSessionRecord({ topicId: folderId, title, mode });
+    const { sessionId, title: finalTitle } = await createSessionRecord({
+      topicId: folderId,
+      title,
+      mode,
+      externalKey: externalKey ?? undefined,
+    });
 
     let accessToken: string | null = null;
     if (tok.permissions.mint_tokens) {
@@ -70,6 +114,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      created: true,
       session_id: sessionId,
       title: finalTitle,
       folder_id: folderId,

@@ -22,6 +22,7 @@ const SCHEMA_STATEMENTS = [
   )`,
   `CREATE TABLE IF NOT EXISTS topics (
     id text PRIMARY KEY,
+    external_key text UNIQUE,
     title text NOT NULL,
     description text,
     archived boolean NOT NULL DEFAULT false,
@@ -30,6 +31,7 @@ const SCHEMA_STATEMENTS = [
   )`,
   `CREATE TABLE IF NOT EXISTS sessions (
     id text PRIMARY KEY,
+    external_key text UNIQUE,
     topic_id text REFERENCES topics(id),
     title text NOT NULL,
     mode text NOT NULL DEFAULT 'wild',
@@ -107,6 +109,8 @@ const SCHEMA_STATEMENTS = [
   'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false',
   // Recording mode the agent is told to honor (wild = may redact, exact = verbatim).
   "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'wild'",
+  'ALTER TABLE topics ADD COLUMN IF NOT EXISTS external_key text',
+  'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS external_key text',
   `CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT now(),
@@ -120,6 +124,8 @@ const SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS events_session_id_idx ON events(session_id)',
   'CREATE INDEX IF NOT EXISTS events_created_at_idx ON events(created_at)',
   'CREATE INDEX IF NOT EXISTS compactions_session_id_idx ON compactions(session_id)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS topics_external_key_idx ON topics(external_key) WHERE external_key IS NOT NULL',
+  'CREATE UNIQUE INDEX IF NOT EXISTS sessions_external_key_idx ON sessions(external_key) WHERE external_key IS NOT NULL',
   `CREATE TABLE IF NOT EXISTS scoped_tokens (
     id text PRIMARY KEY,
     token_hash text NOT NULL,
@@ -220,6 +226,12 @@ export async function ensureDatabaseSchema() {
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
     VALUES ('009_session_links', 'session_to_session_links')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('010_external_session_keys', 'stable_external_topic_and_session_keys')
     ON CONFLICT (version) DO NOTHING
   `);
 }

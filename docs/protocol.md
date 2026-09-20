@@ -65,6 +65,81 @@ Creates a topic. `title` is optional and free-text: omit it (or send `{}`) and
 the server generates a unique default name (`New Topic`, `New Topic 2`, ...).
 Duplicate titles are auto-suffixed instead of rejected.
 
+## Scoped Manager
+
+The scoped manager API is intended for trusted sync workers using a scoped
+token. A global token with `read_all`, `create_sessions`, and `mint_tokens` can
+create and retrieve sessions without using the UI credential.
+
+### POST `/manager/sessions`
+
+Creates a session, or returns the existing session when `external_key` already
+exists. This makes retries from a session synchronizer idempotent. Existing
+clients may omit `external_key` and retain the original create-only behavior.
+
+Body additions:
+
+```json
+{
+  "title": "Codex task",
+  "mode": "exact",
+  "external_key": "win-384de1b4:codex:0199abcd"
+}
+```
+
+`external_key` is the caller's own stable identity for the source transcript,
+conventionally `<device-id>:<source-kind>:<native-session-id>`. It is treated as
+opaque, must be 1–200 characters, and must not contain control characters; an
+invalid value returns `VALIDATION_ERROR`.
+
+The response includes `created`, `session_id`, `recording_url`, and an
+`access_token` when the scoped token has `mint_tokens`. `created` is `false`
+when an existing session was returned, which is what makes a retried push
+idempotent.
+
+### GET `/manager/sessions/by-key/:key`
+
+Resolves an external session key and returns its current append cursor, so a
+sync worker can resume an upload instead of re-sending messages PCP already
+holds:
+
+```json
+{
+  "found": true,
+  "external_key": "win-384de1b4:codex:0199abcd",
+  "session_id": "ses_…",
+  "title": "Codex task",
+  "mode": "exact",
+  "message_count": 12,
+  "last_ordinal": 12
+}
+```
+
+A key that falls outside the token's folder or session scope returns `found:
+false` rather than `403`, so the boundary cannot be used to probe for sessions
+the token may not read. As with every agent-facing route, no topic id is
+returned.
+
+### GET `/manager/tree`
+
+Returns the scoped folder/session tree.
+
+### POST `/manager/search`
+
+Searches message content within the scoped token boundary. The body accepts
+`query`, optional `limit`, and optional `session_id`.
+
+### POST `/manager/sessions/:id/tokens`
+
+Mints a session recording token for an existing session when the scoped token
+has `mint_tokens` and covers the target session.
+
+### GET|POST|DELETE `/manager/sessions/:id/links`
+
+Reads or changes labelled relationships between sessions. Links are useful for
+representing rewrite branches and source-to-import relationships without
+changing the append-only message history.
+
 Body:
 
 ```json
@@ -436,4 +511,3 @@ the request origin. `PCP_APP_URL` is about constructing absolute URLs, not CORS.
 Exports app data as JSON for the UI token holder.
 
 The export omits plaintext tokens.
-

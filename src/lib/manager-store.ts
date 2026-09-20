@@ -15,6 +15,7 @@ export async function createSessionRecord(opts: {
   topicId: string | null;
   title?: string;
   mode?: 'wild' | 'exact';
+  externalKey?: string;
 }): Promise<{ sessionId: string; title: string }> {
   if (opts.topicId) {
     const [topic] = await db
@@ -33,6 +34,7 @@ export async function createSessionRecord(opts: {
   await db.insert(sessions).values({
     id: sessionId,
     topicId: opts.topicId,
+    externalKey: opts.externalKey ?? null,
     title,
     mode: opts.mode ?? 'wild',
     archived: false,
@@ -52,6 +54,15 @@ export async function createSessionRecord(opts: {
   });
 
   return { sessionId, title };
+}
+
+/** Find an existing manager-created session by its stable source identity. */
+export async function findSessionByExternalKey(externalKey: string) {
+  const [row] = await db
+    .select({ id: sessions.id, topicId: sessions.topicId, title: sessions.title, mode: sessions.mode })
+    .from(sessions)
+    .where(eq(sessions.externalKey, externalKey));
+  return row ?? null;
 }
 
 export async function mintSessionTokenRecord(opts: {
