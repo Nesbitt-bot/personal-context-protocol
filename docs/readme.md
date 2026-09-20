@@ -125,8 +125,7 @@ the messages for this fallback path.
 ## TODO and Versions
 
 - [TODO](TODO.md) — owner-visible future work
-- [Per-release notes](versions/) — detailed change notes by version (see
-  `docs/versions/v0.1.14.md` for the latest)
+- [Per-release notes](versions/v0.1.14.md) — detailed change notes by version
 
 ---
 

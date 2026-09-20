@@ -35,6 +35,12 @@ myst_enable_extensions = [
     "colon_fence",
 ]
 
+# Generate anchor targets for headings so one document can deep-link into a
+# section of another (e.g. readme.md -> deployment-vercel-neon.md#...).
+# Without this, MyST creates no cross-file anchors and every such link fails
+# the -W build.
+myst_heading_anchors = 4
+
 # Suppress specific warnings
 suppress_warnings = [
     'misc.highlighting_failure',  # SQL $1, $2 placeholders
