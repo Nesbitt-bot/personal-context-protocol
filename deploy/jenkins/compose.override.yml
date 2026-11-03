@@ -1,0 +1,9 @@
+services:
+  app:
+    image: ${PCP_IMAGE:?Run prepare_env.py before deployment}
+    build:
+      args:
+        GIT_COMMIT: ${PCP_BUILD_COMMIT:-}
+    environment:
+      PCP_BUILD_COMMIT: ${PCP_BUILD_COMMIT:-}
+      PCP_BUILD_TARGET: jenkins

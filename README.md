@@ -181,3 +181,10 @@ sphinx-build -b html . _build/html
 MIT
 
 
+
+## Local Jenkins deployment
+
+The full stack can run locally with code pulled from GitHub main on push
+webhooks. [Jenkins runbook](docs/deployment-jenkins.md) covers private env setup, versioned
+images, backups, tests, and the verified Neon-to-local import. The Neon
+source is retained; the local runtime uses its own PostgreSQL volume.

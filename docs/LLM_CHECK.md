@@ -233,3 +233,30 @@ Append what this round actually did below:
   - Added Docker `.env` generation and `npm run docker:up`
   - Updated login to offer fallback initialization only when deploy initialization did not run
 
+
+- 2026-11-03 — Jenkins/Neon local deployment (v0.1.25)
+  - Discovered the existing workspace tracks the older Nesbitt-bot fork while
+    the running 0.1.24 app/job use Trance-0 main. Work isolated on
+    deploy/jenkins-neon-import; original checkout/main preserved.
+  - Added versioned Jenkinsfile loaded from remote GitHub main, bounded
+    production builds/typecheck/Vitest, backup-before-recreate, full-stack
+    deployment and version/commit/database verification. Jenkins validator,
+    Python/shell/JS syntax and Compose model checks passed.
+  - Production builder ran npm run build; TypeScript check and all nine Vitest
+    files/167 tests passed. Final preflight production image built. Runtime
+    env excluded from contexts, logs/reports and .env.* ignored.
+  - Neon unpooled PostgreSQL 17.11: read-only exported snapshot, public-schema
+    dump via PG18 client, staging restore to local PG16 after omitting only
+    unsupported transaction_timeout default. All 11 tables/495 rows matched
+    before/after local app startup, including stored UI/session token hashes.
+  - Imported 7 topics, 16 sessions, 258 messages and 33 session tokens. Existing
+    user-managed admin credential preserved without rotation. Kept original
+    DB as pcp_local_before_20261103 and private dumps/env/job backups under
+    ~/.local/state/pcp-jenkins/<UTC timestamp>. Neon unchanged, not shut down.
+  - Preserved existing instance secret, local DB password and named volume.
+    Private local.env/prod.env references created; Jenkins env is local only.
+    PCP job disabled during migration and converted from inline to SCM; it
+    will be enabled before authorized push. Notechondria job/data unchanged.
+  - Remote webhook rollout and post-deploy fingerprints are verified after
+    push; UI plaintext admin token is not available from a stored hash, so
+    continue using the existing user-managed Neon credential.

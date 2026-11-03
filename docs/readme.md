@@ -136,3 +136,10 @@ the messages for this fallback path.
 - [Security Model](security.md)
 - [Logging](logging.md) — diagnostic message format
 - [Migrations Guide](migrations.md) — Drizzle migration workflow
+
+## Local Jenkins deployment
+
+The full stack can run locally with code pulled from GitHub main on push
+webhooks. [Jenkins runbook](deployment-jenkins.md) covers private env setup, versioned
+images, backups, tests, and the verified Neon-to-local import. The Neon
+source is retained; the local runtime uses its own PostgreSQL volume.

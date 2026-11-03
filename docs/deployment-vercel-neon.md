@@ -141,3 +141,10 @@ Expected response:
 - Setup or login reports `INVALID_ADMIN_TOKEN`: update `PCP_ADMIN_TOKEN` to at least 32 characters, or remove it and let PCP generate the first-login token.
 - Build fails: run `npm run typecheck` and `npm run build` locally.
 - UI token is lost: set `PCP_ADMIN_TOKEN` in Vercel, redeploy, and log in with that value.
+
+## Alternative local Jenkins target
+
+[Jenkins deployment](deployment-jenkins.md) runs the same app with local
+PostgreSQL and a GitHub-main webhook pipeline. Neon is used only as a
+read-only snapshot source during migration; its runtime URLs are not copied
+into the local Jenkins environment.
