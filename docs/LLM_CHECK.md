@@ -260,3 +260,17 @@ Append what this round actually did below:
   - Remote webhook rollout and post-deploy fingerprints are verified after
     push; UI plaintext admin token is not available from a stored hash, so
     continue using the existing user-managed Neon credential.
+  - Final remote verification: GitHub push 793c5cf automatically started PCP
+    Jenkins build #2, which completed SUCCESS. Remote npm build, typecheck,
+    167 Vitest tests, PostgreSQL backup, full-stack rollout, and runtime
+    software/commit/database checks passed. Both versioned containers healthy.
+  - Post-rollout comparison retains all 495 rows and exact hashes in all ten
+    content/auth tables. app_instance differs only in version 0.1.24→0.1.25,
+    verified by normalizing that field in a read-only comparison. Original
+    data volume and pcp_local_before_20261103 rollback DB remain. Root page
+    HTTP200, unauthenticated topics HTTP401, health commit matches pushed SHA.
+  - Source Neon dump was read-only. Browser login with the unknown plaintext
+    Settings-managed admin token was not tested; its stored hash is preserved.
+    Sphinx documentation build not run locally (toolchain absent). Old local
+    checkout/main untouched; docs/code pushed to canonical Trance-0 main for
+    webhook verification. Local tests/logs/private env excluded from Git.

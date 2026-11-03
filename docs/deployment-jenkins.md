@@ -106,3 +106,17 @@ The source Neon database was not changed or shut down. This is a snapshot,
 not ongoing replication: quiesce source writes and perform a final refresh
 before retiring the remote runtime. Public routing and client URLs are a
 separate cutover step.
+
+## Verified deployment, 2026-11-03
+
+GitHub push `793c5cf` automatically started
+[Jenkins build #2](http://127.0.0.1:8081/job/personal-context-protocol/2/), which
+completed SUCCESS. Production build, TypeScript checks, all 167 Vitest tests,
+database backup and runtime checks passed. The health response reported
+software `0.1.25`, target `jenkins`, and the exact pushed commit. Both versioned
+containers were healthy. Post-rollout fingerprints proved all 495 imported
+rows retained; only app_instance.version changed to 0.1.25. Admin/session token
+hashes remained identical and the previous database was retained for rollback.
+Private evidence is under the `latest-run` directory described above. The
+existing plaintext Settings-managed admin token is still needed for browser
+login; it cannot be recovered from its stored hash and was not reset.
