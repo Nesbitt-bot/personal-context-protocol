@@ -123,6 +123,12 @@ export function normalizeSession({ session, project, messages, parts, device, or
     device,
     origin,
     directory: imported?.directory || metadata.sessionManager?.originalDirectory || session.directory || '',
+    // Every directory the records name, most specific first, for project
+    // planning (organize-projects.mjs); placeholders are filtered there.
+    directories: [imported?.directory, metadata.sessionManager?.originalDirectory, session.directory, project?.worktree].filter((d) => typeof d === 'string' && d),
+    remote: typeof imported?.remote === 'string' ? imported.remote : null,
+    branch: typeof imported?.branch === 'string' ? imported.branch : null,
+    projectID: project?.id || session.project_id || null,
     project: project?.name || baseName(imported?.directory || session.directory),
     title: imported?.sourceTitle || session.title || '(untitled)',
     parentID: session.parent_id || null,
@@ -287,7 +293,7 @@ export function readOpencodeDb(dbPath, device) {
     return out.trim() ? JSON.parse(out) : [];
   };
   const sessions = query('SELECT id, project_id, parent_id, directory, title, metadata, model, time_updated FROM session');
-  const projects = new Map(query('SELECT id, name FROM project').map((p) => [p.id, p]));
+  const projects = new Map(query('SELECT id, name, worktree FROM project').map((p) => [p.id, p]));
   const group = (rows) => {
     const map = new Map();
     for (const row of rows) {

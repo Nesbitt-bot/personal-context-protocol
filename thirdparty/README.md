@@ -11,7 +11,9 @@ from the Docker image (`.dockerignore`).
   HTTP-run tool backstop, and claim links. See `openclaw-pcp/README.md`.
 - `pcp-session-import/`: rerunnable, idempotent upload of the coding sessions
   collected by the OpenCode `session-manager` plugin (Claude Code, Codex, dsh,
-  OpenCode; all devices). See `pcp-session-import/README.md`.
+  OpenCode; all devices), and `organize-projects.mjs`, which groups those
+  sessions into PCP projects with their workspaces per machine (PCP >= 0.2.2).
+  See `pcp-session-import/README.md` and `docs/projects.md`.
 
 Planned:
 

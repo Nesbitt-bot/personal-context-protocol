@@ -54,4 +54,25 @@ node import-sessions.mjs ... --base-url http://127.0.0.1:3000 --token-file ~/.co
 node import-sessions.mjs ... --base-url http://127.0.0.1:3000 --token-file ... --upload
 ```
 
+## Organize into projects (PCP >= 0.2.2)
+
+`organize-projects.mjs` reads the same sources and groups the sessions into PCP
+projects that map one-to-one to the session-manager's canonical project
+(git remote, else directory name; explicit aliases via `--aliases FILE`, a JSON
+object `{ "name:<folder>": "git:<host/owner/repo>" }`). It finds a workspace per
+machine from each session's real directory (Windows paths normalized,
+placeholder and Codex throwaway worktrees skipped) and, with `--openclaw-git
+DIR`, the OpenClaw container checkouts (`/home/node/.openclaw/workspace/git/<repo>`).
+
+- Dry run (default) writes nothing. PCP's sessions come from a read-only
+  export (`pcp-operator.js sessions export`, `--pcp-sessions FILE`) or from
+  read-only by-key lookups (`--base-url`, `--token-file`). `--plan-out FILE`
+  writes the full proposal (mode 600).
+- `--apply` (with a global scoped token that has `manage_projects`) only adds
+  projects, aliases, workspaces and session `project_id` / task title links
+  through the manager API. No deletes, no message changes; a rerun reports 0
+  changes. `--all-projects` also creates projects without PCP sessions.
+
+Full runbook: `docs/projects.md`.
+
 Tests: `node --test` in this directory.
