@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, integer, jsonb, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { APP_VERSION } from './version';
 
@@ -238,3 +238,44 @@ export const schemaMigrations = pgTable('schema_migrations', {
   appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
   checksum: text('checksum'),
 });
+
+// Service credentials for channel plugins (migration 012). Hashed like the
+// other tokens; `principalPrefixesJson` lists the principal prefixes (e.g.
+// "telegram:") this credential may assert. Never admin, never a UI login.
+export const serviceCredentials = pgTable('service_credentials', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  salt: text('salt').notNull(),
+  tokenPrefix: text('token_prefix').notNull(),
+  principalPrefixesJson: jsonb('principal_prefixes_json').notNull().default([]),
+  revoked: boolean('revoked').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+});
+
+// Server-side turn grants: what one conversation turn may read and write,
+// looked up by (credential, OpenClaw session key). Never sent to a model.
+export const turnGrants = pgTable('turn_grants', {
+  id: text('id').primaryKey(),
+  credentialId: text('credential_id').notNull().references(() => serviceCredentials.id, { onDelete: 'cascade' }),
+  sessionKey: text('session_key').notNull(),
+  principal: text('principal').notNull(),
+  homeSessionId: text('home_session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  readableSessionIdsJson: jsonb('readable_session_ids_json').notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+});
+
+// Idempotency ledger for synced turns: one row per (session, external key).
+export const syncedTurns = pgTable('synced_turns', {
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  externalKey: text('external_key').notNull(),
+  firstOrdinal: integer('first_ordinal').notNull(),
+  messageCount: integer('message_count').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.sessionId, table.externalKey] }),
+}));
