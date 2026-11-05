@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { db } from '@/lib/db';
 import { messages, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
@@ -20,10 +20,12 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to delete messages');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json().catch(() => ({}));
     const validation = deleteMessagesSchema.safeParse(body);

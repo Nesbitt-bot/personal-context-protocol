@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { db } from '@/lib/db';
 import { topics, events } from '@/lib/schema';
 import { renameTopicSchema } from '@/lib/validations';
@@ -17,10 +17,12 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to rename topic');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json();
     const validation = renameTopicSchema.safeParse(body);

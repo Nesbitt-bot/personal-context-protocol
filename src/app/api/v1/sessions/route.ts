@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi } from '@/lib/ui-auth';
+import { visibleSessionsFilter } from '@/lib/session-access';
 import { db } from '@/lib/db';
 import { topics, sessions, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
@@ -10,10 +11,13 @@ import { desc, eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
-/** List every session (admin), including uncategorized ones (topic_id null). */
+/**
+ * List sessions visible to the caller: every session for admins (including
+ * uncategorized ones), otherwise only owned or principal-linked sessions.
+ */
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
@@ -29,8 +33,12 @@ export async function GET(request: NextRequest) {
         created_at: sessions.createdAt,
         updated_at: sessions.updatedAt,
         last_message_at: sessions.lastMessageAt,
+        owner_user_id: sessions.ownerUserId,
+        principal: sessions.principal,
+        class: sessions.sessionClass,
       })
       .from(sessions)
+      .where(visibleSessionsFilter(authResult.actor))
       .orderBy(desc(sessions.lastMessageAt), desc(sessions.createdAt));
 
     return NextResponse.json({ sessions: allSessions });
@@ -51,7 +59,7 @@ export async function GET(request: NextRequest) {
 /** Create a session, optionally under a topic. Omit topic_id for uncategorized. */
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
@@ -70,6 +78,16 @@ export async function POST(request: NextRequest) {
     }
 
     const topicId = validation.data.topic_id ?? null;
+    const actor = authResult.actor;
+    // Topics are admin-managed folders; other users create uncategorized
+    // sessions that they own.
+    if (topicId && !actor.isAdmin) {
+      return NextResponse.json(
+        { error: 'Unable to create session: web UI authorization / topic check - only admins can file sessions under a topic; omit topic_id', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+    const ownerUserId = actor.kind === 'user' ? actor.userId : null;
 
     if (topicId) {
       const [topic] = await db.select({ id: topics.id, archived: topics.archived }).from(topics).where(eq(topics.id, topicId));
@@ -89,6 +107,8 @@ export async function POST(request: NextRequest) {
       topicId,
       title,
       mode: validation.data.mode ?? 'wild',
+      ownerUserId,
+      sessionClass: ownerUserId ? 'trusted' : 'unattributed',
       archived: false,
       createdAt: new Date(),
       updatedAt: new Date(),

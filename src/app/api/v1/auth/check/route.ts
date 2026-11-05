@@ -3,10 +3,25 @@ import { verifyUiToken } from '@/lib/middleware';
 import { ensureDatabaseSchema } from '@/lib/setup-schema';
 import { AdminTokenConfigurationError, adminTokenSource, reconcileConfiguredAdminToken } from '@/lib/admin-token';
 import { logError } from '@/lib/logging';
+import { breakGlassEnabled, BREAK_GLASS_ENV } from '@/lib/oidc-config';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Break-glass admin-token check used by the login page. Disabled (401) unless
+ * PCP_BREAK_GLASS_ADMIN_LOGIN=1; normal sign-in goes through Casdoor.
+ */
 export async function GET(request: NextRequest) {
+  if (!breakGlassEnabled()) {
+    return NextResponse.json(
+      {
+        error: `Unable to log in: break-glass admin login / feature flag - admin-token login is disabled on this deployment; sign in with Casdoor instead (an operator can enable it with ${BREAK_GLASS_ENV}=1)`,
+        code: 'BREAK_GLASS_DISABLED',
+      },
+      { status: 401 },
+    );
+  }
+
   try {
     await ensureDatabaseSchema();
     const tokenState = await reconcileConfiguredAdminToken();

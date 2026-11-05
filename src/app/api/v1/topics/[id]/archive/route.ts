@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { db } from '@/lib/db';
 import { events, messages, sessions, topics } from '@/lib/schema';
 import { createId } from '@/lib/auth';
@@ -14,10 +14,12 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to archive topic');
+    if (denied) return authErrorResponse(denied);
 
     const [existing] = await db.select().from(topics).where(eq(topics.id, params.id));
     if (!existing) {
@@ -49,10 +51,12 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to delete topic');
+    if (denied) return authErrorResponse(denied);
 
     const [existing] = await db.select().from(topics).where(eq(topics.id, params.id));
     if (!existing) {

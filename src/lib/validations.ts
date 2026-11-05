@@ -59,12 +59,17 @@ export const updateSessionSchema = z.object({
   archived: z.boolean().optional(),
   public: z.boolean().optional(),
   mode: z.enum(['wild', 'exact']).optional(),
+  // Admin only: platform principal (null clears) and attribution class.
+  principal: z.string().min(1).max(300).nullable().optional(),
+  class: z.enum(['trusted', 'unattributed', 'group']).optional(),
 }).refine((value) => (
   value.title !== undefined
   || value.topic_id !== undefined
   || value.archived !== undefined
   || value.public !== undefined
   || value.mode !== undefined
+  || value.principal !== undefined
+  || value.class !== undefined
 ), 'At least one session field is required');
 
 // Admin message correction (human only — AI tokens remain append-only).

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { configuredAdminToken, storeAdminToken, validateAdminToken } from '@/lib/admin-token';
 import { ensureDatabaseSchema } from '@/lib/setup-schema';
 import { logError } from '@/lib/logging';
@@ -20,13 +20,15 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json(
         { error: authResult.error, code: authResult.code },
         { status: authResult.status },
       );
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to update admin token');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json().catch(() => ({}));
     const newToken = typeof body.new_token === 'string' ? body.new_token.trim() : '';

@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, authErrorResponse } from '@/lib/ui-auth';
+import { authorizeSession } from '@/lib/session-access';
 import { db } from '@/lib/db';
 import { compactions } from '@/lib/schema';
 import { logError } from '@/lib/logging';
@@ -17,10 +18,12 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = await authorizeSession(authResult.actor, params.id, 'Unable to list compactions');
+    if (denied) return authErrorResponse(denied);
 
     const rows = await db
       .select({

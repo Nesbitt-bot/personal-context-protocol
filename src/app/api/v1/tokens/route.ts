@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { db } from '@/lib/db';
 import { scopedTokens, topics, sessions, events } from '@/lib/schema';
 import { createId, generateToken, generateSalt, hashToken } from '@/lib/auth';
@@ -15,10 +15,12 @@ export const dynamic = 'force-dynamic';
 /** List scoped-token metadata (never the secret) for the global token manager. */
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to manage scoped tokens');
+    if (denied) return authErrorResponse(denied);
 
     const rows = await db.select().from(scopedTokens).orderBy(scopedTokens.createdAt);
     const now = new Date();
@@ -53,10 +55,12 @@ export async function GET(request: NextRequest) {
 /** Create a scoped token and return it once. */
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to manage scoped tokens');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json().catch(() => ({}));
     const validation = createScopedTokenSchema.safeParse(body);
@@ -148,10 +152,12 @@ export async function POST(request: NextRequest) {
 /** Rename and/or revoke a scoped token. */
 export async function PATCH(request: NextRequest) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to manage scoped tokens');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json().catch(() => ({}));
     const validation = manageScopedTokenSchema.safeParse(body);
@@ -202,10 +208,12 @@ export async function PATCH(request: NextRequest) {
 /** Permanently delete a scoped token. */
 export async function DELETE(request: NextRequest) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to manage scoped tokens');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json().catch(() => ({}));
     const tokenId = typeof body.token_id === 'string' ? body.token_id.trim() : '';
