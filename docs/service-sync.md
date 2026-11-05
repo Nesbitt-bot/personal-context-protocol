@@ -70,7 +70,34 @@ return `403 GRANT_REQUIRED` (expired, ended, replaced, or another credential's).
 Grant creation, recall and search are audited in `events`
 (`grant.created`, `grant.recall`, `grant.search`, `turn.synced`).
 
+## Operator CLI (no browser)
+
+`scripts/pcp-operator.js` mints, lists and revokes service credentials and
+scoped tokens directly in the database, for the host operator when no admin
+can sign in through Casdoor. It uses the same token format and salted scrypt
+hash as the admin routes (checked by `tests/operator-cli.test.ts`) and writes
+an `events` row with actor `operator` for every create and revoke. It never
+prints a token to a terminal: `--token-out FILE` creates a new mode-600 file,
+and `--token-out -` writes only the token to a pipe. Scoped tokens get exactly
+the `--permission` flags named (there is no full-permission default; expiry
+defaults to 30 days). The production image does not contain `scripts/`, so
+feed the script on stdin:
+
+```sh
+umask 077
+docker exec -i -w /app <app-container> node - service-credential create \
+  --name openclaw-pcp --prefix telegram: --prefix openclaw-weixin: --token-out - \
+  < scripts/pcp-operator.js > /private/path/pcp-service.token
+docker exec -i -w /app <app-container> node - scoped-token create --name session-import \
+  --permission read_all --permission create_sessions --permission mint_tokens --token-out - \
+  < scripts/pcp-operator.js > /private/path/session-import.token
+docker exec -i -w /app <app-container> node - service-credential list < scripts/pcp-operator.js
+docker exec -i -w /app <app-container> node - service-credential revoke --id svc_... < scripts/pcp-operator.js
+docker exec -i -w /app <app-container> node - scoped-token revoke --id stk_... < scripts/pcp-operator.js
+```
+
 ## Not in this phase
 
-No broker process, no AstrBot HMAC/replay checks, no OpenClaw/AstrBot plugins
-and no broker-to-OpenClaw call yet. Those are phases 2b–4 of the design.
+No broker process, no AstrBot HMAC/replay checks, no AstrBot plugin and no
+broker-to-OpenClaw call yet; those are phases 2b–4 of the design. The OpenClaw
+plugin (Phase 3) is `thirdparty/openclaw-pcp`.
