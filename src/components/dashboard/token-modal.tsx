@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { KeyRound, Loader2, Pencil, Trash2, Undo2, X } from 'lucide-react';
+import { KeyRound, Loader2, Pencil, Trash2, Undo2 } from 'lucide-react';
+import { Modal } from '@/components/modal';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { uiAuthHeaders } from '@/lib/client-auth';
 
@@ -43,10 +44,7 @@ export function TokenModal({ sessionId, sessionTitle, onClose }: TokenModalProps
 
   useEffect(() => {
     load();
-    function onKey(event: KeyboardEvent) { if (event.key === 'Escape') onClose(); }
-    document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('keydown', onKey);
       // Clear all undo timers on unmount
       Object.values(undoRef.current).forEach(clearInterval);
     };
@@ -129,14 +127,8 @@ export function TokenModal({ sessionId, sessionTitle, onClose }: TokenModalProps
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" onClick={onClose}>
-      <div className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-          <div className="flex items-center gap-2"><KeyRound size={18} className="text-sky-600 dark:text-sky-300" /><h2 className="truncate text-sm font-semibold text-slate-950 dark:text-white">Tokens — {sessionTitle}</h2></div>
-          <button className="rounded-md p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={onClose} type="button" aria-label="Close"><X size={18} /></button>
-        </div>
-
-        <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
+    <Modal title={`Tokens — ${sessionTitle}`} onClose={onClose} icon={<KeyRound size={18} className="text-sky-600 dark:text-sky-300" />}>
+        <div className="px-5 py-4">
           {error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">{error}</div>}
           {loading ? <div className="flex items-center gap-2 py-6 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Loading tokens...</div>
             : tokens.length === 0 ? <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">No tokens issued for this session yet.</p>
@@ -164,7 +156,7 @@ export function TokenModal({ sessionId, sessionTitle, onClose }: TokenModalProps
                     ) : (
                       <div className="flex shrink-0 items-center gap-2">
                         <button className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" onClick={() => rename(token.id, token.name)} disabled={busyId === token.id} type="button" title="Rename token" aria-label="Rename token"><Pencil size={14} /></button>
-                        <button className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/40" onClick={() => startDelete(token.id)} disabled={busyId === token.id} type="button" title="Delete token permanently"><Trash2 size={14} /></button>
+                        <button className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/40" onClick={() => startDelete(token.id)} disabled={busyId === token.id} type="button" title="Delete token permanently" aria-label="Delete token permanently"><Trash2 size={14} /></button>
                       </div>
                     )}
                   </div>
@@ -173,7 +165,6 @@ export function TokenModal({ sessionId, sessionTitle, onClose }: TokenModalProps
             </div>
           }
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

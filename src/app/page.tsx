@@ -7,6 +7,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { fetchSignedInUser, SignedInUser } from '@/lib/client-auth';
 
 const features = [
   { icon: MessageSquare, title: 'Record scoped sessions', text: 'Create topics and sessions, then let an AI append messages to one session at a time.' },
@@ -27,9 +28,15 @@ export default function HomePage() {
   const [errorDocsUrl, setErrorDocsUrl] = useState('');
   const [setupMessage, setSetupMessage] = useState('');
   const [configIssues, setConfigIssues] = useState<Array<{ key: string; severity: string; problem: string }>>([]);
+  // A signed-in visitor is offered their sessions instead of the login portal.
+  const [user, setUser] = useState<SignedInUser | null>(null);
+  const entry = user
+    ? { href: '/dashboard', label: 'Open sessions' }
+    : { href: '/login', label: 'Open login portal' };
 
   useEffect(() => {
     checkStatus();
+    fetchSignedInUser().then(setUser);
   }, []);
 
   async function checkStatus() {
@@ -126,9 +133,9 @@ export default function HomePage() {
           <div className="mt-7 flex animate-fade-in-up flex-wrap gap-3" style={{ animationDelay: '260ms' }}>
             <Link
               className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
-              href="/login"
+              href={entry.href}
             >
-              Open login portal <ArrowRight size={16} />
+              {entry.label} <ArrowRight size={16} />
             </Link>
             <a
               className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -188,13 +195,13 @@ export default function HomePage() {
                   <Check size={18} />
                   App initialized
                 </div>
-                <p className="mt-2 text-sm">{setupMessage || 'Open the dashboard. If the UI token is not saved in this browser, paste it there.'}</p>
+                <p className="mt-2 text-sm">{setupMessage || (user ? `Signed in as ${user.display_name}.` : 'Sign in with Casdoor to open your sessions.')}</p>
               </div>
               <Link
-                href="/login"
+                href={entry.href}
                 className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
               >
-                Open login portal <ArrowRight size={16} />
+                {entry.label} <ArrowRight size={16} />
               </Link>
             </div>
           ) : initialized ? (

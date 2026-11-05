@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Folder, MessageSquare, X } from 'lucide-react';
+import { useState } from 'react';
+import { Folder, MessageSquare } from 'lucide-react';
+import { Modal } from '@/components/modal';
 import { Topic } from './types';
 
 export interface TopicCreateValues {
@@ -39,14 +40,6 @@ export function CreateModal({ kind, defaultTitle, topics = [], defaultTopicId = 
   const [topicId, setTopicId] = useState<string>(defaultTopicId ?? '');
   const [mode, setMode] = useState<'wild' | 'exact'>('wild');
 
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onCancel();
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel]);
-
   function submit() {
     const trimmed = title.trim() || defaultTitle;
     if (kind === 'topic') {
@@ -57,26 +50,18 @@ export function CreateModal({ kind, defaultTitle, topics = [], defaultTopicId = 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" onClick={onCancel}>
-      <div
-        className="w-full max-w-md overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            {kind === 'topic' ? <Folder size={18} className="text-sky-600 dark:text-sky-300" /> : <MessageSquare size={18} className="text-sky-600 dark:text-sky-300" />}
-            <h2 className="text-sm font-semibold text-slate-950 dark:text-white">{kind === 'topic' ? 'New topic' : 'New session'}</h2>
-          </div>
-          <button className="rounded-md p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={onCancel} type="button" aria-label="Close">
-            <X size={18} />
-          </button>
-        </div>
+    <Modal
+      title={kind === 'topic' ? 'New topic' : 'New session'}
+      onClose={onCancel}
+      widthClass="max-w-md"
+      icon={kind === 'topic' ? <Folder size={18} className="text-sky-600 dark:text-sky-300" /> : <MessageSquare size={18} className="text-sky-600 dark:text-sky-300" />}
+    >
 
         <div className="space-y-4 px-5 py-4">
           <label className="block">
             <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Title</span>
             <input
-              autoFocus
+              data-autofocus
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-sky-950"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
@@ -126,7 +111,6 @@ export function CreateModal({ kind, defaultTitle, topics = [], defaultTopicId = 
           <button className="rounded-md border border-slate-200 px-4 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" onClick={onCancel} type="button">Cancel</button>
           <button className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300" onClick={submit} type="button">Create</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
