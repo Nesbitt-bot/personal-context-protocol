@@ -25,3 +25,6 @@ reports/
 
 # Channel plugins (OpenClaw, AstrBot) are deployed separately, never in the image
 thirdparty/
+
+# Storage guard integration test scratch
+.tmp-storage-test/

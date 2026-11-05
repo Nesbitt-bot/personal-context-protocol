@@ -151,4 +151,5 @@ the messages for this fallback path.
 The full stack can run locally with code pulled from GitHub main on push
 webhooks. [Jenkins runbook](deployment-jenkins.md) covers private env setup, versioned
 images, backups, tests, and the verified Neon-to-local import. The Neon
-source is retained; the local runtime uses its own PostgreSQL volume.
+source is retained; the local runtime keeps its PostgreSQL data in a host
+bind mount (`PCP_POSTGRES_DATA_DIR`).

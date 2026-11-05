@@ -34,6 +34,12 @@ pipeline {
     stage('Build, typecheck and test') {
       steps { sh 'bash deploy/jenkins/build_test.sh "$WORKSPACE/$DEPLOY_ENV"' }
     }
+    stage('Plugin tests') {
+      steps { sh 'timeout 10m bash deploy/jenkins/thirdparty_test.sh' }
+    }
+    stage('Deploy guard tests') {
+      steps { sh 'timeout 5m bash deploy/jenkins/test_check_storage.sh' }
+    }
     stage('Database backup') {
       steps { sh 'timeout 5m bash deploy/jenkins/backup_database.sh "$BACKUP_DIR"' }
     }

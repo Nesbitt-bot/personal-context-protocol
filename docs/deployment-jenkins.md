@@ -51,16 +51,54 @@ metadata. Jenkins deletes the workspace env in final cleanup.
 4. Dump the existing local database and validate its archive before any
    container recreation. Backups remain under
    `/var/lib/jenkins/backups/personal-context-protocol/` inside the agent.
-5. Deploy PostgreSQL, then the app, using the existing Compose project and
-   named volume. Require health and database checks before success.
+5. Check storage (`deploy/jenkins/check_storage.sh`), then deploy PostgreSQL
+   and the app with the existing Compose project and the bind-mounted data
+   directory. Require health and database checks before success.
 
 Images are tagged `personal-context-protocol:v0.1.25-jenkins.<BUILD_NUMBER>`;
 software version is read from VERSION. Containers include that version, such
 as `personal-context-protocol-app-v0.1.25`. PostgreSQL keeps its upstream
-`16-alpine` image. The stable project remains `personal-context-protocol`, and
-its existing volume remains
-`personal-context-protocol_pcp-postgres-0-1-0`. Version changes never create a
-new data volume. OCI labels and `/api/v1/health` expose build identity.
+`16-alpine` image. The stable project remains `personal-context-protocol`. Version changes never
+create a new data directory. OCI labels and `/api/v1/health` expose build
+identity.
+
+## PostgreSQL storage
+
+The cluster lives in the host directory `PCP_POSTGRES_DATA_DIR` (default
+`/home/motuariki/Documents/DockerVolumes/pcp/postgres`, owner 70:70, mode
+700), bind-mounted at `/var/lib/postgresql/data`. Containers can be
+recreated or removed freely; the data stays on the host. Compose never creates
+the directory.
+
+`deploy/jenkins/check_storage.sh` runs before `compose up db` and refuses to
+deploy when:
+
+- the directory is missing or not an absolute path;
+- the directory is empty while the legacy named volume
+  (`PCP_LEGACY_POSTGRES_VOLUME`, default
+  `personal-context-protocol_pcp-postgres-0-1-0`) still holds a cluster;
+- the directory is empty and `PCP_POSTGRES_ALLOW_EMPTY_INIT=1` is not set
+  (only for a brand-new install);
+- the project's running database uses a different mount (copying while it
+  runs would produce a stale copy).
+
+`deploy/jenkins/test_check_storage.sh` exercises every case against real
+Docker with throwaway volumes and directories; Jenkins runs it before deploy.
+
+### Migrating from the named volume (done 2026-11-05)
+
+1. `bash deploy/jenkins/backup_database.sh ~/.local/state/pcp-backups/<ts>`
+   (logical dump) and record row counts.
+2. Announce, then stop the app and the database (`docker stop`).
+3. Tar the volume, then copy it preserving ownership:
+   `docker run --rm -v <legacy>:/from:ro -v <dir>:/to postgres:16-alpine sh -c 'cp -a /from/. /to/ && chown 70:70 /to && chmod 700 /to'`.
+4. Redeploy the same image with this repository's `deploy.sh` (the guard now
+   passes) and compare row counts.
+
+The legacy volume is kept untouched for rollback. To roll back: stop the
+stack, check out the previous `docker-compose.yml` (named volume), and run
+`deploy.sh` from that commit; or restore the logical dump into the bind
+directory's cluster with `pg_restore`.
 
 The dedicated Buildx worker is capped at 8 GiB/four CPUs with one parallel
 build step. Type checks use 1 GiB/two CPUs; tests use 2 GiB/two CPUs with at

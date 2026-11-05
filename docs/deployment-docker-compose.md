@@ -27,9 +27,20 @@ The default Compose image is `personal-context-protocol:0.2.2`. When `VERSION` c
 
 ## Start Locally
 
+PostgreSQL data lives in a host directory (bind mount), not in a Docker named
+volume, so recreating or removing containers never loses it. Create the
+directory once, owned by the image's `postgres` user (uid 70), and point
+`PCP_POSTGRES_DATA_DIR` at it if you do not use the default path:
+
 ```bash
+export PCP_POSTGRES_DATA_DIR="$HOME/pcp-data/postgres"
+mkdir -p "$PCP_POSTGRES_DATA_DIR"
+docker run --rm -v "$PCP_POSTGRES_DATA_DIR:/d" --entrypoint sh postgres:16-alpine -c 'chown 70:70 /d && chmod 700 /d'
 npm run docker:up
 ```
+
+Compose never creates the directory (`create_host_path: false`); a missing
+directory fails the start instead of silently creating an empty database.
 
 `npm run docker:up` creates or repairs `.env` with random local credentials, builds the app, starts Postgres, initializes the database after Postgres is healthy, and prints the generated first-login token once in app container logs when `PCP_ADMIN_TOKEN` is empty. Log in with that token, then change it immediately in **Settings**.
 
@@ -40,6 +51,7 @@ Compose provides local defaults for development. Override them when needed:
 | Name | Default | Purpose |
 |---|---|---|
 | `PCP_VERSION` | `0.2.2` | App image tag and Docker build version |
+| `PCP_POSTGRES_DATA_DIR` | `/home/motuariki/Documents/DockerVolumes/pcp/postgres` | Host directory bind-mounted as the PostgreSQL data directory (must exist, owner 70:70) |
 | `PCP_PORT` | `127.0.0.1:3000` | Host address:port mapped to the app container (loopback by default; publish through a TLS reverse proxy) |
 | `PCP_APP_URL` | `http://localhost:3000` | Public app URL used by clients |
 | `PCP_INSTANCE_SECRET` | Local placeholder | 32+ character instance secret |
@@ -87,12 +99,10 @@ Expected response:
 docker compose down
 ```
 
-To remove the local Postgres volume created for this version:
-
-```bash
-docker compose down -v
-```
+`docker compose down` (with or without `-v`) leaves the data directory in
+place. Delete `PCP_POSTGRES_DATA_DIR` yourself only if you really want to
+discard the database.
 
 For remote-SCM builds and automatic local deployments, use the
-[Jenkins target](deployment-jenkins.md). Its stable named volume preserves
-data while image tags include both software version and Jenkins build.
+[Jenkins target](deployment-jenkins.md). Its stable bind-mounted data directory
+preserves data while image tags include both software version and Jenkins build.

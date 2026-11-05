@@ -48,7 +48,16 @@ services:
       POSTGRES_USER: pcp
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pcp_local_password}
     volumes:
-      - pcp-postgres-0-1-0:/var/lib/postgresql/data
+      # Persistent data lives in a host bind mount, never in a named volume or
+      # the container layer. Override with PCP_POSTGRES_DATA_DIR. The directory
+      # must already exist (owner 70:70, the image's postgres user, mode 700);
+      # Compose never creates it, and deploy/jenkins/check_storage.sh refuses to
+      # start an empty one while the legacy named volume still holds data.
+      - type: bind
+        source: ${PCP_POSTGRES_DATA_DIR:-/home/motuariki/Documents/DockerVolumes/pcp/postgres}
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pcp -d pcp"]
       interval: 10s
@@ -58,6 +67,3 @@ services:
     labels:
       org.opencontainers.image.version: ${PCP_VERSION:-0.2.2}
     restart: unless-stopped
-
-volumes:
-  pcp-postgres-0-1-0:

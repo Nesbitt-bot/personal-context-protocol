@@ -65,3 +65,6 @@ docs/_build/
 .env.*
 !.env.example
 reports/
+
+# Storage guard integration test scratch
+.tmp-storage-test/
