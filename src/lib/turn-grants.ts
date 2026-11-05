@@ -1,9 +1,10 @@
+import crypto from 'crypto';
 import { and, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { db } from './db';
 import { events, identities, sessions, turnGrants } from './schema';
 import { createId } from './auth';
 import { createClaim, ownerForPrincipal } from './claims';
-import { credentialAllowsPrincipal, ResolvedServiceCredential } from './service-auth';
+import { credentialAllowsPrincipal, INGRESS_PREFIX, ResolvedServiceCredential } from './service-auth';
 import { isValidPrincipal } from './session-access';
 
 /**
@@ -19,6 +20,13 @@ import { isValidPrincipal } from './session-access';
  * - Direct chat, unlinked principal: only that principal's own DM session.
  * - Group chat: only the group's own session.
  * Writes always go to the grant's home session only.
+ *
+ * Broker grants (origin `broker`, design Phase 4) are created by the PCP
+ * broker for one AstrBot turn. Their session key is `pcp:<grant id>`, which
+ * the broker sends to OpenClaw as `x-openclaw-session-key`; the openclaw-pcp
+ * plugin's tools then present their own (delegate) credential plus that key.
+ * Delegates may read, never write. `astrbot:` principals exist only in broker
+ * grants, i.e. only behind a verified, signed AstrBot stamp.
  */
 
 export const DEFAULT_GRANT_TTL_SECONDS = 600;
@@ -40,6 +48,24 @@ export function groupPrincipalFor(senderPrincipal: string, groupId: string): str
   return `${platform}:group:${groupId}`;
 }
 
+/** `pcp:<grant id>` (optionally as OpenClaw stores it, `agent:<id>:pcp:<grant id>`). */
+export const BROKER_SESSION_KEY_PATTERN = /^(?:agent:[a-z0-9][a-z0-9_-]{0,63}:)?pcp:(grt_[0-9a-f]{48})$/i;
+
+/** A fresh, unguessable broker grant id (`grt_` + 48 hex). */
+export function newBrokerGrantId(): string {
+  return `grt_${crypto.randomBytes(24).toString('hex')}`;
+}
+
+export function brokerSessionKey(grantId: string): string {
+  return `pcp:${grantId}`;
+}
+
+/** The broker grant id in a session key, or null for ordinary keys. */
+export function brokerGrantIdFromSessionKey(sessionKey: string): string | null {
+  const match = typeof sessionKey === 'string' ? BROKER_SESSION_KEY_PATTERN.exec(sessionKey) : null;
+  return match ? match[1].toLowerCase() : null;
+}
+
 export interface GrantRequest {
   sessionKey: string;
   principal: string;
@@ -47,6 +73,8 @@ export interface GrantRequest {
   groupId?: string;
   ttlSeconds?: number;
   issueClaim?: boolean;
+  /** Broker grants only. */
+  broker?: { grantId: string; agent: string; brokerCredentialId: string; delegateCredentialId: string | null; externalKey: string };
 }
 
 export type GrantResult =
@@ -85,6 +113,15 @@ export async function createTurnGrant(credential: ResolvedServiceCredential, inp
   if (input.principal.includes(':group:')) return fail(400, 'INVALID_PRINCIPAL', 'a sender principal cannot contain ":group:"');
   if (!credentialAllowsPrincipal(credential.principalPrefixes, input.principal)) {
     return fail(403, 'PRINCIPAL_NOT_ALLOWED', 'this service credential may not assert principals of that platform');
+  }
+  if (input.principal.startsWith(INGRESS_PREFIX) && !input.broker) {
+    return fail(403, 'PRINCIPAL_NOT_ALLOWED', `${INGRESS_PREFIX} principals are only accepted from a signed AstrBot stamp through the broker`);
+  }
+  if (input.broker && input.sessionKey !== brokerSessionKey(input.broker.grantId)) {
+    return fail(400, 'VALIDATION_ERROR', 'a broker grant uses the session key pcp:<grant id>');
+  }
+  if (!input.broker && brokerGrantIdFromSessionKey(input.sessionKey)) {
+    return fail(400, 'VALIDATION_ERROR', 'pcp:<grant id> session keys are reserved for broker grants');
   }
 
   let homePrincipal = input.principal;
@@ -135,7 +172,7 @@ export async function createTurnGrant(credential: ResolvedServiceCredential, inp
 
   const ttl = clampGrantTtl(input.ttlSeconds);
   const expiresAt = new Date(now.getTime() + ttl * 1000);
-  const grantId = createId('grt');
+  const grantId = input.broker ? input.broker.grantId : createId('grt');
 
   // One live grant per (credential, session key): a new turn replaces the last.
   await db.update(turnGrants).set({ revokedAt: now }).where(and(
@@ -152,6 +189,11 @@ export async function createTurnGrant(credential: ResolvedServiceCredential, inp
     readableSessionIdsJson: readable,
     createdAt: now,
     expiresAt,
+    origin: input.broker ? 'broker' : 'service',
+    agent: input.broker?.agent ?? null,
+    delegateCredentialId: input.broker?.delegateCredentialId ?? null,
+    externalKey: input.broker?.externalKey ?? null,
+    brokerCredentialId: input.broker?.brokerCredentialId ?? null,
   });
 
   let claim: { code: string; expiresAt: Date } | null = null;
@@ -165,7 +207,7 @@ export async function createTurnGrant(credential: ResolvedServiceCredential, inp
     sessionId: home.id,
     action: 'grant.created',
     actor: `service:${credential.id}`,
-    detailsJson: { grant_id: grantId, principal: input.principal, chat: input.chat, readable_count: readable.length, ttl_seconds: ttl, claim_issued: Boolean(claim) },
+    detailsJson: { grant_id: grantId, principal: input.principal, chat: input.chat, readable_count: readable.length, ttl_seconds: ttl, claim_issued: Boolean(claim), ...(input.broker ? { origin: 'broker', agent: input.broker.agent } : {}) },
     createdAt: now,
   });
 
@@ -178,26 +220,70 @@ export interface ActiveGrant {
   homeSessionId: string;
   readableSessionIds: string[];
   expiresAt: Date;
+  origin: 'service' | 'broker';
+  agent: string | null;
+  externalKey: string | null;
+  /** True when a delegate (not the grant's own credential) is reading it. */
+  delegated: boolean;
 }
 
-/** The live grant for this credential and session key, or null. */
+function toActiveGrant(grant: typeof turnGrants.$inferSelect, credentialId: string): ActiveGrant {
+  const readable = Array.isArray(grant.readableSessionIdsJson)
+    ? (grant.readableSessionIdsJson as unknown[]).filter((id): id is string => typeof id === 'string')
+    : [];
+  return {
+    id: grant.id,
+    principal: grant.principal,
+    homeSessionId: grant.homeSessionId,
+    readableSessionIds: readable,
+    expiresAt: grant.expiresAt,
+    origin: grant.origin === 'broker' ? 'broker' : 'service',
+    agent: grant.agent ?? null,
+    externalKey: grant.externalKey ?? null,
+    delegated: grant.credentialId !== credentialId,
+  };
+}
+
+/**
+ * The live grant for this credential and session key, or null. A broker key
+ * (`pcp:<grant id>`) resolves to that broker grant for its own credential or
+ * its delegate only.
+ */
 export async function findActiveGrant(credentialId: string, sessionKey: string, now = new Date()): Promise<ActiveGrant | null> {
+  const brokerGrantId = brokerGrantIdFromSessionKey(sessionKey);
+  if (brokerGrantId) {
+    const [grant] = await db
+      .select()
+      .from(turnGrants)
+      .where(and(
+        eq(turnGrants.id, brokerGrantId),
+        eq(turnGrants.origin, 'broker'),
+        or(eq(turnGrants.credentialId, credentialId), eq(turnGrants.delegateCredentialId, credentialId)),
+        isNull(turnGrants.revokedAt),
+        gt(turnGrants.expiresAt, now),
+      ))
+      .limit(1);
+    return grant ? toActiveGrant(grant, credentialId) : null;
+  }
   const [grant] = await db
     .select()
     .from(turnGrants)
     .where(and(
       eq(turnGrants.credentialId, credentialId),
       eq(turnGrants.sessionKey, sessionKey),
+      eq(turnGrants.origin, 'service'),
       isNull(turnGrants.revokedAt),
       gt(turnGrants.expiresAt, now),
     ))
     .orderBy(desc(turnGrants.createdAt))
     .limit(1);
-  if (!grant) return null;
-  const readable = Array.isArray(grant.readableSessionIdsJson)
-    ? (grant.readableSessionIdsJson as unknown[]).filter((id): id is string => typeof id === 'string')
-    : [];
-  return { id: grant.id, principal: grant.principal, homeSessionId: grant.homeSessionId, readableSessionIds: readable, expiresAt: grant.expiresAt };
+  return grant ? toActiveGrant(grant, credentialId) : null;
+}
+
+/** End one grant by id (the broker ends its grant when the turn ends). */
+export async function revokeGrantById(grantId: string, now = new Date()) {
+  const rows = await db.update(turnGrants).set({ revokedAt: now }).where(and(eq(turnGrants.id, grantId), isNull(turnGrants.revokedAt))).returning({ id: turnGrants.id });
+  return rows.length;
 }
 
 /** Explicitly end a grant (e.g. at the end of the turn). */

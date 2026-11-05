@@ -103,7 +103,7 @@ AI recording sessions, optionally within a topic.
 | `updated_at` | TIMESTAMPTZ | Last update time |
 | `last_message_at` | TIMESTAMPTZ | Last message timestamp |
 | `owner_user_id` | TEXT | Owning Casdoor user (`users.id`, nullable, `ON DELETE SET NULL`); NULL = unowned (admin-only) |
-| `principal` | TEXT | Platform identity the session belongs to, e.g. `telegram:8627151333` (nullable) |
+| `principal` | TEXT | Platform identity the session belongs to, e.g. `telegram:100000001` (nullable) |
 | `class` | TEXT | `trusted` \| `unattributed` (default) \| `group` (admin-only, never claimable) |
 | `project_id` | TEXT | Project this session belongs to (`projects.id`, nullable, `ON DELETE SET NULL`) |
 | `context_title` | TEXT | Per-task context title within the project (nullable) |
@@ -194,7 +194,7 @@ Platform principals linked to a user. A principal links to at most one user.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `principal` | TEXT | Primary key, e.g. `telegram:8627151333`, `openclaw-weixin:<id>`, `astrbot:qq:<id>` |
+| `principal` | TEXT | Primary key, e.g. `telegram:100000001`, `openclaw-weixin:<id>`, `astrbot:qq:<id>` |
 | `user_id` | TEXT | `users.id` (`ON DELETE CASCADE`) |
 | `link_method` | TEXT | `claim` or `admin` |
 | `linked_at` | TIMESTAMPTZ | |
@@ -593,6 +593,12 @@ LIMIT 50;
 ### v0.2.1 (service sync)
 
 - `service_credentials`, `turn_grants`, `synced_turns` (migration 012)
+
+### v0.3.0 (broker)
+
+- `service_credentials.kind`, `delegate_credential_id`; `turn_grants.origin`,
+  `agent`, `delegate_credential_id`, `external_key`, `broker_credential_id`;
+  `broker_replay` (migration 014). See [broker.md](broker.md).
 
 ### v0.2.2 (projects)
 

@@ -12,14 +12,14 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 FROM base AS builder
-ARG APP_VERSION=0.2.2
+ARG APP_VERSION=0.3.0
 ENV PCP_VERSION=$APP_VERSION
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
 FROM base AS runner
-ARG APP_VERSION=0.2.2
+ARG APP_VERSION=0.3.0
 ARG GIT_COMMIT=""
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
@@ -37,6 +37,8 @@ COPY scripts/project-version.js scripts/runtime-check.js scripts/deploy-init.js 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY deploy/jenkins/verify_runtime.js ./deploy/jenkins/verify_runtime.js
+# The loopback PCP broker (docker-compose.yml service "broker"), no dependencies.
+COPY broker/server.js ./broker/server.js
 
 EXPOSE 3000
 CMD ["npm", "run", "start"]

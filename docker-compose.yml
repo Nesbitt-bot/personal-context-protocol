@@ -1,13 +1,13 @@
 services:
   app:
-    container_name: personal-context-protocol-app-v${PCP_VERSION:-0.2.2}
+    container_name: personal-context-protocol-app-v${PCP_VERSION:-0.3.0}
     mem_limit: 1g
-    image: personal-context-protocol:${PCP_VERSION:-0.2.2}
+    image: personal-context-protocol:${PCP_VERSION:-0.3.0}
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        APP_VERSION: "${PCP_VERSION:-0.2.2}"
+        APP_VERSION: "${PCP_VERSION:-0.3.0}"
     depends_on:
       db:
         condition: service_healthy
@@ -30,7 +30,7 @@ services:
       # Loopback by default; put a TLS reverse proxy in front for remote use.
       - "${PCP_PORT:-127.0.0.1:3000}:3000"
     labels:
-      org.opencontainers.image.version: ${PCP_VERSION:-0.2.2}
+      org.opencontainers.image.version: ${PCP_VERSION:-0.3.0}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -39,8 +39,48 @@ services:
       retries: 10
       start_period: 30s
 
+  # PCP broker (AstrBot -> PCP -> OpenClaw). Same image, separate process.
+  # Host networking because the OpenClaw gateway listens on host loopback;
+  # the broker itself binds 127.0.0.1 only and refuses anything else. Never
+  # publish it or route it through a tunnel. Started only with the "broker"
+  # profile (deploy.sh enables it when the secrets directory exists).
+  broker:
+    profiles: ["broker"]
+    container_name: personal-context-protocol-broker-v${PCP_VERSION:-0.3.0}
+    image: personal-context-protocol:${PCP_VERSION:-0.3.0}
+    command: ["node", "broker/server.js"]
+    network_mode: host
+    mem_limit: 128m
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      PCP_BROKER_HOST: 127.0.0.1
+      PCP_BROKER_PORT: ${PCP_BROKER_PORT:-3101}
+      # The app's loopback port (PCP_PORT) and the gateway's loopback port.
+      PCP_BROKER_PCP_URL: ${PCP_BROKER_PCP_URL:-http://127.0.0.1:3000}
+      PCP_BROKER_OPENCLAW_URL: ${PCP_BROKER_OPENCLAW_URL:-http://127.0.0.1:18789}
+    volumes:
+      # broker.token (PCP broker credential) and openclaw-gateway.token, mode
+      # 600; never in the repository or the image.
+      - type: bind
+        source: ${PCP_BROKER_SECRETS_DIR:-/home/motuariki/Documents/DockerVolumes/pcp/broker-secrets}
+        target: /run/secrets/pcp-broker
+        read_only: true
+        bind:
+          create_host_path: false
+    labels:
+      org.opencontainers.image.version: ${PCP_VERSION:-0.3.0}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:'+(process.env.PCP_BROKER_PORT||3101)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   db:
-    container_name: personal-context-protocol-db-v${PCP_VERSION:-0.2.2}
+    container_name: personal-context-protocol-db-v${PCP_VERSION:-0.3.0}
     mem_limit: 512m
     image: postgres:16-alpine
     environment:
@@ -65,5 +105,5 @@ services:
       retries: 10
       start_period: 10s
     labels:
-      org.opencontainers.image.version: ${PCP_VERSION:-0.2.2}
+      org.opencontainers.image.version: ${PCP_VERSION:-0.3.0}
     restart: unless-stopped

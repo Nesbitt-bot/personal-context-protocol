@@ -39,7 +39,7 @@ export const users = pgTable('users', {
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
 });
 
-// Platform principals (e.g. `telegram:8627151333`) linked to a user. A
+// Platform principals (e.g. `telegram:100000001`) linked to a user. A
 // principal links to at most one user.
 export const identities = pgTable('identities', {
   principal: text('principal').primaryKey(),
@@ -305,6 +305,12 @@ export const serviceCredentials = pgTable('service_credentials', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  // Migration 014: 'channel' (plugins, /service/*), 'ingress' (AstrBot, broker
+  // routes only, astrbot: principals only), 'broker' (the loopback broker).
+  kind: text('kind', { enum: ['channel', 'ingress', 'broker'] }).notNull().default('channel'),
+  // Broker only: the channel credential (openclaw-pcp) that may read the
+  // broker's turn grants through its tools.
+  delegateCredentialId: text('delegate_credential_id'),
 });
 
 // Server-side turn grants: what one conversation turn may read and write,
@@ -319,7 +325,25 @@ export const turnGrants = pgTable('turn_grants', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  // Migration 014: broker grants (session key `pcp:<grant id>`), the agent the
+  // broker policy picked, the delegate credential that may read it, and the
+  // external key the turn is recorded under.
+  origin: text('origin', { enum: ['service', 'broker'] }).notNull().default('service'),
+  agent: text('agent'),
+  delegateCredentialId: text('delegate_credential_id'),
+  externalKey: text('external_key'),
+  brokerCredentialId: text('broker_credential_id'),
 });
+
+// AstrBot stamp replay ledger (migration 014): one row per (credential, nonce)
+// inside the replay window.
+export const brokerReplay = pgTable('broker_replay', {
+  credentialId: text('credential_id').notNull().references(() => serviceCredentials.id, { onDelete: 'cascade' }),
+  nonce: text('nonce').notNull(),
+  seenAt: timestamp('seen_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.credentialId, table.nonce] }),
+}));
 
 // Idempotency ledger for synced turns: one row per (session, external key).
 export const syncedTurns = pgTable('synced_turns', {

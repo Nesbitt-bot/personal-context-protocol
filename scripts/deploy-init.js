@@ -362,6 +362,21 @@ function schemaStatements(version) {
       completed_at timestamptz
     )`,
     'CREATE INDEX IF NOT EXISTS merge_tasks_status_idx ON merge_tasks(status, created_at)',
+    // Migration 014 (broker). Must match BROKER_SCHEMA_STATEMENTS.
+    "ALTER TABLE service_credentials ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'channel' CHECK (kind IN ('channel', 'ingress', 'broker'))",
+    'ALTER TABLE service_credentials ADD COLUMN IF NOT EXISTS delegate_credential_id text REFERENCES service_credentials(id) ON DELETE SET NULL',
+    "ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'service' CHECK (origin IN ('service', 'broker'))",
+    'ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS agent text',
+    'ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS delegate_credential_id text REFERENCES service_credentials(id) ON DELETE SET NULL',
+    'ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS external_key text',
+    'ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS broker_credential_id text REFERENCES service_credentials(id) ON DELETE SET NULL',
+    `CREATE TABLE IF NOT EXISTS broker_replay (
+        credential_id text NOT NULL REFERENCES service_credentials(id) ON DELETE CASCADE,
+        nonce text NOT NULL,
+        seen_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (credential_id, nonce)
+      )`,
+    'CREATE INDEX IF NOT EXISTS broker_replay_seen_at_idx ON broker_replay(seen_at)',
   ];
 }
 
@@ -420,6 +435,12 @@ async function main() {
     await sql`
       INSERT INTO schema_migrations (version, checksum)
       VALUES ('013_projects', 'projects_workspaces_aliases_sync_conflicts_merge_tasks')
+      ON CONFLICT (version) DO NOTHING
+    `;
+
+    await sql`
+      INSERT INTO schema_migrations (version, checksum)
+      VALUES ('014_broker', 'credential_kinds_broker_grants_replay_ledger')
       ON CONFLICT (version) DO NOTHING
     `;
 

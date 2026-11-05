@@ -11,6 +11,13 @@ export async function POST(request: NextRequest) {
   try {
     const ctx = await serviceRequest(request, syncTurnSchema, consequence, true);
     if ('response' in ctx) return ctx.response;
+    if (ctx.grant!.origin === 'broker') {
+      // The broker records its own turns; a delegate (openclaw-pcp) only reads.
+      return NextResponse.json(
+        { error: `${consequence}: service sync / grant scope check - broker turn grants are read-only for plugins; the broker records the turn`, code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
     const result = await appendTurn(ctx.grant!, ctx.body.external_key, ctx.body.messages, `service:${ctx.credential.id}`);
     if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
     return NextResponse.json({

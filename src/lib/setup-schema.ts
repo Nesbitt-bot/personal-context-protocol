@@ -204,6 +204,30 @@ export const PROJECT_SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS merge_tasks_status_idx ON merge_tasks(status, created_at)',
 ];
 
+/**
+ * Migration 014 (broker): credential kinds (channel plugins, the AstrBot
+ * ingress credential, the loopback broker) and the broker's delegate (the
+ * OpenClaw plugin credential allowed to read broker turn grants); broker turn
+ * grants (origin, agent, delegate, turn external key); the stamp replay
+ * ledger. Additive only.
+ */
+export const BROKER_SCHEMA_STATEMENTS = [
+  "ALTER TABLE service_credentials ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'channel' CHECK (kind IN ('channel', 'ingress', 'broker'))",
+  'ALTER TABLE service_credentials ADD COLUMN IF NOT EXISTS delegate_credential_id text REFERENCES service_credentials(id) ON DELETE SET NULL',
+  "ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'service' CHECK (origin IN ('service', 'broker'))",
+  'ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS agent text',
+  'ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS delegate_credential_id text REFERENCES service_credentials(id) ON DELETE SET NULL',
+  'ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS external_key text',
+  'ALTER TABLE turn_grants ADD COLUMN IF NOT EXISTS broker_credential_id text REFERENCES service_credentials(id) ON DELETE SET NULL',
+  `CREATE TABLE IF NOT EXISTS broker_replay (
+      credential_id text NOT NULL REFERENCES service_credentials(id) ON DELETE CASCADE,
+      nonce text NOT NULL,
+      seen_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (credential_id, nonce)
+    )`,
+  'CREATE INDEX IF NOT EXISTS broker_replay_seen_at_idx ON broker_replay(seen_at)',
+];
+
 export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS app_instance (
     id text PRIMARY KEY DEFAULT 'instance_1',
@@ -357,6 +381,7 @@ export const SCHEMA_STATEMENTS = [
   ...IDENTITY_SCHEMA_STATEMENTS,
   ...SERVICE_SCHEMA_STATEMENTS,
   ...PROJECT_SCHEMA_STATEMENTS,
+  ...BROKER_SCHEMA_STATEMENTS,
 ];
 
 /**
@@ -466,6 +491,12 @@ async function applySchema() {
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
     VALUES ('013_projects', 'projects_workspaces_aliases_sync_conflicts_merge_tasks')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('014_broker', 'credential_kinds_broker_grants_replay_ledger')
     ON CONFLICT (version) DO NOTHING
   `);
 }

@@ -137,7 +137,8 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     const cli = createRequire(import.meta.url)('../scripts/pcp-operator.js');
     const exported = await cli.exportSessions(raw);
     expect(exported.has_projects).toBe(true);
-    expect(exported.schema_version).toBe('013_projects');
+    // Latest applied migration (schema_migrations versions sort lexically).
+    expect(exported.schema_version).toBe('014_broker');
     expect(exported.sessions.find((x: { id: string }) => x.id === 'ses_win_codex')).toEqual({ id: 'ses_win_codex', external_key: 'win-384de1b4:codex:019f', title: 'opencode:win-384de1b4:circtime [codex] deploy page', project_id: null, archived: false });
     expect(JSON.stringify(exported)).not.toContain('deploy via actions');
     // The transaction really is read-only.

@@ -33,6 +33,7 @@ describe.skipIf(!enabled)('service credentials, turn grants, sync and recall (da
   };
   let openclaw = '';
   let astrbot = '';
+  let other = '';
   let adminBrowser = { session: '', csrf: '' };
   let aliceBrowser = { session: '', csrf: '' };
 
@@ -90,7 +91,8 @@ describe.skipIf(!enabled)('service credentials, turn grants, sync and recall (da
     adminBrowser = { session: created.sessionValue, csrf: created.csrfValue };
     const createdAlice = await createWebSession('usr_alice');
     aliceBrowser = { session: createdAlice.sessionValue, csrf: createdAlice.csrfValue };
-    astrbot = (await createServiceCredential('astrbot ingress', ['astrbot:'], null)).token;
+    astrbot = (await createServiceCredential('astrbot ingress', ['astrbot:'], null, { kind: 'ingress' })).token;
+    other = (await createServiceCredential('other channel', ['discord:'], null)).token;
 
     routes = {
       creds: await import('../src/app/api/v1/service-credentials/route'),
@@ -133,8 +135,12 @@ describe.skipIf(!enabled)('service credentials, turn grants, sync and recall (da
     const res = await grant(openclaw, { session_key: 'agent:main:qq', principal: 'astrbot:qq:1', chat: 'direct' });
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('PRINCIPAL_NOT_ALLOWED');
-    expect((await grant(astrbot, { session_key: 'k', principal: 'telegram:111', chat: 'direct' })).status).toBe(403);
+    expect((await grant(other, { session_key: 'k', principal: 'telegram:111', chat: 'direct' })).status).toBe(403);
     expect((await grant(openclaw, { session_key: 'k', principal: 'telegram:group:-100', chat: 'direct' })).status).toBe(400);
+    // The AstrBot ingress credential is not a channel credential: /service/* refuses it outright.
+    expect((await grant(astrbot, { session_key: 'k', principal: 'astrbot:qq:1', chat: 'direct' })).status).toBe(401);
+    // astrbot: is reserved for the ingress kind: the admin API will not mint it as a channel prefix.
+    expect((await call('creds', 'POST', { browser: adminBrowser, body: { name: 'fake astrbot', principal_prefixes: ['astrbot:'] } })).status).toBe(400);
   });
 
   it('a linked DM principal reads the owner\'s sessions across channels, never other users\' or group sessions', async () => {
@@ -204,7 +210,8 @@ describe.skipIf(!enabled)('service credentials, turn grants, sync and recall (da
 
   it('grants are bound to the credential and expire', async () => {
     // Another credential cannot use OpenClaw's grant.
-    expect((await call('recall', 'POST', { bearer: astrbot, body: { session_key: 'agent:main:telegram:111' } })).status).toBe(403);
+    expect((await call('recall', 'POST', { bearer: other, body: { session_key: 'agent:main:telegram:111' } })).status).toBe(403);
+    expect((await call('recall', 'POST', { bearer: astrbot, body: { session_key: 'agent:main:telegram:111' } })).status).toBe(401);
 
     await lib.db.execute(lib.sql`UPDATE turn_grants SET expires_at = now() - interval '1 second' WHERE session_key = 'agent:main:telegram:111'`);
     const expired = await call('recall', 'POST', { bearer: openclaw, body: { session_key: 'agent:main:telegram:111' } });

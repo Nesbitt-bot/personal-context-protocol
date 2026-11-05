@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { desc, eq } from 'drizzle-orm';
 import { authenticateUi, authErrorResponse, requireAdmin } from '@/lib/ui-auth';
 import { createServiceCredentialSchema } from '@/lib/validations';
-import { createServiceCredential } from '@/lib/service-auth';
+import { createServiceCredential, credentialShapeError } from '@/lib/service-auth';
 import { resolveExpiresAt, tokenStatus } from '@/lib/token-expiration';
 import { db } from '@/lib/db';
 import { events, serviceCredentials } from '@/lib/schema';
@@ -51,6 +51,12 @@ export async function POST(request: NextRequest) {
     const parsed = createServiceCredentialSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Unable to create service credential: service credential administration / request validation - invalid request body', code: 'VALIDATION_ERROR', details: parsed.error.errors }, { status: 400 });
+    }
+    // The admin API mints channel credentials only; ingress and broker
+    // credentials (with signing key / delegate) come from scripts/pcp-operator.js.
+    const shapeError = credentialShapeError('channel', parsed.data.principal_prefixes, null);
+    if (shapeError) {
+      return NextResponse.json({ error: `Unable to create service credential: service credential administration / request validation - ${shapeError}`, code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     const now = new Date();
     const expiresAt = resolveExpiresAt(parsed.data.expires_in ?? 'never', now);

@@ -200,6 +200,17 @@ code ignores the new tables and columns). Organizing existing sessions into
 projects is a separate, explicit operator step (see
 [projects.md](projects.md#reorganizing-imported-sessions-operator-runbook)).
 
+### 0014_broker (v0.3.0)
+
+PCP broker (idempotent, only additive): `service_credentials.kind`
+(`channel` default, `ingress`, `broker`) and `delegate_credential_id`;
+`turn_grants.origin` (`service` default, `broker`), `agent`,
+`delegate_credential_id`, `external_key`, `broker_credential_id`; table
+`broker_replay` (stamp nonce / platform message ledger) and its index. Existing
+credentials become `channel`, existing grants `service`; nothing else changes.
+Rollback to v0.2.2 is safe (the old code ignores the new columns and table;
+broker grants are never matched by its lookup).
+
 ## Checking migration status
 
 ```bash

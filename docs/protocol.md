@@ -110,7 +110,7 @@ where `method` is `oidc` or `break_glass`. `401` when anonymous.
 ### POST `/sessions/:id/claims` (admin)
 
 Issues a single-use claim code for the session and a platform principal.
-Body `{ "principal": "telegram:8627151333" }` (defaults to the session's own
+Body `{ "principal": "telegram:100000001" }` (defaults to the session's own
 principal). Group sessions return `409 GROUP_SESSION`. The plaintext code is
 returned once (only its SHA-256 is stored) and expires after 15 minutes:
 
@@ -148,6 +148,10 @@ Full semantics in [service-sync.md](service-sync.md).
 List, mint (`{ name, principal_prefixes, expires_in? }`, token shown once) or
 revoke (`{ id }`) service credentials.
 
+Credential kinds: only `channel` credentials are accepted here; `ingress` and
+`broker` credentials get `401`. The `astrbot:` prefix is reserved for the
+AstrBot ingress credential and is only ever asserted through the broker.
+
 ### POST|DELETE `/service/grants`
 
 Create the turn grant for `{ session_key, principal, chat, group_id?, ttl_seconds?, issue_claim? }`
@@ -157,7 +161,8 @@ or end it (`{ session_key }`). Returns `{ grant_id, session_id, readable_session
 ### POST `/service/sync`
 
 `{ session_key, external_key, messages }`: append one turn to the grant's home
-session, idempotent by `external_key` (`duplicate: true` on replay).
+session, idempotent by `external_key` (`duplicate: true` on replay). Broker
+grants (`pcp:<grant id>` keys) are read-only for plugins: `403`.
 
 ### POST `/service/recall`
 
@@ -168,6 +173,29 @@ readable sessions. A session outside the grant is `403`.
 
 `{ session_key, query, limit? }`: substring search within the grant's readable
 sessions. Without a live grant every service read/write is `403 GRANT_REQUIRED`.
+
+## PCP broker (AstrBot path)
+
+Called only by the loopback broker process (`broker/server.js`), never by a
+plugin directly. Semantics in [broker.md](broker.md).
+
+### POST `/service/broker/turns`
+
+Prepare one AstrBot turn. `Authorization: Bearer <broker credential>`,
+`x-pcp-ingress-authorization: Bearer <AstrBot ingress credential>`,
+`x-pcp-signature: v1=<hex HMAC-SHA256>` over the raw body
+`{ stamp, message: { text } }`, all forwarded unchanged from AstrBot. Any
+credential, signature, replay-window or nonce failure is `401` (`code`:
+`INGRESS_CREDENTIAL_INVALID`, `BAD_SIGNATURE`, `STALE_STAMP`,
+`REPLAYED_STAMP`, ...). Returns `{ turn_id, session_key, agent, model,
+messages, expires_at }`: the OpenClaw request to make with
+`x-openclaw-session-key: <session_key>` (`pcp:<turn_id>`).
+
+### POST `/service/broker/turns/complete`
+
+`{ turn_id, status: "ok" | "error", reply?, error_code? }` with the broker
+credential that prepared the turn: records the reply and ends the turn's
+grant. `404 TURN_NOT_FOUND` for unknown, finished or expired turns.
 
 ## Break-glass admin token
 

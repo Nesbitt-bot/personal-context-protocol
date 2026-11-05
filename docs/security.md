@@ -37,6 +37,21 @@ can see which session.
   only their own session. Writes go only to the grant's home session.
   See [service-sync.md](service-sync.md).
 
+## PCP Broker (AstrBot)
+
+- The broker binds loopback only (it refuses other addresses) and must never
+  be published or tunnelled. It alone holds the OpenClaw gateway token and
+  its broker credential, as mounted secret files.
+- AstrBot holds only the ingress credential and its signing key. PCP accepts
+  a turn only with both, a fresh timestamp (±120 s) and an unseen nonce and
+  platform message; otherwise `401`. `astrbot:` principals exist only behind
+  such a stamp; channel credentials can never assert them.
+- The agent (`relay` / `relay-owner`) and the readable sessions are decided
+  by PCP from the attested sender, before the message text is read. Groups
+  never read outside the group's own session.
+- Broker grants are read-only for the OpenClaw plugin (the broker's
+  delegate) and end with the turn. See [broker.md](broker.md).
+
 ## Projects and Sync
 
 - Project, workspace and session-context writes from agents and plugins need a

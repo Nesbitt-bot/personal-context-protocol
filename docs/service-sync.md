@@ -20,12 +20,20 @@ the OpenClaw session key.
   `GET /api/v1/service-credentials` lists them (no hashes);
   `DELETE /api/v1/service-credentials` `{ "id" }` revokes one immediately.
 
+### Kinds (v0.3.0)
+
+`channel` (the default; what the admin API mints) is the only kind accepted
+by `/api/v1/service/*`. `ingress` (AstrBot, exactly `astrbot:`) and `broker`
+(the loopback broker) are minted with `scripts/pcp-operator.js` and accepted
+only by the broker routes; see [broker.md](broker.md). The `astrbot:` prefix
+is reserved: a channel credential can never assert it.
+
 ## Turn grants
 
 `POST /api/v1/service/grants` at the start of a turn:
 
 ```json
-{ "session_key": "agent:main:direct:owner", "principal": "telegram:8627151333",
+{ "session_key": "agent:main:direct:owner", "principal": "telegram:100000001",
   "chat": "direct", "ttl_seconds": 600, "issue_claim": false }
 ```
 
@@ -56,6 +64,8 @@ Response: `{ grant_id, session_id, readable_session_ids, expires_at, linked, cla
 
 All need a live grant for `session_key` issued to the same credential, or
 return `403 GRANT_REQUIRED` (expired, ended, replaced, or another credential's).
+Broker turn keys (`pcp:<grant id>`) resolve to that broker grant for the
+broker's delegate credential only, read-only.
 
 - `POST /api/v1/service/sync`
   `{ "session_key", "external_key": "turn-123", "messages": [{ "role", "content", ... }] }`

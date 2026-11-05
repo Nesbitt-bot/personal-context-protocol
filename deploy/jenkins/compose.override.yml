@@ -7,3 +7,5 @@ services:
     environment:
       PCP_BUILD_COMMIT: ${PCP_BUILD_COMMIT:-}
       PCP_BUILD_TARGET: jenkins
+  broker:
+    image: ${PCP_IMAGE:?Run prepare_env.py before deployment}

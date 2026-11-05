@@ -23,7 +23,7 @@ Bash:
 export PCP_VERSION="$(cat VERSION)"
 ```
 
-The default Compose image is `personal-context-protocol:0.2.2`. When `VERSION` changes, set `PCP_VERSION` to the new value before building so each release gets a distinct image tag.
+The default Compose image is `personal-context-protocol:0.3.0`. When `VERSION` changes, set `PCP_VERSION` to the new value before building so each release gets a distinct image tag.
 
 ## Start Locally
 
@@ -50,7 +50,7 @@ Compose provides local defaults for development. Override them when needed:
 
 | Name | Default | Purpose |
 |---|---|---|
-| `PCP_VERSION` | `0.2.2` | App image tag and Docker build version |
+| `PCP_VERSION` | `0.3.0` | App image tag and Docker build version |
 | `PCP_POSTGRES_DATA_DIR` | `/home/motuariki/Documents/DockerVolumes/pcp/postgres` | Host directory bind-mounted as the PostgreSQL data directory (must exist, owner 70:70) |
 | `PCP_PORT` | `127.0.0.1:3000` | Host address:port mapped to the app container (loopback by default; publish through a TLS reverse proxy) |
 | `PCP_APP_URL` | `http://localhost:3000` | Public app URL used by clients |
@@ -88,7 +88,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "database": "pending"
 }
 ```

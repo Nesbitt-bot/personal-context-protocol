@@ -28,6 +28,7 @@
    security
    auth-oidc
    service-sync
+   broker
    limitations
 
 .. toctree::
