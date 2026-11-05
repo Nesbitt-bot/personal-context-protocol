@@ -11,6 +11,7 @@ Run this checklist before declaring any modification round complete.
 - **Migration failures**: Not testing migrations end-to-end before claiming success
 - **Env var gaps**: Missing required env vars (`DATABASE_URL`, `PCP_INSTANCE_SECRET`, `PCP_APP_URL`)
 - **Build failures**: Not running `npm run build` before claiming deploy readiness
+- **Fixed overlays inside filtered ancestors**: a `position: fixed` modal rendered inside an element with `backdrop-filter`, `filter` or `transform` (the sticky `backdrop-blur` nav) is positioned relative to that element, not the viewport. Use `src/components/modal.tsx` (portal on `document.body`, focus trap, Esc) for every dialog, and run `deploy/docker/test-ui-browser.sh`
 
 ## Round-end checklist
 
@@ -55,6 +56,25 @@ Run this checklist before declaring any modification round complete.
 ## Current round log
 
 Append what this round actually did below:
+
+- 2026-11-05 - Projects across machines, sync conflict policy, UI fixes (v0.2.2)
+  - Root cause of the unusable token dialog: `ScopedTokenManager` rendered inside
+    the sticky nav whose `backdrop-blur` made it the containing block for the
+    fixed overlay (panel at y=-235 at 1280x800). All dialogs now use the shared
+    portal `Modal` (role=dialog, focus trap, Esc/Close, focus restore).
+  - Nav: Sessions and Projects for signed-in users, phone menu (Tokens/Settings
+    were unreachable below 640 px); signed-in home and `/login` no longer offer a
+    second login; break-glass return path uses the server's sanitizer.
+  - Migration 013 (additive): projects, aliases, workspaces, session project link
+    and task context, sync clocks, conflicts, merge tasks. APIs for agents
+    (global scoped token + `manage_projects`) and the admin UI; conflict policy
+    documented in `docs/protocol.md`.
+  - `organize-projects.mjs` + read-only `pcp-operator.js sessions export`;
+    production dry run only (deployed version had no migration 013).
+  - Verified: typecheck, `npm run build` (Docker builder target), vitest 302/302
+    with a throwaway Postgres (300 + 2 skipped in the CI image, which excludes
+    `thirdparty/`), thirdparty node tests 18 + 19, 152 browser checks, reorg
+    e2e on the test stack with a byte-identical rerun.
 
 - 2026-06-26 - Consent-framed token prompts + dashboard scroll fix (v0.1.21)
   - Rewrote the three token instruction builders (`buildAgentInstruction` /

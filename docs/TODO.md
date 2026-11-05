@@ -2,6 +2,16 @@
 
 Owner-visible future work for Personal Context Protocol. Keep this list focused on versioned product work, not per-round scratch notes.
 
+## v0.2.2 Projects — follow-ups
+
+- [x] Projects, aliases, workspaces per machine, session project link and task context (migration 013)
+- [x] Sync conflict policy, conflict review, AI merge tasks
+- [x] Reorganization tool for imported sessions (`organize-projects.mjs`)
+- [ ] OpenCode session-manager `pcp_sync`: resolve/register the project and workspace, send `updated_at`/`device_id` context writes and `merge-messages` with message ids
+- [ ] openclaw-pcp: register `openclaw-container` workspaces for checkouts under `/home/node/.openclaw/workspace/git`
+- [ ] Web UI forms for editing a project, adding a workspace or alias, and moving a session into a project (APIs exist)
+- [ ] An agent worker that drains `/manager/merge-tasks`
+
 ## v0.2.0 Identity phase 1 — follow-ups
 
 - [x] Casdoor OIDC sign-in, server-side sessions, CSRF, break-glass flag

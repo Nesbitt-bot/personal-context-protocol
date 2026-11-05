@@ -104,6 +104,50 @@ export const topics = pgTable('topics', {
   externalKeyIdx: uniqueIndex('topics_external_key_idx').on(table.externalKey),
 }));
 
+// Projects (migration 013): one row per OpenCode session-manager canonical
+// project. `canonicalKey` is `git:<host/owner/repo>` or `name:<basename>`
+// (src/lib/project-identity.ts); `gitRemotesJson` lists every known remote.
+// `ownerUserId` null = admin-only, like sessions. `syncClockJson` holds the
+// per-field {at, device} clocks of the conflict policy (src/lib/sync-policy.ts).
+export const projects = pgTable('projects', {
+  id: text('id').primaryKey(),
+  canonicalKey: text('canonical_key').notNull(),
+  displayName: text('display_name').notNull(),
+  description: text('description'),
+  gitRemotesJson: jsonb('git_remotes_json').notNull().default([]),
+  ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'set null' }),
+  syncClockJson: jsonb('sync_clock_json').notNull().default({}),
+  archived: boolean('archived').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  canonicalKeyIdx: uniqueIndex('projects_canonical_key_key').on(table.canonicalKey),
+}));
+
+// Explicit alias table: another canonical key (e.g. `name:marketing-roi-analysis`)
+// that resolves to a project. Never inferred silently at request time.
+export const projectAliases = pgTable('project_aliases', {
+  aliasKey: text('alias_key').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  source: text('source').notNull().default('manual'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Where a project is checked out, per machine.
+export const projectWorkspaces = pgTable('project_workspaces', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  deviceId: text('device_id').notNull(),
+  deviceLabel: text('device_label'),
+  deviceKind: text('device_kind', { enum: ['openclaw-container', 'linux', 'linux-remote', 'windows', 'macos'] }).notNull(),
+  directory: text('directory').notNull(),
+  defaultBranch: text('default_branch'),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+  syncClockJson: jsonb('sync_clock_json').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Sessions. `topicId` is nullable: a session may be uncategorized (no topic).
 // `public` exposes a read-only view without the admin UI token.
 export const sessions = pgTable('sessions', {
@@ -128,6 +172,12 @@ export const sessions = pgTable('sessions', {
   ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'set null' }),
   principal: text('principal'),
   sessionClass: text('class', { enum: ['trusted', 'unattributed', 'group'] }).notNull().default('unattributed'),
+  // Projects (migration 013): the project this session belongs to, and the
+  // per-task context (what this session is about within the project).
+  projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  contextTitle: text('context_title'),
+  contextSummary: text('context_summary'),
+  syncClockJson: jsonb('sync_clock_json').notNull().default({}),
 }, (table) => ({
   externalKeyIdx: uniqueIndex('sessions_external_key_idx').on(table.externalKey),
 }));
@@ -199,6 +249,8 @@ export const messages = pgTable('messages', {
   sourceJson: jsonb('source_json'),
   metadataJson: jsonb('metadata_json').default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Plugin message id for multi-machine merges (migration 013); unique per session.
+  externalMessageId: text('external_message_id'),
 });
 
 // Compactions: durable session summaries stored alongside (never replacing)
@@ -279,3 +331,42 @@ export const syncedTurns = pgTable('synced_turns', {
 }, (table) => ({
   pk: primaryKey({ columns: [table.sessionId, table.externalKey] }),
 }));
+
+// Sync conflict log (migration 013): the losing version of a reviewable field
+// (title, summary, description) when two machines edited it concurrently.
+export const syncConflicts = pgTable('sync_conflicts', {
+  id: text('id').primaryKey(),
+  entityType: text('entity_type', { enum: ['session', 'project'] }).notNull(),
+  entityId: text('entity_id').notNull(),
+  field: text('field').notNull(),
+  reason: text('reason').notNull(),
+  keptValueJson: jsonb('kept_value_json'),
+  keptAt: timestamp('kept_at', { withTimezone: true }),
+  keptDevice: text('kept_device'),
+  lostValueJson: jsonb('lost_value_json'),
+  lostAt: timestamp('lost_at', { withTimezone: true }),
+  lostDevice: text('lost_device'),
+  status: text('status', { enum: ['open', 'resolved', 'dismissed'] }).notNull().default('open'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolvedBy: text('resolved_by'),
+});
+
+// Pending "AI merge suggestion" requests (migration 013). PCP only stores the
+// versions; an agent picks the task up and posts a merged value. PCP never
+// calls a model.
+export const mergeTasks = pgTable('merge_tasks', {
+  id: text('id').primaryKey(),
+  conflictId: text('conflict_id').references(() => syncConflicts.id, { onDelete: 'set null' }),
+  entityType: text('entity_type', { enum: ['session', 'project'] }).notNull(),
+  entityId: text('entity_id').notNull(),
+  field: text('field').notNull(),
+  versionsJson: jsonb('versions_json').notNull(),
+  instructions: text('instructions'),
+  status: text('status', { enum: ['pending', 'completed', 'cancelled'] }).notNull().default('pending'),
+  requestedBy: text('requested_by').notNull(),
+  resultValueJson: jsonb('result_value_json'),
+  completedBy: text('completed_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});

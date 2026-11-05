@@ -36,6 +36,15 @@ for lost-token recovery and the three credential sources (deploy / env / user).
    or permanently delete from Trash. Empty Trash bulk-deletes all archived items.
 5. **Settings** (`/settings`) — set your own admin token (stops per-deploy rotation).
    Rotation is disabled while `PCP_ADMIN_TOKEN` is configured.
+6. **Projects** (`/projects`) — one project per repository across machines,
+   with its git remotes, a workspace per machine (Windows, Linux host, remote
+   Linux, macOS, OpenClaw container) and a "how to start dev here" snippet for
+   each, the sessions of the project, and sync conflicts to review or hand to
+   an AI merge. See [projects.md](projects.md).
+
+The top navigation shows **Sessions** (the dashboard) and **Projects** to every
+signed-in user, plus **Tokens** and **Settings** to admins; on phones these are
+in the menu button.
 
 ---
 

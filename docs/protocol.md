@@ -421,6 +421,187 @@ summaries."
 
 Archives a session.
 
+## Projects (web UI)
+
+Projects group sessions by the piece of work they belong to, across machines
+(see [projects.md](projects.md)). Signed-in users only (Casdoor session or
+break-glass admin). Admins see every project; other users see projects they
+own or that contain a session visible to them, and inside a project only those
+sessions. Every write below is admin-only and CSRF-checked.
+
+### GET `/projects`
+
+`{ projects: [{ id, canonical_key, display_name, description, git_remotes,
+session_count, workspace_count, device_kinds, last_activity_at, ... }],
+unassigned_sessions }`.
+
+### POST `/projects` (admin)
+
+Same body as `POST /manager/projects`; finds or creates by canonical key.
+
+### GET `/projects/:id`
+
+`{ project (with aliases), workspaces, sessions, conflicts }`. `conflicts` (open
+sync conflicts of the project and its sessions) is filled for admins only.
+`403` when the project is not visible to the caller, `404` when unknown.
+
+### PATCH `/projects/:id` (admin)
+
+`{ display_name?, description?, add_git_remotes?, add_aliases? }`. Name and
+description are applied as a write from device `web` that has seen the current
+values (so they never silently drop a concurrent plugin edit); remotes and
+aliases are only added. An alias owned by another project is reported in
+`extended.alias_conflicts`, never reassigned.
+
+### POST `/projects/:id/workspaces` (admin)
+
+Add a workspace by hand; body as `POST /manager/projects/:id/workspaces`.
+
+### PATCH `/sessions/:id/context` (admin)
+
+`{ project_id?, context_title?, context_summary? }`: move a session into a
+project (`null` removes it) and edit its task context, as a `web` write under
+the conflict policy.
+
+### GET `/conflicts?status=open|resolved|dismissed` (admin)
+
+Sync conflicts: `{ id, entity_type, entity_id, field, reason, kept: { value,
+at, device }, lost: { value, at, device }, status }`.
+
+### PATCH `/conflicts/:id` (admin)
+
+`{ status: "resolved" | "dismissed" }` for an open conflict ("keep latest" or
+"not important"); `404` once it is no longer open.
+
+### POST `/conflicts/:id/merge-request` (admin)
+
+The **AI merge suggestion** action: stores a pending merge task holding both
+versions and merge instructions, for an agent to resolve later through
+`/manager/merge-tasks`. PCP never calls a model. Idempotent per conflict
+(`created: false` returns the pending task).
+
+## Projects for agents and plugins (scoped manager)
+
+`Authorization: Bearer <scoped token>`, **global scope only** (folder and
+session tokens get `403`). Reads need `read_all` or `manage_projects`; writes
+need `manage_projects`. Web sessions, service credentials, session recording
+tokens and the admin token are not accepted. `manage_projects` is a new flag
+(v0.2.2): tokens minted before it existed do not get it implicitly; mint one
+with `scripts/pcp-operator.js scoped-token create --permission manage_projects`
+or in the token manager.
+
+### GET|POST `/manager/projects`
+
+`GET` lists projects with their workspaces. `POST` finds or creates a project
+(idempotent) and adds new remotes and aliases:
+
+```json
+{
+  "canonical_key": "git:github.com/owner/repo",
+  "display_name": "repo",
+  "git_remotes": ["git@github.com:owner/repo.git"],
+  "aliases": ["name:old-folder-name"],
+  "workspace": { "device_id": "win-1a2b3c4d", "device_kind": "windows", "directory": "D:\\work\\repo", "default_branch": "main", "seen_at": "2026-11-05T10:00:00Z" }
+}
+```
+
+`canonical_key` defaults to `git:<first remote>` or `name:<display_name>`.
+Lookup is by canonical key, then the alias table, then any matching remote
+(case-insensitive). Response: `{ project, created, remotes_added,
+aliases_added, alias_conflicts, workspace }` (`201` when created).
+
+### GET `/manager/projects/resolve?remote=&directory=&device_id=&name=`
+
+Resolve a checkout: by remote, then a registered workspace directory (on
+`device_id` when given; directories are normalized, `d:\x\` = `D:/x`), then
+name or alias. `{ found: false }` or `{ found: true, matched_by: "remote" |
+"workspace" | "name", project, workspaces }`.
+
+### POST `/manager/projects/:id/workspaces`
+
+Register or refresh this machine's checkout: `{ device_id, device_label?,
+device_kind, directory, default_branch?, seen_at? }`. `device_kind` is one of
+`openclaw-container`, `linux`, `linux-remote`, `windows`, `macos`; the
+directory must be absolute. Unique per (project, device, directory).
+`last_seen_at` only moves forward; `default_branch` and `device_label` are
+last-writer-wins by `seen_at`.
+
+### PATCH `/manager/sessions/by-key/:key/context`
+
+Attach the session with this external key to a project and/or set its task
+context:
+
+```json
+{
+  "project_id": "prj_...",
+  "context_title": "Deploy the page with GitHub Actions",
+  "context_summary": "...",
+  "updated_at": "2026-11-05T10:00:00Z",
+  "device_id": "win-1a2b3c4d",
+  "base_updated_at": { "context_summary": "2026-11-04T09:00:00Z" }
+}
+```
+
+`updated_at` is the plugin's own modification time; `base_updated_at` (per
+field, optional) is the field clock the writer last saw. Response `{
+session_id, applied, kept, unchanged, conflicts, clock_skew }`.
+
+### POST `/manager/sessions/by-key/:key/merge-messages`
+
+`{ device_id, messages: [{ external_id, role, content, provider?, base_model?,
+provider_timestamp? }] }` (1-50): append-only merge by message id. Response `{
+session_id, appended, duplicates, first_ordinal }`.
+
+### GET `/manager/merge-tasks?status=pending`
+
+Pending AI merge tasks: `{ id, entity_type, entity_id, field, versions: [{
+label, value, at, device }], instructions, status }`. Needs `manage_projects`.
+
+### POST `/manager/merge-tasks/:id/complete`
+
+`{ value }`: the agent's merged value. Applied as a fresh write that has seen
+the current value (so it is not itself a conflict), the task is completed and
+its conflict resolved. `409` when the task is no longer pending.
+
+## Sync conflict policy
+
+Applies whenever the same session or project field is written from more than
+one machine (plugins, the web UI as device `web`, AI merges as
+`ai-merge:<actor>`). Every write carries `updated_at` (plugin time) and
+`device_id`; PCP keeps a per-field clock `{ at, device }` in
+`sync_clock_json`.
+
+1. **Last writer wins by plugin timestamp.** A write applies when its time is
+   later than the field's clock. Exact ties go to the lexically greater
+   `device_id`, so every replica decides the same way.
+2. **Clock-skew guard.** A timestamp in the future is clamped to PCP's receive
+   time before comparing, so a machine with a fast clock cannot win every later
+   edit. More than 5 minutes ahead is also flagged (`clock_skew: true`, and a
+   resulting conflict has reason `clock_skew`).
+3. **Same value** only advances the clock, so a later stale write with a
+   different value still loses.
+4. **Reviewable fields** (`context_title`, `context_summary`, project
+   `display_name`, `description`): the latest value is kept, and when the
+   losing value came from another device that the winner had not seen (no
+   matching `base_updated_at`), the losing version is stored in
+   `sync_conflicts` (`reason`: `concurrent_edit`, `stale_write`,
+   `timestamp_tie` or `clock_skew`) with status `open`, flagged for review on
+   the project page. A device editing its own value, or a writer that
+   fast-forwards from the current clock, is not a conflict.
+5. **Plain fields** (`project_id`, workspace `default_branch` and
+   `device_label`) are last-writer-wins without a conflict record; workspace
+   `last_seen_at` takes the maximum; remotes and aliases are a union.
+6. **Message streams** are append-only: messages with an `external_id` PCP
+   already holds for the session are skipped, the rest are appended after the
+   existing ordinals in (`provider_timestamp`, `external_id`) order. Nothing is
+   overwritten or reordered; for a chronological view sort by
+   (`provider_timestamp`, `ordinal`).
+7. **AI merge suggestion.** For an open conflict an admin can request a merge
+   (`POST /conflicts/:id/merge-request`): PCP stores a pending task with both
+   versions; an agent lists it (`GET /manager/merge-tasks`) and posts the merged
+   value (`POST /manager/merge-tasks/:id/complete`). PCP never calls a model.
+   Alternatively "Keep latest" resolves and "Dismiss" dismisses the conflict.
+
 ## Tokens
 
 ### GET `/sessions/:sessionId/tokens`

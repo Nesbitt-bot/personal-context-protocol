@@ -8,7 +8,8 @@ import { SiteNav } from '@/components/site-nav';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { loginErrorMessage } from '@/lib/oidc-config';
-import { BREAK_GLASS_STORAGE_KEY } from '@/lib/client-auth';
+import { BREAK_GLASS_STORAGE_KEY, fetchSignedInUser } from '@/lib/client-auth';
+import { sanitizeReturnTo } from '@/lib/return-to';
 
 interface AuthConfig {
   oidc_enabled: boolean;
@@ -28,13 +29,15 @@ function LoginForm() {
   const [setupMessage, setSetupMessage] = useState('');
   const [generatedToken, setGeneratedToken] = useState('');
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
-  const nextPath = searchParams.get('next') || '/dashboard';
   const authError = searchParams.get('auth_error');
-  const safeNext = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/dashboard';
+  const safeNext = sanitizeReturnTo(searchParams.get('next'));
 
   useEffect(() => {
     checkSetupStatus();
     loadAuthConfig();
+    // Already signed in (e.g. the Back button after the Casdoor callback):
+    // go where the user was headed instead of offering a second sign-in.
+    if (!authError) fetchSignedInUser().then((user) => { if (user) router.replace(safeNext); });
   }, []);
 
   async function loadAuthConfig() {

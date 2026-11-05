@@ -37,6 +37,22 @@ can see which session.
   only their own session. Writes go only to the grant's home session.
   See [service-sync.md](service-sync.md).
 
+## Projects and Sync
+
+- Project, workspace and session-context writes from agents and plugins need a
+  **global** scoped token with `manage_projects` (reads: `read_all` or
+  `manage_projects`). Folder and session tokens, service credentials, session
+  recording tokens, web sessions and the admin token are refused on
+  `/api/v1/manager/projects*`, `/manager/sessions/by-key/:key/context`,
+  `/merge-messages` and `/manager/merge-tasks*`.
+- `manage_projects` is never implied for a token minted before v0.2.2.
+- On the web UI, non-admins see only projects they own or that contain a
+  session visible to them, and only those sessions. Creating or editing
+  projects, workspaces, session-project links, conflicts and merge requests is
+  admin-only and CSRF-checked.
+- Merge tasks only store both versions; PCP never sends content to a model.
+- These writes never delete rows or change message content.
+
 ## Token Rules
 
 - UI token (break-glass admin token) is created during deploy initialization or fallback setup. It only opens the UI while `PCP_BREAK_GLASS_ADMIN_LOGIN=1`.

@@ -34,7 +34,7 @@ describe('operator CLI', () => {
 
   it('grants only the named scoped-token permissions, clamped like the app', () => {
     const perms = cli.explicitPermissions(['read_all', 'create_sessions', 'mint_tokens'], 'global');
-    expect(perms).toEqual({ create_folders: false, delete_folders: false, create_sessions: true, delete_sessions: false, mint_tokens: true, rename_sessions: false, read_all: true });
+    expect(perms).toEqual({ create_folders: false, delete_folders: false, create_sessions: true, delete_sessions: false, mint_tokens: true, rename_sessions: false, read_all: true, manage_projects: false });
     // The stored value survives the app's own normalization unchanged.
     expect(normalizePermissions(perms, 'global')).toEqual(perms);
     expect(cli.explicitPermissions(['read_all', 'mint_tokens'], 'session').read_all).toBe(false);

@@ -59,3 +59,30 @@ docker compose -f deploy/docker/docker-compose.test.yml exec db \
 Two partial unique indexes should exist. They are partial so that the many
 sessions with no external key (all pre-existing rows) keep `NULL` without
 colliding, while any two rows that do carry the same key are rejected.
+
+## Browser checks (web UI)
+
+`test-ui-browser.sh` runs `test-ui-browser.mjs` in the Playwright Docker image
+against the running test stack. It seeds a signed-in admin and member straight
+into the test database (random cookie values; only their SHA-256 is stored,
+like a Casdoor login), some sessions and a project, and drives Chromium inside
+the app container's network namespace (`http://localhost:3000`, a secure
+context for the `__Host-` cookies). Nothing new is published.
+
+```bash
+docker compose -f deploy/docker/docker-compose.test.yml up -d --build
+# once: playwright-core matching the image, in a volume
+docker run --rm -v pcp-pw:/pw -w /pw mcr.microsoft.com/playwright:v1.58.2-noble \
+  sh -c 'npm init -y && npm i playwright-core@1.58.2'
+PCP_UI_OUT=/tmp/pcp-ui PCP_PLAYWRIGHT_MODULES=pcp-pw deploy/docker/test-ui-browser.sh
+```
+
+At 1280x800 and 390x844, light and dark, it checks: Sessions and Projects in
+the top nav for signed-in users (Tokens and Settings for admins only, all
+reachable through the phone menu); every dialog is `role="dialog"`, fully
+inside the viewport, has every control hit-testable, traps Tab focus, closes on
+Esc and on Close and returns focus to its opener; the signed-in home page
+offers sessions instead of a login prompt; member session and project
+visibility; the projects list and detail pages. Screenshots go to
+`$PCP_UI_OUT`; the script exits 1 on any failed check.
+

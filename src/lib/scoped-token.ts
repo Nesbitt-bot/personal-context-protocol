@@ -20,6 +20,13 @@ export interface ScopedPermissions {
   mint_tokens: boolean;
   rename_sessions: boolean;
   read_all: boolean;
+  /**
+   * Resolve and register projects and workspaces, attach sessions and sync
+   * their context, merge messages, and work AI merge tasks (migration 013).
+   * Global scope only. A stored token without this key (minted before 0.2.2)
+   * does not get it implicitly.
+   */
+  manage_projects: boolean;
 }
 
 export const PERMISSION_KEYS: readonly (keyof ScopedPermissions)[] = [
@@ -30,6 +37,7 @@ export const PERMISSION_KEYS: readonly (keyof ScopedPermissions)[] = [
   'mint_tokens',
   'rename_sessions',
   'read_all',
+  'manage_projects',
 ] as const;
 
 export const FULL_PERMISSIONS: ScopedPermissions = {
@@ -40,6 +48,7 @@ export const FULL_PERMISSIONS: ScopedPermissions = {
   mint_tokens: true,
   rename_sessions: true,
   read_all: true,
+  manage_projects: true,
 };
 
 export function defaultPermissionsForScope(scope: TokenScope): ScopedPermissions {
@@ -55,6 +64,7 @@ export function defaultPermissionsForScope(scope: TokenScope): ScopedPermissions
         mint_tokens: true,
         rename_sessions: true,
         read_all: true,
+        manage_projects: false,
       };
     case 'session':
       return {
@@ -65,6 +75,7 @@ export function defaultPermissionsForScope(scope: TokenScope): ScopedPermissions
         mint_tokens: false,
         rename_sessions: false,
         read_all: false,
+        manage_projects: false,
       };
   }
 }
@@ -81,7 +92,11 @@ export function normalizePermissions(input: unknown, scope: TokenScope): ScopedP
     for (const key of PERMISSION_KEYS) {
       if (typeof record[key] === 'boolean') base[key] = record[key] as boolean;
     }
+    // Never widen a token minted before the flag existed.
+    if (typeof record.manage_projects !== 'boolean') base.manage_projects = false;
   }
+  // Projects are instance-wide objects; folder and session tokens cannot manage them.
+  if (scope !== 'global') base.manage_projects = false;
   if (scope === 'folder') {
     base.create_folders = false;
     base.delete_folders = false;

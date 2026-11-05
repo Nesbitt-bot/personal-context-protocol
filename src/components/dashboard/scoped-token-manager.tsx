@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Folder, Globe, Inbox, KeyRound, Loader2, MessageSquare, Plus, ShieldCheck, Trash2, X } from 'lucide-react';
+import { ChevronRight, Folder, Globe, Inbox, KeyRound, Loader2, MessageSquare, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import { Modal } from '@/components/modal';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { uiAuthHeaders } from '@/lib/client-auth';
@@ -32,6 +33,7 @@ const PERMISSION_LABELS: Array<[keyof ScopedTokenRecord['permissions'], string]>
   ['mint_tokens', 'Mint tokens'],
   ['rename_sessions', 'Rename sessions'],
   ['read_all', 'Read all'],
+  ['manage_projects', 'Manage projects'],
 ];
 
 const EXPIRATIONS = ['1h', '24h', '7d', '30d', 'never'] as const;
@@ -48,6 +50,7 @@ function defaultPermissions(scope: Scope): Record<string, boolean> {
     base.rename_sessions = true;
     base.read_all = true;
   }
+  if (scope !== 'global') base.manage_projects = false;
   return base;
 }
 
@@ -110,9 +113,6 @@ export function ScopedTokenManager({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     load();
-    function onKey(event: KeyboardEvent) { if (event.key === 'Escape') onClose(); }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
   }, []);
 
   const activeSessions = useMemo(() => sessions.filter((s) => (s as unknown as { archived?: boolean }).archived !== true), [sessions]);
@@ -199,14 +199,8 @@ export function ScopedTokenManager({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" onClick={onClose}>
-      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-          <div className="flex items-center gap-2"><KeyRound size={18} className="text-sky-600 dark:text-sky-300" /><h2 className="text-sm font-semibold text-slate-950 dark:text-white">Token manager</h2></div>
-          <button className="rounded-md p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={onClose} type="button" aria-label="Close"><X size={18} /></button>
-        </div>
-
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+    <Modal title="Token manager" onClose={onClose} widthClass="max-w-2xl" icon={<KeyRound size={18} className="text-sky-600 dark:text-sky-300" />}>
+        <div className="space-y-4 px-5 py-4">
           {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">{error}</div>}
 
           {generated && (
@@ -220,7 +214,7 @@ export function ScopedTokenManager({ onClose }: { onClose: () => void }) {
             <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100"><Plus size={15} /> New scoped token</h3>
             <input
               className="mb-2 w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-950 outline-none placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              value={name} onChange={(e) => setName(e.target.value)} placeholder="Token name (e.g. dsh-sync)"
+              value={name} onChange={(e) => setName(e.target.value)} placeholder="Token name (e.g. dsh-sync)" aria-label="Token name" data-autofocus
             />
 
             {/* scope tree */}
@@ -305,7 +299,6 @@ export function ScopedTokenManager({ onClose }: { onClose: () => void }) {
             )}
           </section>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -12,6 +12,9 @@
  *        [--expires 30d] --token-out /path/file
  *   node scripts/pcp-operator.js scoped-token list
  *   node scripts/pcp-operator.js scoped-token revoke --id stk_...
+ *   node scripts/pcp-operator.js sessions export > pcp-sessions.json
+ *       (read-only transaction: id, external_key, title, project_id per
+ *       session, for thirdparty/pcp-session-import/organize-projects.mjs)
  *
  * It connects with DATABASE_URL, so run it where the app runs, e.g.
  *   docker exec -i -w /app <app-container> node - <args> < scripts/pcp-operator.js
@@ -41,7 +44,7 @@ const SERVICE_TOKEN_PREFIX = 'pcps_';
 const PRINCIPAL_PREFIX_PATTERN = /^[a-z][a-z0-9_-]{0,63}:$/;
 const EXPIRATION_CHOICES = ['1h', '24h', '7d', '30d', 'never'];
 const DURATION_MS = { '1h': 3600e3, '24h': 86400e3, '7d': 7 * 86400e3, '30d': 30 * 86400e3 };
-const PERMISSION_KEYS = ['create_folders', 'delete_folders', 'create_sessions', 'delete_sessions', 'mint_tokens', 'rename_sessions', 'read_all'];
+const PERMISSION_KEYS = ['create_folders', 'delete_folders', 'create_sessions', 'delete_sessions', 'mint_tokens', 'rename_sessions', 'read_all', 'manage_projects'];
 const SCOPES = ['global', 'folder', 'session'];
 
 function generateToken() {
@@ -72,6 +75,7 @@ function explicitPermissions(names, scope) {
   if (scope === 'folder' || scope === 'session') {
     perms.create_folders = false;
     perms.delete_folders = false;
+    perms.manage_projects = false;
   }
   if (scope === 'session') {
     perms.create_sessions = false;
@@ -206,7 +210,24 @@ async function run(sql, { kind, action, opts }) {
     await audit(sql, kind === 'service-credential' ? 'service_credential.revoked' : 'token.revoked', { credential_id: opts.id, by: 'operator-cli' });
     return { id: opts.id, revoked: true };
   }
-  throw new Error('usage: pcp-operator.js <service-credential|scoped-token> <create|list|revoke> [options]');
+  if (kind === 'sessions' && action === 'export') return exportSessions(sql);
+  throw new Error('usage: pcp-operator.js <service-credential|scoped-token> <create|list|revoke> [options] | sessions export');
+}
+
+/**
+ * Session identities for project planning, read in a READ ONLY transaction so
+ * the export can run against production without writing anything. Message
+ * content is never included. Works before and after migration 013.
+ */
+async function exportSessions(sql) {
+  return sql.begin('read only', async (tx) => {
+    const [col] = await tx`SELECT 1 AS ok FROM information_schema.columns WHERE table_name = 'sessions' AND column_name = 'project_id'`;
+    const rows = col
+      ? await tx`SELECT id, external_key, title, project_id, archived FROM sessions ORDER BY id`
+      : await tx`SELECT id, external_key, title, NULL::text AS project_id, archived FROM sessions ORDER BY id`;
+    const [version] = await tx`SELECT max(version) AS v FROM schema_migrations`;
+    return { exported_at: new Date().toISOString(), schema_version: version ? version.v : null, has_projects: Boolean(col), sessions: rows };
+  });
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -216,13 +237,16 @@ async function main(argv = process.argv.slice(2)) {
   const postgres = require('postgres');
   const sql = postgres(process.env.DATABASE_URL, { max: 1, onnotice: () => undefined });
   try {
-    report(await run(sql, parsed));
+    const result = await run(sql, parsed);
+    // The export is data for another tool: stdout. Everything else is metadata on stderr.
+    if (parsed.kind === 'sessions') process.stdout.write(`${JSON.stringify(result)}\n`);
+    else report(result);
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
 
-module.exports = { generateToken, hashToken, explicitPermissions, parseArgs, validateServiceCreate, validateScopedCreate, deliverToken, resolveExpiresAt, SERVICE_TOKEN_PREFIX, PRINCIPAL_PREFIX_PATTERN, PERMISSION_KEYS, run };
+module.exports = { generateToken, hashToken, explicitPermissions, parseArgs, validateServiceCreate, validateScopedCreate, deliverToken, resolveExpiresAt, SERVICE_TOKEN_PREFIX, PRINCIPAL_PREFIX_PATTERN, PERMISSION_KEYS, run, exportSessions };
 
 // `node - <args> < pcp-operator.js` (stdin) has no require.main, so also accept that.
 if (require.main === module || module.id === '[stdin]' || module.filename === '[stdin]') {
