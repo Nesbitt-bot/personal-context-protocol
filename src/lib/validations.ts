@@ -59,12 +59,17 @@ export const updateSessionSchema = z.object({
   archived: z.boolean().optional(),
   public: z.boolean().optional(),
   mode: z.enum(['wild', 'exact']).optional(),
+  // Admin only: platform principal (null clears) and attribution class.
+  principal: z.string().min(1).max(300).nullable().optional(),
+  class: z.enum(['trusted', 'unattributed', 'group']).optional(),
 }).refine((value) => (
   value.title !== undefined
   || value.topic_id !== undefined
   || value.archived !== undefined
   || value.public !== undefined
   || value.mode !== undefined
+  || value.principal !== undefined
+  || value.class !== undefined
 ), 'At least one session field is required');
 
 // Admin message correction (human only — AI tokens remain append-only).
@@ -157,3 +162,41 @@ export const createSessionLinkSchema = z.object({
   to_session_id: z.string().min(1),
   label: z.string().max(100).optional(),
 });
+
+// Service sync (channel plugins). Session keys are OpenClaw session keys.
+const sessionKeySchema = z.string().min(1).max(300);
+
+export const createGrantSchema = z.object({
+  session_key: sessionKeySchema,
+  principal: z.string().min(1).max(300),
+  chat: z.enum(['direct', 'group']),
+  group_id: z.string().min(1).max(128).optional(),
+  ttl_seconds: z.number().int().positive().optional(),
+  issue_claim: z.boolean().optional(),
+}).strict();
+
+export const endGrantSchema = z.object({ session_key: sessionKeySchema }).strict();
+
+export const syncTurnSchema = z.object({
+  session_key: sessionKeySchema,
+  external_key: z.string().min(1).max(200),
+  messages: z.array(messageInputSchema).min(1).max(MAX_MESSAGES_PER_REQUEST),
+}).strict();
+
+export const recallSchema = z.object({
+  session_key: sessionKeySchema,
+  session_id: z.string().min(1).max(100).optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+}).strict();
+
+export const searchSchema = z.object({
+  session_key: sessionKeySchema,
+  query: z.string().min(1).max(200),
+  limit: z.number().int().min(1).max(50).optional(),
+}).strict();
+
+export const createServiceCredentialSchema = z.object({
+  name: z.string().min(1).max(100),
+  principal_prefixes: z.array(z.string().regex(/^[a-z][a-z0-9_-]{0,63}:$/)).min(1).max(20),
+  expires_in: z.enum(EXPIRATION_CHOICES).optional(),
+}).strict();

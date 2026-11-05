@@ -79,7 +79,9 @@ Both require the same environment variables:
 | `DATABASE_URL` | Postgres connection string (Neon, or the Compose `db` service) |
 | `PCP_INSTANCE_SECRET` | Random secret, 32+ characters |
 | `PCP_APP_URL` | Your app's public URL (optional; the request origin is used otherwise) |
-| `PCP_ADMIN_TOKEN` | Optional 32+ character admin/reset token. Leave unset for zero-config first login. |
+| `PCP_ADMIN_TOKEN` | Optional 32+ character break-glass admin token. Only usable while `PCP_BREAK_GLASS_ADMIN_LOGIN=1`. |
+| `PCP_OIDC_ISSUER`, `PCP_OIDC_CLIENT_ID`, `PCP_OIDC_CLIENT_SECRET`, `PCP_OIDC_REDIRECT_URI`, `PCP_OIDC_REQUIRED_GROUP`, `PCP_OIDC_ADMIN_GROUP` | Casdoor OIDC sign-in (all required; sign-in is disabled otherwise). See [docs/auth-oidc.md](docs/auth-oidc.md). |
+| `PCP_BREAK_GLASS_ADMIN_LOGIN` | Set to `1` only to re-enable the legacy admin-token login in an emergency. |
 
 ### Option A — Vercel + Neon (recommended)
 
@@ -131,9 +133,16 @@ npm run build
 
 ## Token Model
 
-### UI/admin token
+### Human sign-in (v0.2.0+)
 
-- Unlocks the admin UI and protected admin API routes.
+- People sign in with Casdoor OIDC. Members of the admin group see every
+  session; other members see the sessions they own or have claimed with a
+  single-use claim code. See [docs/auth-oidc.md](docs/auth-oidc.md).
+
+### UI/admin token (break-glass)
+
+- Disabled unless `PCP_BREAK_GLASS_ADMIN_LOGIN=1`; then it unlocks the admin UI
+  and protected admin API routes.
 - Stored as a salted hash in Postgres.
 - Generated during deploy initialization when `PCP_ADMIN_TOKEN` is not configured; the generated first-login token is printed once in build/start logs.
 - Can be rotated from the Settings page after login.

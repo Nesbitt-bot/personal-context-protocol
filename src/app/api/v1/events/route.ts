@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { desc, eq, and, inArray, type SQL } from 'drizzle-orm';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { db } from '@/lib/db';
 import { events, sessions } from '@/lib/schema';
 import { logError } from '@/lib/logging';
@@ -25,10 +25,12 @@ const DEFAULT_LIMIT = 50;
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyUiToken(request);
+    const auth = await authenticateUi(request);
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
     }
+    const denied = requireAdmin(auth.actor, 'Unable to list events');
+    if (denied) return authErrorResponse(denied);
 
     const params = request.nextUrl.searchParams;
     const limit = Math.min(MAX_LIMIT, Math.max(1, Number(params.get('limit')) || DEFAULT_LIMIT));

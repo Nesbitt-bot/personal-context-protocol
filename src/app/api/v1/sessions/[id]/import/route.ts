@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, authErrorResponse } from '@/lib/ui-auth';
+import { authorizeSession } from '@/lib/session-access';
 import { db } from '@/lib/db';
 import { messages } from '@/lib/schema';
 import { appendMessagesToSession, recordCompaction } from '@/lib/recording-store';
@@ -31,10 +32,12 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = await authorizeSession(authResult.actor, params.id, 'Unable to import into session');
+    if (denied) return authErrorResponse(denied);
 
     const raw = await request.text().catch(() => '');
     // Accept either { payload: "..." } JSON or the raw pasted text directly.

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, integer, jsonb, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { APP_VERSION } from './version';
 
@@ -22,6 +22,73 @@ export const uiAuth = pgTable('ui_auth', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+});
+
+// Casdoor users (migration 011). One row per (issuer, sub). `groupsJson` is the
+// groups snapshot from the last login and `isAdmin` is derived from the admin
+// group at that login.
+export const users = pgTable('users', {
+  id: text('id').primaryKey(),
+  oidcIssuer: text('oidc_issuer').notNull(),
+  oidcSub: text('oidc_sub').notNull(),
+  displayName: text('display_name').notNull(),
+  email: text('email'),
+  groupsJson: jsonb('groups_json').notNull().default([]),
+  isAdmin: boolean('is_admin').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+});
+
+// Platform principals (e.g. `telegram:8627151333`) linked to a user. A
+// principal links to at most one user.
+export const identities = pgTable('identities', {
+  principal: text('principal').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  linkMethod: text('link_method', { enum: ['claim', 'admin'] }).notNull(),
+  linkedAt: timestamp('linked_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Single-use claim codes. Only the SHA-256 of the code is stored.
+export const claims = pgTable('claims', {
+  id: text('id').primaryKey(),
+  codeHash: text('code_hash').notNull(),
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  principal: text('principal').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  redeemedBy: text('redeemed_by').references(() => users.id, { onDelete: 'set null' }),
+  redeemedAt: timestamp('redeemed_at', { withTimezone: true }),
+});
+
+// Claim redemption attempts, for per-user rate limiting.
+export const claimAttempts = pgTable('claim_attempts', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  succeeded: boolean('succeeded').notNull(),
+  attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Browser login sessions. The cookie carries a random id; only its SHA-256 is
+// stored, together with the SHA-256 of the session's CSRF token.
+export const webSessions = pgTable('web_sessions', {
+  idHash: text('id_hash').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  csrfHash: text('csrf_hash').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+});
+
+// In-flight OIDC authorization requests (state, nonce, PKCE verifier), keyed by
+// the SHA-256 of a random value held in a short-lived browser cookie.
+export const oidcLoginStates = pgTable('oidc_login_states', {
+  idHash: text('id_hash').primaryKey(),
+  state: text('state').notNull(),
+  nonce: text('nonce').notNull(),
+  codeVerifier: text('code_verifier').notNull(),
+  returnTo: text('return_to').notNull().default('/dashboard'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 });
 
 // Topics
@@ -53,6 +120,14 @@ export const sessions = pgTable('sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   lastMessageAt: timestamp('last_message_at', { withTimezone: true }),
+  // Identity (migration 011). `ownerUserId` is the Casdoor user that owns the
+  // session (null = unowned, admin-only). `principal` is the platform identity
+  // the session belongs to (e.g. `telegram:123`). `class` is 'trusted' (a
+  // verified one-to-one identity), 'unattributed' (no verified identity) or
+  // 'group' (shared group chat; admin-only, never claimable).
+  ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'set null' }),
+  principal: text('principal'),
+  sessionClass: text('class', { enum: ['trusted', 'unattributed', 'group'] }).notNull().default('unattributed'),
 }, (table) => ({
   externalKeyIdx: uniqueIndex('sessions_external_key_idx').on(table.externalKey),
 }));
@@ -163,3 +238,44 @@ export const schemaMigrations = pgTable('schema_migrations', {
   appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
   checksum: text('checksum'),
 });
+
+// Service credentials for channel plugins (migration 012). Hashed like the
+// other tokens; `principalPrefixesJson` lists the principal prefixes (e.g.
+// "telegram:") this credential may assert. Never admin, never a UI login.
+export const serviceCredentials = pgTable('service_credentials', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  salt: text('salt').notNull(),
+  tokenPrefix: text('token_prefix').notNull(),
+  principalPrefixesJson: jsonb('principal_prefixes_json').notNull().default([]),
+  revoked: boolean('revoked').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+});
+
+// Server-side turn grants: what one conversation turn may read and write,
+// looked up by (credential, OpenClaw session key). Never sent to a model.
+export const turnGrants = pgTable('turn_grants', {
+  id: text('id').primaryKey(),
+  credentialId: text('credential_id').notNull().references(() => serviceCredentials.id, { onDelete: 'cascade' }),
+  sessionKey: text('session_key').notNull(),
+  principal: text('principal').notNull(),
+  homeSessionId: text('home_session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  readableSessionIdsJson: jsonb('readable_session_ids_json').notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+});
+
+// Idempotency ledger for synced turns: one row per (session, external key).
+export const syncedTurns = pgTable('synced_turns', {
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  externalKey: text('external_key').notNull(),
+  firstOrdinal: integer('first_ordinal').notNull(),
+  messageCount: integer('message_count').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.sessionId, table.externalKey] }),
+}));

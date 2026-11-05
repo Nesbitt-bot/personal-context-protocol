@@ -8,11 +8,8 @@ import { SiteNav } from '@/components/site-nav';
 import { DiagnosticsPanel } from '@/components/diagnostics-panel';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { BREAK_GLASS_STORAGE_KEY, breakGlassToken, fetchSignedInUser, uiAuthHeaders } from '@/lib/client-auth';
 
-function getUiToken() {
-  if (typeof window === 'undefined') return '';
-  return localStorage.getItem('ui_token') || '';
-}
 
 /**
  * Admin settings for rotating the browser login token after the current token
@@ -26,17 +23,21 @@ export default function SettingsPage() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  // Held in state rather than read per render: localStorage is unavailable
-  // during the server pass, and the panel needs a stable value to fetch with.
-  const [token, setToken] = useState('');
+  // Settings are admin-only; the panel loads once the admin check passed.
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const current = getUiToken();
-    if (!current) {
-      router.replace('/login?next=/settings');
-      return;
-    }
-    setToken(current);
+    fetchSignedInUser().then((user) => {
+      if (!user) {
+        router.replace('/login?next=/settings');
+        return;
+      }
+      if (!user.is_admin) {
+        setError('Unable to open settings: web UI authorization / admin check - settings need membership in the PCP admin group');
+        return;
+      }
+      setIsAdmin(true);
+    });
   }, [router]);
 
   async function updateToken(event: FormEvent<HTMLFormElement>) {
@@ -59,7 +60,7 @@ export default function SettingsPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${getUiToken()}`,
+          ...uiAuthHeaders(),
         },
         body: JSON.stringify({ new_token: candidate }),
       });
@@ -74,11 +75,15 @@ export default function SettingsPage() {
         return;
       }
 
-      localStorage.setItem('ui_token', candidate);
-      setToken(candidate);
+      // Only a browser that is itself using the break-glass token switches to
+      // the new value; Casdoor sessions are unaffected.
+      const usingBreakGlass = Boolean(breakGlassToken());
+      if (usingBreakGlass) localStorage.setItem(BREAK_GLASS_STORAGE_KEY, candidate);
       setNewToken('');
       setConfirmToken('');
-      setStatus('Admin token updated. This browser now uses the new token.');
+      setStatus(usingBreakGlass
+        ? 'Break-glass admin token updated. This browser now uses the new token.'
+        : 'Break-glass admin token updated. It only works while PCP_BREAK_GLASS_ADMIN_LOGIN=1.');
     } catch (err) {
       setError(diagnosticMessage({
         consequence: 'Unable to update admin token',
@@ -158,7 +163,7 @@ export default function SettingsPage() {
 
         {/* What this deployment is and what it has been doing. Answering
             either question previously meant probing the API by hand. */}
-        <DiagnosticsPanel token={token} />
+        <DiagnosticsPanel enabled={isAdmin} />
       </section>
     </main>
   );

@@ -54,8 +54,9 @@ function main() {
   }
 
   ensure('PCP_VERSION', () => readProjectVersion(root));
-  ensure('PCP_PORT', () => '3000');
-  ensure('PCP_APP_URL', () => `http://localhost:${values.get('PCP_PORT') || '3000'}`);
+  // Loopback publish by default; PCP_PORT may be `port` or `address:port`.
+  ensure('PCP_PORT', () => '127.0.0.1:3000');
+  ensure('PCP_APP_URL', () => `http://localhost:${String(values.get('PCP_PORT') || '3000').split(':').pop()}`);
   ensure('PCP_INSTANCE_SECRET', () => randomHex(32));
   ensure('POSTGRES_PASSWORD', () => randomHex(24));
   ensure('DATABASE_URL', () => `postgresql://pcp:${values.get('POSTGRES_PASSWORD')}@db:5432/pcp?sslmode=disable`);

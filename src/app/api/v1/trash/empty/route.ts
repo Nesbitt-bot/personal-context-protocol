@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { db } from '@/lib/db';
 import { compactions, events, messages, sessionTokens, sessions, topics } from '@/lib/schema';
 import { createId } from '@/lib/auth';
@@ -11,10 +11,12 @@ export const dynamic = 'force-dynamic';
 /** Permanently delete ALL archived topics and sessions. UI token only. */
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to empty trash');
+    if (denied) return authErrorResponse(denied);
 
     const archivedSessions = await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.archived, true));
     const archivedTopics = await db.select({ id: topics.id }).from(topics).where(eq(topics.archived, true));

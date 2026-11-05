@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Folder, Globe, Inbox, KeyRound, Loader2, MessageSquare, Plus, ShieldCheck, Trash2, X } from 'lucide-react';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { uiAuthHeaders } from '@/lib/client-auth';
 
 type Scope = 'global' | 'folder' | 'session';
 
@@ -50,11 +51,6 @@ function defaultPermissions(scope: Scope): Record<string, boolean> {
   return base;
 }
 
-function getUiToken() {
-  if (typeof window === 'undefined') return '';
-  return localStorage.getItem('ui_token') || '';
-}
-
 const STATUS_TONE: Record<ScopedTokenRecord['status'], string> = {
   active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
   expired: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
@@ -86,7 +82,7 @@ export function ScopedTokenManager({ onClose }: { onClose: () => void }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   function authHeaders(): Record<string, string> {
-    return { Authorization: `Bearer ${getUiToken()}` };
+    return uiAuthHeaders();
   }
 
   async function load() {

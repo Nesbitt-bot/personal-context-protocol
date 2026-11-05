@@ -1,12 +1,13 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { db } from '@/lib/db';
 import { topics, sessions, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
 import { createSessionSchema } from '@/lib/validations';
 import { uniqueSessionTitle } from '@/lib/session-store';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
+import { visibleSessionsFilter } from '@/lib/session-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
@@ -46,7 +47,7 @@ export async function GET(
         last_message_at: sessions.lastMessageAt,
       })
       .from(sessions)
-      .where(eq(sessions.topicId, params.id))
+      .where(and(eq(sessions.topicId, params.id), visibleSessionsFilter(authResult.actor)))
       .orderBy(desc(sessions.lastMessageAt), desc(sessions.createdAt));
 
     return NextResponse.json({ sessions: topicSessions });
@@ -69,10 +70,12 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to create session in topic');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json();
     const validation = createSessionSchema.safeParse(body);

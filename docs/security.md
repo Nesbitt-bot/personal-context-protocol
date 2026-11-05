@@ -1,10 +1,45 @@
 # Security Model
 
-PCP limits what an AI session token can do.
+PCP limits what an AI session token can do, and (since v0.2.0) which human
+can see which session.
+
+## Human Sign-in
+
+- People sign in with Casdoor OIDC (authorization code + state + nonce + PKCE
+  S256). ID tokens are verified against the issuer's JWKS (asymmetric
+  algorithms only), issuer, audience, expiry and nonce. See
+  [auth-oidc.md](auth-oidc.md).
+- Sign-in requires `PCP_OIDC_REQUIRED_GROUP`; `PCP_OIDC_ADMIN_GROUP` members are
+  admins. Groups are re-read at every login.
+- Missing OIDC configuration disables sign-in (fail closed).
+- Browser sessions are server-side (`web_sessions`, hashed ids, 12-hour TTL),
+  regenerated on every login, in `__Host-` HttpOnly/Secure/SameSite=Lax
+  cookies. Cookie-authenticated writes need the `X-PCP-CSRF` header.
+- Admins see all sessions. Other members see only sessions they own or whose
+  principal is linked to them; unowned and group sessions are admin-only;
+  everything else returns 403.
+- The single admin token is a break-glass path, disabled unless
+  `PCP_BREAK_GLASS_ADMIN_LOGIN=1`.
+- Claim codes (identity linking) are single-use, expire after 15 minutes, are
+  stored only as SHA-256 hashes, are rate limited per user, and grant nothing
+  outside the signed-in web UI.
+
+## Service Credentials and Turn Grants
+
+- Channel plugins use `pcps_` service credentials (salted scrypt hash, shown
+  once, admin-minted, revocable). They are accepted only on
+  `/api/v1/service/*`, never as admin, UI login or agent recording token.
+- Each credential may assert only principals under its configured prefixes.
+- What a turn may read is a server-side grant (readable session set, TTL,
+  bound to the credential and the OpenClaw session key). Plugins never pass
+  session ids they want to read beyond that set; models never see a grant.
+- Group turns read only the group's own session; unlinked direct chats read
+  only their own session. Writes go only to the grant's home session.
+  See [service-sync.md](service-sync.md).
 
 ## Token Rules
 
-- UI token is created during deploy initialization or fallback setup.
+- UI token (break-glass admin token) is created during deploy initialization or fallback setup. It only opens the UI while `PCP_BREAK_GLASS_ADMIN_LOGIN=1`.
 - Session tokens are generated per session.
 - Token values are stored as salted hashes.
 - Session token validation checks token hash, revocation flag, expiration field, and session scope.
@@ -62,6 +97,7 @@ Do not commit:
 - `PCP_INSTANCE_SECRET`
 - UI tokens
 - Session tokens
+- `PCP_OIDC_CLIENT_SECRET` or any other deploy env value
 
 Commit only placeholder examples such as `.env.example`.
 

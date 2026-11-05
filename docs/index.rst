@@ -25,6 +25,8 @@
    :caption: Security
 
    security
+   auth-oidc
+   service-sync
    limitations
 
 .. toctree::

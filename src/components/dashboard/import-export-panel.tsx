@@ -7,6 +7,7 @@ import { buildIngestExport, buildCompactExport, redactSecrets, ExportCompaction 
 import { buildFallbackInstruction } from '@/lib/agent-schema';
 import { messagesToTranscript, TRANSCRIPT_VERSION } from '@/lib/agent-markdown';
 import { displayMode, RecordingMode } from '@/lib/agent-protocol';
+import { uiAuthHeaders } from '@/lib/client-auth';
 
 interface ImportExportPanelProps {
   sessionId: string;
@@ -63,7 +64,7 @@ export function ImportExportPanel({ sessionId, sessionTitle, mode, messages, onC
 
   useEffect(() => {
     if (!open) return;
-    fetch(`/api/v1/sessions/${sessionId}/compactions`, { headers: { Authorization: `Bearer ${localStorage.getItem('ui_token')}` } })
+    fetch(`/api/v1/sessions/${sessionId}/compactions`, { headers: { ...uiAuthHeaders() } })
       .then((r) => r.json()).then((d) => setCompactions(d.compactions || [])).catch(() => setCompactions([]));
   }, [open, sessionId]);
 

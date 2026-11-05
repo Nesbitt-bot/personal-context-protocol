@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { sql } from 'drizzle-orm';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { db } from '@/lib/db';
 import { APP_VERSION } from '@/lib/version';
 import { logError } from '@/lib/logging';
@@ -24,10 +24,12 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyUiToken(request);
+    const auth = await authenticateUi(request);
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
     }
+    const denied = requireAdmin(auth.actor, 'Unable to load diagnostics');
+    if (denied) return authErrorResponse(denied);
 
     // Each probe is isolated: a database that is down must still yield a
     // report saying so, rather than a 500 that says nothing.

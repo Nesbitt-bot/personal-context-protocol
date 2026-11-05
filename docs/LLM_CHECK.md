@@ -274,3 +274,29 @@ Append what this round actually did below:
     Sphinx documentation build not run locally (toolchain absent). Old local
     checkout/main untouched; docs/code pushed to canonical Trance-0 main for
     webhook verification. Local tests/logs/private env excluded from Git.
+
+- 2026-11-05 — Identity phase 1: Casdoor OIDC, ownership, claims (v0.2.0)
+  - Fresh clone of Nesbitt-bot main on the remote dev host; branch
+    feat/identity-phase1. Running deployment, Jenkins and deploy env untouched.
+  - Builder image (`docker build --target builder`) ran `npm run build`
+    successfully; `npm run typecheck` passed; `npm run test:run` passed
+    12 files / 224 tests with a disposable tmpfs Postgres
+    (`PCP_TEST_DATABASE_URL`), and 11 files / 208 passed + 16 skipped without
+    it (the CI configuration).
+  - Upgrade check: a database bootstrapped by v0.1.25 deploy-init with a
+    session row was upgraded by the new deploy-init twice (idempotent); the
+    session kept its data and became `unattributed`/unowned; `ui_auth` kept.
+  - Runtime smoke test against the production build (internal Docker network,
+    no published port): health 200, anonymous `/api/v1/sessions` and
+    `/api/v1/auth/me` 401, admin token rejected with `BREAK_GLASS_DISABLED`,
+    `/auth/login` without OIDC env redirects to `OIDC_DISABLED`.
+  - Real Casdoor login not exercised (IdP stubbed in tests); first live check
+    happens after the owner deploys with the `PCP_OIDC_*` env set.
+
+- 2026-11-05 — Identity phase 2: service credentials, turn grants, sync (v0.2.1)
+  - Separate commits on feat/identity-phase1 after phase 1 was complete.
+  - Builder image ran `npm run build`; typecheck passed; `npm run test:run`
+    passed 13 files / 244 tests with a disposable Postgres (218 + 26 skipped without it)
+    (`tests/service-sync-db.test.ts` uses its own `<db>_service` database);
+    without `PCP_TEST_DATABASE_URL` both DB files are skipped.
+  - No broker, plugins or broker→OpenClaw call (later phases).

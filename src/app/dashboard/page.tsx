@@ -14,11 +14,7 @@ import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { buildExportInstruction, buildImportInstruction, buildMinimalInstruction } from '@/lib/agent-protocol';
 import { buildMcpInstruction } from '@/lib/agent-schema';
 import { DEFAULT_SESSION_TITLE, DEFAULT_TOPIC_TITLE, generateUniqueTitle } from '@/lib/naming';
-
-function getUiToken() {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('ui_token');
-}
+import { BREAK_GLASS_STORAGE_KEY, breakGlassToken, fetchSignedInUser, uiAuthHeaders } from '@/lib/client-auth';
 
 /**
  * Dashboard content. Wrapped in Suspense so useSearchParams works without
@@ -92,8 +88,6 @@ function DashboardContent() {
   const selectedTopic = topics.find((topic) => topic.id === selectedSession?.topic_id) || null;
 
   useEffect(() => {
-    setHasUiToken(Boolean(getUiToken()));
-    loadAll();
     loadAuthState();
   }, []);
 
@@ -106,11 +100,15 @@ function DashboardContent() {
     }
   }, [selectedSessionId]);
 
+  /** Anonymous visitors go to /login; signed-in users load the workspace. */
   async function loadAuthState() {
-    const uiToken = getUiToken();
-    if (!uiToken) return;
+    const user = await fetchSignedInUser();
+    if (!user) { setHasUiToken(false); router.replace('/login?next=/dashboard'); return; }
+    setHasUiToken(true);
+    loadAll();
+    if (user.method !== 'break_glass') return;
     try {
-      const res = await fetch('/api/v1/auth/check', { headers: { Authorization: `Bearer ${uiToken}` } });
+      const res = await fetch('/api/v1/auth/check', { headers: { Authorization: `Bearer ${breakGlassToken()}` } });
       const data = await res.json().catch(() => ({}));
       if (res.ok && typeof data.ui_token_source === 'string') setUiTokenSource(data.ui_token_source);
     } catch { /* advisory only */ }
@@ -119,11 +117,10 @@ function DashboardContent() {
   function saveUiToken() {
     const token = uiTokenInput.trim();
     if (!token) return;
-    localStorage.setItem('ui_token', token);
+    localStorage.setItem(BREAK_GLASS_STORAGE_KEY, token);
     setHasUiToken(true);
     setUiTokenInput('');
     setError('');
-    loadAll();
     loadAuthState();
   }
 
@@ -142,14 +139,12 @@ function DashboardContent() {
   }
 
   function authHeaders(): Record<string, string> {
-    return { Authorization: `Bearer ${getUiToken()}` };
+    return uiAuthHeaders();
   }
 
   async function loadAll() {
     setLoading(true);
     try {
-      const uiToken = getUiToken();
-      if (!uiToken) { setHasUiToken(false); router.replace('/login?next=/dashboard'); return; }
       const [topicsRes, sessionsRes] = await Promise.all([
         fetch('/api/v1/topics', { headers: authHeaders() }),
         fetch('/api/v1/sessions', { headers: authHeaders() }),

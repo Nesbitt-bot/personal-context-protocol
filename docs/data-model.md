@@ -102,10 +102,15 @@ AI recording sessions, optionally within a topic.
 | `created_at` | TIMESTAMPTZ | Creation time |
 | `updated_at` | TIMESTAMPTZ | Last update time |
 | `last_message_at` | TIMESTAMPTZ | Last message timestamp |
+| `owner_user_id` | TEXT | Owning Casdoor user (`users.id`, nullable, `ON DELETE SET NULL`); NULL = unowned (admin-only) |
+| `principal` | TEXT | Platform identity the session belongs to, e.g. `telegram:8627151333` (nullable) |
+| `class` | TEXT | `trusted` \| `unattributed` (default) \| `group` (admin-only, never claimable) |
 
 **Constraints**:
 - Primary key: `id`
 - Foreign key: `topic_id → topics.id` (nullable)
+- Foreign key: `owner_user_id → users.id` (nullable)
+- Index: `owner_user_id`, `principal`
 - Index: `topic_id`
 - Index: `archived`
 
@@ -125,6 +130,66 @@ descriptor (`recording_mode` + `recording_guidance`) and the generated
 instruction. It is guidance to the agent, not a server-side filter.
 
 **AI access**: AI can only view/append to sessions for which it has a valid token.
+
+### users
+
+Casdoor users who have signed in at least once (migration 011).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | TEXT | `usr_<timestamp>_<id>` |
+| `oidc_issuer` | TEXT | Issuer that authenticated the user |
+| `oidc_sub` | TEXT | OIDC subject (Casdoor user id); unique with `oidc_issuer` |
+| `display_name` | TEXT | From the ID token at the last login |
+| `email` | TEXT | From the ID token (nullable) |
+| `groups_json` | JSONB | Groups snapshot from the last login |
+| `is_admin` | BOOLEAN | Admin group present at the last login |
+| `created_at` / `last_login_at` | TIMESTAMPTZ | |
+
+### identities
+
+Platform principals linked to a user. A principal links to at most one user.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `principal` | TEXT | Primary key, e.g. `telegram:8627151333`, `openclaw-weixin:<id>`, `astrbot:qq:<id>` |
+| `user_id` | TEXT | `users.id` (`ON DELETE CASCADE`) |
+| `link_method` | TEXT | `claim` or `admin` |
+| `linked_at` | TIMESTAMPTZ | |
+
+### claims
+
+Single-use claim codes. Only the SHA-256 of the code is stored.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | TEXT | `clm_<timestamp>_<id>` |
+| `code_hash` | TEXT | SHA-256 of the normalized code (unique) |
+| `session_id` | TEXT | Session the claim hands over (`ON DELETE CASCADE`) |
+| `principal` | TEXT | Principal the claim links |
+| `created_at` / `expires_at` | TIMESTAMPTZ | `expires_at` = issue + 15 minutes |
+| `redeemed_by` / `redeemed_at` | TEXT / TIMESTAMPTZ | Set once on redemption |
+
+`claim_attempts` (`user_id`, `succeeded`, `attempted_at`) backs the per-user
+redemption rate limit.
+
+### web_sessions and oidc_login_states
+
+Browser sign-in state. `web_sessions` stores the SHA-256 of the session cookie
+value and of its CSRF token, the user, and `expires_at` (12 hours).
+`oidc_login_states` holds in-flight authorization requests (`state`, `nonce`,
+PKCE `code_verifier`, `return_to`) for 10 minutes, keyed by the SHA-256 of the
+`__Host-pcp_oidc` cookie value, and is deleted when the callback consumes it.
+
+### service_credentials, turn_grants, synced_turns
+
+Migration 012. `service_credentials` stores plugin credentials (salted hash,
+16-character lookup prefix, `principal_prefixes_json`, revoked/expiry).
+`turn_grants` stores one live grant per (credential, `session_key`):
+`principal`, `home_session_id`, `readable_session_ids_json`, `expires_at`,
+`revoked_at`. `synced_turns` is the idempotency ledger (primary key
+`session_id`, `external_key`) for `POST /service/sync`. Grants and ledger rows
+cascade when their session is deleted.
 
 ### session_tokens
 
@@ -378,6 +443,8 @@ See [`docs/migrations.md`](migrations.md).
 
 ### Access control
 
+- Web UI access is decided per session from `owner_user_id`, `principal`
+  (via `identities`) and `class`; admins see everything
 - Session tokens are scoped by foreign key
 - Token validation checks session match
 - Topic routes reject AI tokens (403)
@@ -474,3 +541,13 @@ LIMIT 50;
 
 - Compactions rendered as first-class content; `<PCP_INGEST>` / mixed ingest
   records messages + a compaction; shared config validator; API doc-drift test
+
+### v0.2.0 (identity: Casdoor OIDC, ownership, claims)
+
+- `users`, `identities`, `claims`, `claim_attempts`, `web_sessions`,
+  `oidc_login_states`; `sessions.owner_user_id`, `sessions.principal`,
+  `sessions.class` (migration 011)
+
+### v0.2.1 (service sync)
+
+- `service_credentials`, `turn_grants`, `synced_turns` (migration 012)

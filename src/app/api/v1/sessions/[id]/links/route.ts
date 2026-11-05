@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { eq, or, inArray } from 'drizzle-orm';
-import { verifyUiToken } from '@/lib/middleware';
+import { and, eq, or, inArray } from 'drizzle-orm';
+import { authenticateUi, authErrorResponse } from '@/lib/ui-auth';
+import { authorizeSession, canAccessSession, linkedPrincipalsFor } from '@/lib/session-access';
 import { db } from '@/lib/db';
 import { sessionLinks, sessions } from '@/lib/schema';
 import { createId } from '@/lib/auth';
@@ -14,10 +15,12 @@ interface Params { id: string; }
 /** List every link attached to a session, with the linked session's title. */
 export async function GET(request: NextRequest, { params }: { params: Params }) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = await authorizeSession(authResult.actor, params.id, 'Unable to list session links');
+    if (denied) return authErrorResponse(denied);
 
     const rows = await db
       .select()
@@ -26,11 +29,21 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
 
     const otherIds = rows.map((r) => (r.sessionA === params.id ? r.sessionB : r.sessionA));
     const linkedSessions = otherIds.length
-      ? await db.select({ id: sessions.id, title: sessions.title }).from(sessions).where(inArray(sessions.id, otherIds))
+      ? await db.select({
+        id: sessions.id,
+        title: sessions.title,
+        ownerUserId: sessions.ownerUserId,
+        principal: sessions.principal,
+        sessionClass: sessions.sessionClass,
+      }).from(sessions).where(inArray(sessions.id, otherIds))
       : [];
 
-    const titleById = new Map(linkedSessions.map((s) => [s.id, s.title]));
-    const links = rows.map((r) => {
+    // Non-admins only see links whose other end they may also see.
+    const actor = authResult.actor;
+    const linked = actor.isAdmin ? new Set<string>() : await linkedPrincipalsFor(actor.userId);
+    const visible = linkedSessions.filter((s) => canAccessSession(actor, s, linked));
+    const titleById = new Map(visible.map((s) => [s.id, s.title]));
+    const links = rows.filter((r) => titleById.has(r.sessionA === params.id ? r.sessionB : r.sessionA)).map((r) => {
       const otherId = r.sessionA === params.id ? r.sessionB : r.sessionA;
       return {
         id: r.id,
@@ -59,10 +72,12 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
 /** Create an undirected link between this session and another. */
 export async function POST(request: NextRequest, { params }: { params: Params }) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = await authorizeSession(authResult.actor, params.id, 'Unable to link sessions');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json().catch(() => ({}));
     const validation = createSessionLinkSchema.safeParse(body);
@@ -80,6 +95,9 @@ export async function POST(request: NextRequest, { params }: { params: Params })
         { status: 400 },
       );
     }
+
+    const targetDenied = await authorizeSession(authResult.actor, toId, 'Unable to link sessions');
+    if (targetDenied) return authErrorResponse(targetDenied);
 
     const sessionIds = [params.id, toId];
     const targets = await db.select({ id: sessions.id }).from(sessions).where(inArray(sessions.id, sessionIds));
@@ -133,10 +151,12 @@ export async function POST(request: NextRequest, { params }: { params: Params })
 /** Remove a link by its id. */
 export async function DELETE(request: NextRequest, { params }: { params: Params }) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = await authorizeSession(authResult.actor, params.id, 'Unable to unlink sessions');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json().catch(() => ({}));
     const linkId = typeof body.link_id === 'string' ? body.link_id.trim() : '';
@@ -147,7 +167,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
       );
     }
 
-    await db.delete(sessionLinks).where(eq(sessionLinks.id, linkId));
+    // Only links attached to the authorized session may be removed through it.
+    await db.delete(sessionLinks).where(and(
+      eq(sessionLinks.id, linkId),
+      or(eq(sessionLinks.sessionA, params.id), eq(sessionLinks.sessionB, params.id)),
+    ));
     return NextResponse.json({ success: true, id: linkId, deleted: true });
   } catch (error) {
     logError({

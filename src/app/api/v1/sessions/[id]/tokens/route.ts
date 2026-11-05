@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, authErrorResponse } from '@/lib/ui-auth';
+import { authorizeSession } from '@/lib/session-access';
 import { db } from '@/lib/db';
 import { sessionTokens, sessions, events } from '@/lib/schema';
 import { generateToken, generateSalt, hashToken, createId } from '@/lib/auth';
@@ -19,10 +20,12 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = await authorizeSession(authResult.actor, params.id, 'Unable to manage session tokens');
+    if (denied) return authErrorResponse(denied);
 
     const rows = await db
       .select({
@@ -70,10 +73,12 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = await authorizeSession(authResult.actor, params.id, 'Unable to manage session tokens');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json().catch(() => ({}));
     const validation = manageTokenSchema.safeParse(body);
@@ -146,10 +151,12 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = await authorizeSession(authResult.actor, params.id, 'Unable to manage session tokens');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json();
     const validation = createTokenSchema.safeParse(body);
@@ -261,10 +268,12 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = await authorizeSession(authResult.actor, params.id, 'Unable to manage session tokens');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json().catch(() => ({}));
     const tokenId = typeof body.token_id === 'string' ? body.token_id.trim() : '';

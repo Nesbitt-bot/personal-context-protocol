@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, RefreshCw, XCircle } from 'lucide-react';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { uiAuthHeaders } from '@/lib/client-auth';
 
 type Feature = {
   id: string;
@@ -51,18 +52,18 @@ type EventRow = {
 const CARD = 'rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900';
 const LABEL = 'text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400';
 
-export function DiagnosticsPanel({ token }: { token: string }) {
+export function DiagnosticsPanel({ enabled }: { enabled: boolean }) {
   const [data, setData] = useState<Diagnostics | null>(null);
   const [events, setEvents] = useState<EventRow[] | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!enabled) return;
     setLoading(true);
     setError('');
     try {
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = uiAuthHeaders();
       const [diagRes, eventRes] = await Promise.all([
         fetch('/api/v1/diagnostics', { headers }),
         fetch('/api/v1/events?limit=50', { headers }),
@@ -99,11 +100,11 @@ export function DiagnosticsPanel({ token }: { token: string }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [enabled]);
 
   useEffect(() => { void load(); }, [load]);
 
-  if (!token) return null;
+  if (!enabled) return null;
 
   return (
     <div className="space-y-6">

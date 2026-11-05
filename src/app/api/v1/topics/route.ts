@@ -1,12 +1,13 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyUiToken } from '@/lib/middleware';
+import { authenticateUi, requireAdmin, authErrorResponse } from '@/lib/ui-auth';
 import { db } from '@/lib/db';
 import { topics, sessions, events } from '@/lib/schema';
 import { createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
 import { createTopicSchema } from '@/lib/validations';
 import { DEFAULT_TOPIC_TITLE, generateUniqueTitle } from '@/lib/naming';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { visibleSessionsFilter } from '@/lib/session-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,20 +16,28 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
 
-    const allTopics = await db.select().from(topics).orderBy(topics.createdAt);
-    
+    // Non-admins only see topics that contain a session visible to them, and
+    // counts only include those sessions.
+    const visible = visibleSessionsFilter(authResult.actor);
+    const allTopics = visible
+      ? await db.select().from(topics).where(inArray(
+        topics.id,
+        db.select({ id: sql<string>`${sessions.topicId}` }).from(sessions).where(visible),
+      )).orderBy(topics.createdAt)
+      : await db.select().from(topics).orderBy(topics.createdAt);
+
     // Add session count to each topic
     const topicsWithCount = await Promise.all(
       allTopics.map(async (topic) => {
         const [result] = await db
           .select({ count: sql<number>`count(${sessions.id})` })
           .from(sessions)
-          .where(eq(sessions.topicId, topic.id));
+          .where(and(eq(sessions.topicId, topic.id), visible));
         const count = result?.count ? Number(result.count) : 0;
         return { ...topic, session_count: count };
       })
@@ -51,10 +60,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await verifyUiToken(request);
+    const authResult = await authenticateUi(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error, code: authResult.code }, { status: authResult.status });
     }
+    const denied = requireAdmin(authResult.actor, 'Unable to create topic');
+    if (denied) return authErrorResponse(denied);
 
     const body = await request.json();
     const validation = createTopicSchema.safeParse(body);
