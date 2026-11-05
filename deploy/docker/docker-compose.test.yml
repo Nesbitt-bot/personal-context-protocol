@@ -36,9 +36,13 @@ services:
       # Fixed so the test script can authenticate deterministically. This value
       # is local-only and never reaches a real deployment.
       PCP_ADMIN_TOKEN: pcp-test-admin-token-at-least-32-characters
+      # The sync script authenticates with the admin token, which is the
+      # break-glass path (disabled by default since v0.2.0).
+      PCP_BREAK_GLASS_ADMIN_LOGIN: "1"
       NODE_ENV: production
     ports:
-      - "${PCP_TEST_PORT:-3100}:3000"
+      # Loopback only: this stack has a fixed, published admin token.
+      - "127.0.0.1:${PCP_TEST_PORT:-3100}:3000"
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 5s

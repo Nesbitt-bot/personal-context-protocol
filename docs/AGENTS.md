@@ -35,12 +35,23 @@ These rules extend the canonical [Trance-0/AGENTS.md](https://github.com/Trance-
 - Revoked tokens (soft delete) must be rejected
 - Never return plaintext tokens after initial generation
 
-### No external auth in v0.1
+### Human auth is Casdoor OIDC (v0.2+)
 
-- v0.1 uses single instance token + scoped session tokens only
-- No OAuth, no SSO, no GitHub login
-- UI token is generated at setup, stored as hash
-- If user loses UI token, they must rotate (generates new token)
+- Humans sign in with the configured Casdoor OIDC provider only (no other
+  OAuth/SSO providers). Missing `PCP_OIDC_*` configuration must disable
+  sign-in, never fall open.
+- Web UI routes authenticate with `authenticateUi()` (`src/lib/ui-auth.ts`)
+  and authorize per session with `authorizeSession()` /
+  `visibleSessionsFilter()` (`src/lib/session-access.ts`), or `requireAdmin()`
+  for admin-only actions. Never add a UI route that skips these.
+- Admins (admin group) see all sessions; other users see owned or
+  principal-linked sessions; unowned and `group` sessions are admin-only.
+- The single UI/admin token is a break-glass path, accepted only when
+  `PCP_BREAK_GLASS_ADMIN_LOGIN=1`. It is still generated at setup and stored as
+  a hash; if lost, rotate it.
+- Agent credentials (session tokens, scoped manager tokens) are never accepted
+  on web UI routes, and web sessions are never accepted on agent routes.
+- See `docs/auth-oidc.md`.
 
 ## Development rules
 

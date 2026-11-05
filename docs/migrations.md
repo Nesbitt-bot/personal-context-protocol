@@ -157,6 +157,28 @@ Per-session recording mode (idempotent, data-preserving):
 `wild` (default) lets the agent redact secrets it judges unsafe; `exact` asks for
 verbatim recording. Existing sessions default to `wild`.
 
+### 0011_identity (v0.2.0)
+
+Casdoor OIDC identity and session ownership (idempotent, data-preserving, only
+additive):
+- New tables `users`, `identities`, `claims`, `claim_attempts`,
+  `web_sessions`, `oidc_login_states`
+- `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS owner_user_id` (nullable FK to
+  `users`, `ON DELETE SET NULL`), `principal` (nullable) and
+  `class text NOT NULL DEFAULT 'unattributed'` (CHECK `trusted`/`unattributed`/`group`)
+- Indexes on the new foreign keys and lookup columns
+
+Applied by `scripts/deploy-init.js` at container start and by
+`ensureDatabaseSchema()`; `tests/identity.test.ts` checks the three copies match.
+
+Rollout notes:
+- Every existing session becomes `unattributed` and unowned, i.e. visible to
+  admins only, until it is claimed or an admin sets its `principal`.
+- The admin-token login stops working on upgrade unless
+  `PCP_BREAK_GLASS_ADMIN_LOGIN=1`; configure the `PCP_OIDC_*` variables first.
+  Agent recording tokens and scoped manager tokens are unaffected.
+- Rollback to v0.1.x is safe: the old code ignores the new tables and columns.
+
 ## Checking migration status
 
 ```bash

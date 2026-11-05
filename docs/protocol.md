@@ -2,11 +2,33 @@
 
 Base path: `/api/v1`
 
-All protected endpoints use:
+Agent and manager endpoints use:
 
 ```http
 Authorization: Bearer <token>
 ```
+
+Human (web UI) endpoints — everything under "Admin" / "Sessions" / "Topics"
+below — authenticate with the Casdoor OIDC browser session instead (see
+[Human sign-in](#human-sign-in-oidc)). Since v0.2.0 the legacy single admin
+token is accepted as a Bearer header on those routes **only** when the
+deployment sets `PCP_BREAK_GLASS_ADMIN_LOGIN=1`; otherwise it is rejected with
+`401 BREAK_GLASS_DISABLED`. Per-session recording tokens and scoped manager
+tokens are unchanged and never accepted on web UI routes.
+
+Web UI authorization:
+
+- Members of the admin group (`PCP_OIDC_ADMIN_GROUP`) and the break-glass
+  admin see and manage every session.
+- Other signed-in members see only sessions they own or whose `principal` is
+  linked to them. Unowned sessions and `class: "group"` sessions are
+  admin-only. Another user's session returns `403 FORBIDDEN`.
+- Topic management, permanent deletion, message edit/delete, scoped tokens,
+  export, global events, diagnostics, claim issuing and admin-token rotation
+  are admin-only.
+- Cookie-authenticated `POST`/`PATCH`/`DELETE` requests must send the CSRF
+  token from the `__Host-pcp_csrf` cookie in the `X-PCP-CSRF` header, or get
+  `403 CSRF_REJECTED`.
 
 ## Error Shape
 
@@ -45,9 +67,83 @@ Response:
 }
 ```
 
+## Human sign-in (OIDC)
+
+`/auth/login`, `/auth/callback` and `/auth/logout` live at the site root (not
+under `/api/v1`); `/auth/config` and `/auth/me` are under `/api/v1`.
+
+### GET `/auth/login?next=/path`
+
+Starts the Casdoor authorization-code flow with `state`, `nonce` and PKCE
+(S256), stores them server-side under a short-lived `__Host-pcp_oidc` cookie
+and redirects (303) to Casdoor. `next` must be a same-origin path. When any
+`PCP_OIDC_*` variable is missing, login is disabled and this redirects to
+`/login?auth_error=OIDC_DISABLED` (fail closed).
+
+### GET `/auth/callback`
+
+The `PCP_OIDC_REDIRECT_URI` target. Consumes the login state once, checks
+`state`, exchanges the code with the PKCE verifier, and verifies the ID token
+(JWKS signature with asymmetric algorithms only, issuer, audience, expiry,
+nonce). Users without `PCP_OIDC_REQUIRED_GROUP` in the `groups` claim are
+redirected to `/login?auth_error=GROUP_REQUIRED` and no user or session is
+created. On success a new session is issued (`__Host-pcp_session`: HttpOnly,
+Secure, SameSite=Lax; `__Host-pcp_csrf`: readable CSRF token), any previous
+session cookie is revoked, and the browser is redirected to `next`.
+
+### POST `/auth/logout`
+
+Revokes the server-side session (CSRF-checked) and clears the cookies.
+
+### GET `/auth/config`
+
+Public, secret-free: `{ "oidc_enabled", "oidc_error", "break_glass_enabled" }`
+for the login page. `oidc_error` names missing variables, never values.
+
+### GET `/auth/me`
+
+The signed-in user: `{ "user_id", "display_name", "is_admin", "method" }`
+where `method` is `oidc` or `break_glass`. `401` when anonymous.
+
+## Identity claims
+
+### POST `/sessions/:id/claims` (admin)
+
+Issues a single-use claim code for the session and a platform principal.
+Body `{ "principal": "telegram:8627151333" }` (defaults to the session's own
+principal). Group sessions return `409 GROUP_SESSION`. The plaintext code is
+returned once (only its SHA-256 is stored) and expires after 15 minutes:
+
+```json
+{ "success": true, "claim_id": "clm_...", "code": "ABCDE-FGHJK-MNPQR-STVWX",
+  "claim_url": "https://pcp.example.com/claim?code=...", "expires_at": "..." }
+```
+
+### POST `/claims/redeem`
+
+Signed-in Casdoor users only (CSRF-checked). Body `{ "code": "..." }`. Links
+the claim's principal to the caller (`identities`), makes the caller the
+session owner, and marks the claim redeemed. Later sessions with that principal
+become visible to (and, when a principal is attached, owned by) the same user.
+Errors: `400 CLAIM_INVALID`, `409 CLAIM_ALREADY_REDEEMED`, `410 CLAIM_EXPIRED`,
+`409 PRINCIPAL_LINKED_ELSEWHERE`, `409 SESSION_OWNED`, `429 RATE_LIMITED`
+(10 failed attempts per user per 15 minutes). The `/claim` page wraps this.
+
+### GET `/identities`
+
+Linked principals: all for admins, the caller's own otherwise.
+
+### DELETE `/identities` (admin)
+
+Body `{ "principal": "telegram:..." }`. Unlinks a principal; existing session
+owners are kept.
+
+## Break-glass admin token
+
 ### GET `/auth/check`
 
-Validates a UI/admin bearer token before opening the dashboard. If `PCP_ADMIN_TOKEN` is configured, the deployment token is reconciled into `ui_auth` before validation. Missing generated credentials return `SETUP_REQUIRED`; configured-but-unusable deployment credentials return `INVALID_ADMIN_TOKEN` or `ADMIN_CREDENTIAL_NOT_INITIALIZED` with a deployment guide URL.
+Returns `401 BREAK_GLASS_DISABLED` unless `PCP_BREAK_GLASS_ADMIN_LOGIN=1`.
+When enabled, validates a UI/admin bearer token before opening the dashboard. If `PCP_ADMIN_TOKEN` is configured, the deployment token is reconciled into `ui_auth` before validation. Missing generated credentials return `SETUP_REQUIRED`; configured-but-unusable deployment credentials return `INVALID_ADMIN_TOKEN` or `ADMIN_CREDENTIAL_NOT_INITIALIZED` with a deployment guide URL.
 
 ### PATCH `/auth/token`
 
@@ -184,13 +280,15 @@ Permanently deletes ALL archived sessions and topics. Returns
 
 ### GET `/sessions`
 
-Lists every session across all topics, including uncategorized ones
-(`topic_id: null`). Used by the dashboard to group sessions by topic.
+Lists the sessions visible to the caller (all of them for admins), including
+uncategorized ones (`topic_id: null`). Each row includes `owner_user_id`,
+`principal` and `class`. Used by the dashboard to group sessions by topic.
 
 ### POST `/sessions`
 
-Creates a session. `topic_id` is optional — omit it for an **uncategorized**
-(no-topic) session. `title` is optional and auto-suffixed for uniqueness within
+Creates a session owned by the signed-in user (`class: "trusted"`). `topic_id`
+is optional — omit it for an **uncategorized** (no-topic) session; only admins
+may file a session under a topic. `title` is optional and auto-suffixed for uniqueness within
 the topic group (or the uncategorized group).
 
 Body (all fields optional):
@@ -237,6 +335,11 @@ Body:
   "archived": false
 }
 ```
+
+Admins may also set `principal` (e.g. `"telegram:123"`, `null` clears it) and
+`class` (`trusted` | `unattributed` | `group`); attaching a principal that is
+already linked to a user makes that user the owner of an unowned session.
+Non-admins may not change `topic_id`, `principal` or `class`.
 
 At least one field is required. `topic_id: null` moves the session to
 Uncategorized (no topic). `public: true` enables a read-only public view;

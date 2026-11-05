@@ -22,3 +22,6 @@ tsconfig.tsbuildinfo
 # Private deployment diagnostics and test artifacts
 logs/
 reports/
+
+# Channel plugins (OpenClaw, AstrBot) are deployed separately, never in the image
+thirdparty/

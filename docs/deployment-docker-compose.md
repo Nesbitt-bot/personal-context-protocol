@@ -23,7 +23,7 @@ Bash:
 export PCP_VERSION="$(cat VERSION)"
 ```
 
-The default Compose image is `personal-context-protocol:0.1.25`. When `VERSION` changes, set `PCP_VERSION` to the new value before building so each release gets a distinct image tag.
+The default Compose image is `personal-context-protocol:0.2.0`. When `VERSION` changes, set `PCP_VERSION` to the new value before building so each release gets a distinct image tag.
 
 ## Start Locally
 
@@ -39,13 +39,15 @@ Compose provides local defaults for development. Override them when needed:
 
 | Name | Default | Purpose |
 |---|---|---|
-| `PCP_VERSION` | `0.1.25` | App image tag and Docker build version |
-| `PCP_PORT` | `3000` | Host port mapped to the app container |
+| `PCP_VERSION` | `0.2.0` | App image tag and Docker build version |
+| `PCP_PORT` | `127.0.0.1:3000` | Host address:port mapped to the app container (loopback by default; publish through a TLS reverse proxy) |
 | `PCP_APP_URL` | `http://localhost:3000` | Public app URL used by clients |
 | `PCP_INSTANCE_SECRET` | Local placeholder | 32+ character instance secret |
 | `POSTGRES_PASSWORD` | Generated in `.env` | Local Postgres password |
 | `DATABASE_URL` | Generated in `.env` | App connection string for the Compose Postgres service |
-| `PCP_ADMIN_TOKEN` | Empty | Optional 32+ character admin/reset token |
+| `PCP_ADMIN_TOKEN` | Empty | Optional 32+ character break-glass admin token |
+| `PCP_OIDC_*` | Empty | Casdoor sign-in; see [auth-oidc.md](auth-oidc.md). Sign-in is disabled until all six are set. |
+| `PCP_BREAK_GLASS_ADMIN_LOGIN` | Empty | `1` re-enables admin-token login (emergency only) |
 
 ## Reset Admin Token With Env
 
@@ -74,7 +76,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "0.1.25",
+  "version": "0.2.0",
   "database": "pending"
 }
 ```

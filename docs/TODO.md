@@ -2,6 +2,17 @@
 
 Owner-visible future work for Personal Context Protocol. Keep this list focused on versioned product work, not per-round scratch notes.
 
+## v0.2.0 Identity phase 1 — follow-ups
+
+- [x] Casdoor OIDC sign-in, server-side sessions, CSRF, break-glass flag
+- [x] Session ownership (`owner_user_id`, `principal`, `class`) and admin-sees-all
+- [x] Single-use claim codes and `/claim` page
+- [ ] Hide admin-only dashboard controls (topic create/rename, trash, message edit) for non-admin users; the API already returns 403
+- [ ] Run `tests/identity-db.test.ts` in CI (needs `PCP_TEST_DATABASE_URL` pointing at a throwaway Postgres)
+- [ ] Admin UI for issuing claim codes and managing linked identities (API exists)
+- [ ] Revoke a user's web sessions when an admin removes them (today: group changes apply at next login, sessions expire after 12 h)
+- [ ] Phase 2+: service credentials, turn grants, broker, plugins under `thirdparty/`
+
 ## v0.1 Completed
 
 - [x] **Core schema and API**

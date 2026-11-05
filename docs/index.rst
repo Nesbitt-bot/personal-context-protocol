@@ -25,6 +25,7 @@
    :caption: Security
 
    security
+   auth-oidc
    limitations
 
 .. toctree::
