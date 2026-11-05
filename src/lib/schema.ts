@@ -24,6 +24,73 @@ export const uiAuth = pgTable('ui_auth', {
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
 });
 
+// Casdoor users (migration 011). One row per (issuer, sub). `groupsJson` is the
+// groups snapshot from the last login and `isAdmin` is derived from the admin
+// group at that login.
+export const users = pgTable('users', {
+  id: text('id').primaryKey(),
+  oidcIssuer: text('oidc_issuer').notNull(),
+  oidcSub: text('oidc_sub').notNull(),
+  displayName: text('display_name').notNull(),
+  email: text('email'),
+  groupsJson: jsonb('groups_json').notNull().default([]),
+  isAdmin: boolean('is_admin').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+});
+
+// Platform principals (e.g. `telegram:8627151333`) linked to a user. A
+// principal links to at most one user.
+export const identities = pgTable('identities', {
+  principal: text('principal').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  linkMethod: text('link_method', { enum: ['claim', 'admin'] }).notNull(),
+  linkedAt: timestamp('linked_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Single-use claim codes. Only the SHA-256 of the code is stored.
+export const claims = pgTable('claims', {
+  id: text('id').primaryKey(),
+  codeHash: text('code_hash').notNull(),
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  principal: text('principal').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  redeemedBy: text('redeemed_by').references(() => users.id, { onDelete: 'set null' }),
+  redeemedAt: timestamp('redeemed_at', { withTimezone: true }),
+});
+
+// Claim redemption attempts, for per-user rate limiting.
+export const claimAttempts = pgTable('claim_attempts', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  succeeded: boolean('succeeded').notNull(),
+  attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Browser login sessions. The cookie carries a random id; only its SHA-256 is
+// stored, together with the SHA-256 of the session's CSRF token.
+export const webSessions = pgTable('web_sessions', {
+  idHash: text('id_hash').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  csrfHash: text('csrf_hash').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+});
+
+// In-flight OIDC authorization requests (state, nonce, PKCE verifier), keyed by
+// the SHA-256 of a random value held in a short-lived browser cookie.
+export const oidcLoginStates = pgTable('oidc_login_states', {
+  idHash: text('id_hash').primaryKey(),
+  state: text('state').notNull(),
+  nonce: text('nonce').notNull(),
+  codeVerifier: text('code_verifier').notNull(),
+  returnTo: text('return_to').notNull().default('/dashboard'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+});
+
 // Topics
 export const topics = pgTable('topics', {
   id: text('id').primaryKey(),
@@ -53,6 +120,14 @@ export const sessions = pgTable('sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   lastMessageAt: timestamp('last_message_at', { withTimezone: true }),
+  // Identity (migration 011). `ownerUserId` is the Casdoor user that owns the
+  // session (null = unowned, admin-only). `principal` is the platform identity
+  // the session belongs to (e.g. `telegram:123`). `class` is 'trusted' (a
+  // verified one-to-one identity), 'unattributed' (no verified identity) or
+  // 'group' (shared group chat; admin-only, never claimable).
+  ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'set null' }),
+  principal: text('principal'),
+  sessionClass: text('class', { enum: ['trusted', 'unattributed', 'group'] }).notNull().default('unattributed'),
 }, (table) => ({
   externalKeyIdx: uniqueIndex('sessions_external_key_idx').on(table.externalKey),
 }));
