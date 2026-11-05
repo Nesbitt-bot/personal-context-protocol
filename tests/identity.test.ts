@@ -3,7 +3,9 @@ import path from 'path';
 import { describe, it, expect } from 'vitest';
 import { canAccessSession, isValidPrincipal } from '../src/lib/session-access';
 import { generateClaimCode, hashClaimCode, normalizeClaimCode } from '../src/lib/claims';
-import { IDENTITY_SCHEMA_STATEMENTS } from '../src/lib/setup-schema';
+import { IDENTITY_SCHEMA_STATEMENTS, SERVICE_SCHEMA_STATEMENTS } from '../src/lib/setup-schema';
+import { credentialAllowsPrincipal, isValidPrincipalPrefix } from '../src/lib/service-auth';
+import { clampGrantTtl, groupPrincipalFor, MAX_GRANT_TTL_SECONDS, MIN_GRANT_TTL_SECONDS } from '../src/lib/turn-grants';
 
 const admin = { isAdmin: true, userId: 'usr_admin' };
 const alice = { isAdmin: false, userId: 'usr_alice' };
@@ -98,5 +100,50 @@ describe('identity migration 011', () => {
       expect(statement).toMatch(/^(CREATE TABLE IF NOT EXISTS|CREATE INDEX IF NOT EXISTS|ALTER TABLE sessions ADD COLUMN IF NOT EXISTS)/);
       expect(statement).not.toMatch(/\b(DROP|TRUNCATE|DELETE FROM|UPDATE)\b/);
     }
+  });
+});
+
+describe('migration 012 (service sync)', () => {
+  const squash = (value: string) => value.replace(/\s+/g, ' ').trim();
+
+  it('deploy-init.js and drizzle/0012_service_sync.sql carry every statement', () => {
+    const deployInit = squash(fs.readFileSync(path.join(__dirname, '../scripts/deploy-init.js'), 'utf8'));
+    const sqlFile = squash(fs.readFileSync(path.join(__dirname, '../drizzle/0012_service_sync.sql'), 'utf8'));
+    for (const statement of SERVICE_SCHEMA_STATEMENTS) {
+      expect(deployInit).toContain(squash(statement));
+      expect(sqlFile).toContain(squash(statement));
+      expect(statement).toMatch(/^(CREATE TABLE IF NOT EXISTS|CREATE INDEX IF NOT EXISTS)/);
+    }
+  });
+});
+
+describe('service credential principal scope', () => {
+  it('only allows principals under the configured prefixes', () => {
+    expect(credentialAllowsPrincipal(['telegram:', 'openclaw-weixin:'], 'telegram:123')).toBe(true);
+    expect(credentialAllowsPrincipal(['telegram:', 'openclaw-weixin:'], 'openclaw-weixin:abc')).toBe(true);
+    expect(credentialAllowsPrincipal(['telegram:'], 'astrbot:qq:1')).toBe(false);
+    expect(credentialAllowsPrincipal(['astrbot:'], 'astrbot:qq:1')).toBe(true);
+    expect(credentialAllowsPrincipal([], 'telegram:1')).toBe(false);
+  });
+
+  it('a prefix must name a whole platform segment', () => {
+    expect(isValidPrincipalPrefix('telegram:')).toBe(true);
+    expect(isValidPrincipalPrefix('tele')).toBe(false);
+    expect(isValidPrincipalPrefix('')).toBe(false);
+    expect(credentialAllowsPrincipal(['tele'], 'telegram:1')).toBe(false);
+  });
+});
+
+describe('turn grant helpers', () => {
+  it('clamps the grant TTL', () => {
+    expect(clampGrantTtl(undefined)).toBe(600);
+    expect(clampGrantTtl(1)).toBe(MIN_GRANT_TTL_SECONDS);
+    expect(clampGrantTtl(10 ** 9)).toBe(MAX_GRANT_TTL_SECONDS);
+    expect(clampGrantTtl(120)).toBe(120);
+  });
+
+  it('derives a platform-scoped group principal', () => {
+    expect(groupPrincipalFor('telegram:42', '-1001')).toBe('telegram:group:-1001');
+    expect(groupPrincipalFor('astrbot:qq:42', '777')).toBe('astrbot:qq:group:777');
   });
 });
