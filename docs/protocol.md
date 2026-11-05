@@ -162,7 +162,7 @@ or end it (`{ session_key }`). Returns `{ grant_id, session_id, readable_session
 
 `{ session_key, external_key, messages }`: append one turn to the grant's home
 session, idempotent by `external_key` (`duplicate: true` on replay). Broker
-grants (`pcp:<grant id>` keys) are read-only for plugins: `403`.
+grants (`[agent:<agent>:]pcp:<grant id>` keys) are read-only for plugins: `403`.
 
 ### POST `/service/recall`
 
@@ -189,7 +189,7 @@ credential, signature, replay-window or nonce failure is `401` (`code`:
 `INGRESS_CREDENTIAL_INVALID`, `BAD_SIGNATURE`, `STALE_STAMP`,
 `REPLAYED_STAMP`, ...). Returns `{ turn_id, session_key, agent, model,
 messages, expires_at }`: the OpenClaw request to make with
-`x-openclaw-session-key: <session_key>` (`pcp:<turn_id>`).
+`x-openclaw-session-key: <session_key>` (`agent:<agent>:pcp:<turn_id>`; the prefix makes OpenClaw run that agent).
 
 ### POST `/service/broker/turns/complete`
 

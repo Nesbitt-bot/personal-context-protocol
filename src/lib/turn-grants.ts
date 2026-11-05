@@ -60,6 +60,17 @@ export function brokerSessionKey(grantId: string): string {
   return `pcp:${grantId}`;
 }
 
+/**
+ * The OpenClaw session key for a broker turn: `agent:<agent>:pcp:<grant id>`.
+ * OpenClaw takes the run's agent from an `agent:<id>:` key prefix and falls
+ * back to its default agent (main) for any other explicit key, ignoring the
+ * `openclaw/<agent>` model. The prefix is what makes the policy's agent run.
+ */
+export function openclawBrokerSessionKey(agent: string, grantId: string): string {
+  if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(agent)) throw new Error('invalid agent id');
+  return `agent:${agent}:${brokerSessionKey(grantId)}`;
+}
+
 /** The broker grant id in a session key, or null for ordinary keys. */
 export function brokerGrantIdFromSessionKey(sessionKey: string): string | null {
   const match = typeof sessionKey === 'string' ? BROKER_SESSION_KEY_PATTERN.exec(sessionKey) : null;

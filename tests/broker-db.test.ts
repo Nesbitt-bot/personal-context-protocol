@@ -151,7 +151,8 @@ describe.skipIf(!enabled)('PCP broker: AstrBot identity, policy, grants and reco
     expect(res.status).toBe(200);
     expect(res.body.agent).toBe('relay-owner');
     expect(res.body.model).toBe('openclaw/relay-owner');
-    expect(res.body.session_key).toBe(`pcp:${res.body.turn_id}`);
+    // OpenClaw runs the agent named in the key (a bare pcp: key would run main).
+    expect(res.body.session_key).toBe(`agent:relay-owner:pcp:${res.body.turn_id}`);
     const [system, user] = res.body.messages;
     expect(system.content).toMatch(/^Verified sender \(PCP-attested\): astrbot:qq:200001, private chat on QQ; linked PCP user "owner" \(the verified owner\)/);
     expect(system.content).toContain('BLUE HERON'); // owner's other sessions, bounded
@@ -159,7 +160,7 @@ describe.skipIf(!enabled)('PCP broker: AstrBot identity, policy, grants and reco
     expect(user).toEqual({ role: 'user', content: 'what is the trip codename from Telegram?' });
 
     // openclaw-pcp tools: its own credential + the session key (as OpenClaw may store it).
-    for (const key of [res.body.session_key, `agent:relay-owner:${res.body.session_key}`]) {
+    for (const key of [res.body.session_key, `pcp:${res.body.turn_id}`]) {
       const found = await tool('search', tok.openclaw, { session_key: key, query: 'heron' });
       expect(found.status).toBe(200);
       expect(found.body.results.map((r: { content: string }) => r.content).join()).toContain('BLUE HERON');
@@ -186,6 +187,7 @@ describe.skipIf(!enabled)('PCP broker: AstrBot identity, policy, grants and reco
     const res = await prepare(body(stamp({ chat: 'group', group_id: GROUP, sender_id: STRANGER_QQ }), forged));
     expect(res.status).toBe(200);
     expect(res.body.agent).toBe('relay');
+    expect(res.body.session_key).toBe(`agent:relay:pcp:${res.body.turn_id}`);
     const system = res.body.messages[0].content;
     expect(system).toMatch(/^Verified sender \(PCP-attested\): astrbot:qq:300003, group chat 700001 on QQ; no linked PCP user\./);
     expect(system).not.toMatch(/BLUE HERON|verified owner\)|trip codename/);

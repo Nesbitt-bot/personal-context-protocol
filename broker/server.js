@@ -4,7 +4,7 @@
  *
  *   AstrBot plugin --(ingress credential + HMAC-signed stamp)--> broker (loopback)
  *     -> PCP  POST /api/v1/service/broker/turns            (verify, grant, policy, context)
- *     -> OpenClaw POST /v1/chat/completions                (gateway token, pcp:<grant> key)
+ *     -> OpenClaw POST /v1/chat/completions   (gateway token, agent:<agent>:pcp:<grant> key)
  *     -> PCP  POST /api/v1/service/broker/turns/complete   (record reply, end grant)
  *     <- { reply }
  *
@@ -119,6 +119,11 @@ function createBroker(cfg = loadConfig(), deps = {}) {
       return send(res, status, { error: 'turn refused', code: String(prepared.json?.code || 'REFUSED').slice(0, 40) });
     }
     const t = prepared.json;
+    // OpenClaw runs the agent named in the key; refuse anything inconsistent.
+    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(String(t.agent)) || t.session_key !== `agent:${t.agent}:pcp:${t.turn_id}` || t.model !== `openclaw/${t.agent}`) {
+      log('WARN', 'AstrBot turn refused: PCP broker / prepare — inconsistent agent, model or session key from PCP; no reply.');
+      return send(res, 503, { error: 'turn refused', code: 'INCONSISTENT_TURN' });
+    }
     const complete = (body) => postJson(fetchImpl, `${cfg.pcpUrl}/api/v1/service/broker/turns/complete`, { authorization: `Bearer ${broker}` }, JSON.stringify({ turn_id: t.turn_id, ...body }), cfg.pcpTimeoutMs)
       .catch(() => ({ ok: false, status: 0 }));
 
@@ -127,6 +132,7 @@ function createBroker(cfg = loadConfig(), deps = {}) {
       completion = await postJson(fetchImpl, `${cfg.openclawUrl}/v1/chat/completions`, {
         authorization: `Bearer ${gateway}`,
         'x-openclaw-session-key': t.session_key,
+        'x-openclaw-agent-id': t.agent,
       }, JSON.stringify({ model: t.model, messages: t.messages, stream: false }), cfg.openclawTimeoutMs);
     } catch {
       completion = { ok: false, status: 0, json: null };

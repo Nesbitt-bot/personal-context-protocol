@@ -29,7 +29,7 @@ function json(status: number, body: unknown) {
 
 const PREPARED = {
   turn_id: `grt_${'a'.repeat(48)}`,
-  session_key: `pcp:grt_${'a'.repeat(48)}`,
+  session_key: `agent:relay-owner:pcp:grt_${'a'.repeat(48)}`,
   agent: 'relay-owner',
   model: 'openclaw/relay-owner',
   messages: [{ role: 'system', content: 'Verified sender (PCP-attested): ...' }, { role: 'user', content: 'hi' }],
@@ -63,6 +63,7 @@ describe('PCP broker process', () => {
     expect(prepare.body).toBe('{"stamp":{},"message":{"text":"hi"}}');
     expect(openclaw.headers.authorization).toBe('Bearer gw_secret');
     expect(openclaw.headers['x-openclaw-session-key']).toBe(PREPARED.session_key);
+    expect(openclaw.headers['x-openclaw-agent-id']).toBe('relay-owner');
     expect(JSON.parse(openclaw.body)).toEqual({ model: 'openclaw/relay-owner', messages: PREPARED.messages, stream: false });
     expect(JSON.parse(complete.body)).toEqual({ turn_id: PREPARED.turn_id, status: 'ok', reply: 'hello from relay-owner' });
     // The gateway token never goes to PCP; the broker credential never goes to OpenClaw.
@@ -82,6 +83,21 @@ describe('PCP broker process', () => {
     expect(res.status).toBe(401);
     expect((await res.json()).code).toBe('REPLAYED_STAMP');
     expect(h.calls).toHaveLength(1);
+  });
+
+  it('an inconsistent agent / key / model from PCP is refused before OpenClaw', async () => {
+    for (const bad of [
+      { ...PREPARED, session_key: `pcp:${PREPARED.turn_id}` },
+      { ...PREPARED, session_key: `agent:main:pcp:${PREPARED.turn_id}` },
+      { ...PREPARED, model: 'openclaw/main' },
+      { ...PREPARED, agent: 'Relay Owner' },
+    ]) {
+      const h = await start(harness({ prepare: () => json(200, bad) }));
+      expect((await turn()).status).toBe(503);
+      expect(h.calls.map((c) => c.url)).toEqual(['http://127.0.0.1:3000/api/v1/service/broker/turns']);
+      await close();
+    }
+    close = async () => undefined;
   });
 
   it('PCP 5xx means 503 (fail closed)', async () => {

@@ -10,7 +10,7 @@ import {
   agentFor, contextLines, externalKeyForStamp, ingressBodySchema, principalFromStamp, signIngressBody, signatureMatches,
   verifiedSenderBlock, AGENT_RELAY, AGENT_RELAY_OWNER,
 } from '../src/lib/broker';
-import { brokerGrantIdFromSessionKey, brokerSessionKey, newBrokerGrantId } from '../src/lib/turn-grants';
+import { brokerGrantIdFromSessionKey, brokerSessionKey, newBrokerGrantId, openclawBrokerSessionKey } from '../src/lib/turn-grants';
 import { credentialShapeError, deriveIngressSigningKey } from '../src/lib/service-auth';
 import { BROKER_SCHEMA_STATEMENTS, SCHEMA_STATEMENTS } from '../src/lib/setup-schema';
 
@@ -103,6 +103,9 @@ describe('broker session keys', () => {
     expect(newBrokerGrantId()).not.toBe(id);
     expect(brokerGrantIdFromSessionKey(brokerSessionKey(id))).toBe(id);
     expect(brokerGrantIdFromSessionKey(`agent:relay-owner:pcp:${id}`)).toBe(id);
+    expect(openclawBrokerSessionKey('relay', id)).toBe(`agent:relay:pcp:${id}`);
+    expect(brokerGrantIdFromSessionKey(openclawBrokerSessionKey('relay-owner', id))).toBe(id);
+    expect(() => openclawBrokerSessionKey('Main Agent', id)).toThrow();
     expect(brokerGrantIdFromSessionKey(`pcp:${id.toUpperCase().replace('GRT_', 'grt_')}`)).toBe(id);
     for (const key of ['agent:main:direct:owner', 'pcp:grt_1793904467977_c4fe0053', `x:pcp:${id}`, `pcp:${id}x`]) {
       expect(brokerGrantIdFromSessionKey(key)).toBeNull();

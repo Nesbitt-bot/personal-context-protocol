@@ -17,9 +17,9 @@ QQ ─▶ AstrBot (wake, mention, rate limit, profile routing unchanged)
         broker turn grant (server side), agent policy, bounded context
         records the user message
    ─▶ OpenClaw POST /v1/chat/completions      (gateway token: broker only)
-        model openclaw/<agent>, x-openclaw-session-key: pcp:<grant id>
+        model openclaw/<agent>, x-openclaw-session-key: agent:<agent>:pcp:<grant id>
         system: "Verified sender (PCP-attested) …" + context; user: latest message
-        openclaw-pcp tools: own credential + pcp:<grant id> → PCP checks delegate
+        openclaw-pcp tools: own credential + that key → PCP checks delegate
    ─▶ PCP  POST /api/v1/service/broker/turns/complete   (records reply, ends grant)
    ─▶ reply ─▶ AstrBot ─▶ QQ
 ```
@@ -89,7 +89,12 @@ principal to a user with the claim flow or
 `scripts/pcp-operator.js identity link --principal astrbot:qq:<id> --user usr_…`.
 
 Broker grants (`turn_grants.origin = 'broker'`) are keyed by an unguessable
-`grt_<48 hex>` id; the OpenClaw session key is `pcp:<grant id>`. Only the
+`grt_<48 hex>` id; the OpenClaw session key is `agent:<agent>:pcp:<grant id>`
+(also sent as `x-openclaw-agent-id`). The `agent:<agent>:` prefix is required:
+OpenClaw takes the run's agent from it and falls back to its default agent
+(`main`, with the owner's workspace and tools) for any other explicit key,
+whatever the `openclaw/<agent>` model says. The broker refuses a prepared turn
+whose key, model and agent disagree. Only the
 broker credential that created the grant can complete it, and only the
 broker's delegate (`openclaw-pcp`) can read it with its own credential. Delegates
 cannot write (`/service/sync` is `403`). The grant ends when the turn completes

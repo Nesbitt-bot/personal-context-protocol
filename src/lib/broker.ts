@@ -7,7 +7,7 @@ import { createId } from './auth';
 import { ownerForPrincipal } from './claims';
 import { deriveIngressSigningKey, ResolvedServiceCredential, verifyServiceToken } from './service-auth';
 import { isValidPrincipal } from './session-access';
-import { brokerSessionKey, createTurnGrant, findActiveGrant, groupPrincipalFor, newBrokerGrantId, revokeGrantById } from './turn-grants';
+import { brokerSessionKey, createTurnGrant, findActiveGrant, groupPrincipalFor, newBrokerGrantId, openclawBrokerSessionKey, revokeGrantById } from './turn-grants';
 import { appendTurn, recallMessages, RecalledMessage } from './turn-sync';
 import { MAX_CONTENT_CHARS } from './agent-protocol';
 
@@ -249,7 +249,7 @@ export async function prepareBrokerTurn(
   return {
     ok: true,
     turnId: grantId,
-    sessionKey,
+    sessionKey: openclawBrokerSessionKey(agent, grantId),
     agent,
     model: `openclaw/${agent}`,
     messages: [{ role: 'system', content: system }, { role: 'user', content: message.text }],
