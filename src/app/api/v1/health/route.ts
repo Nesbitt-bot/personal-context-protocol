@@ -11,6 +11,10 @@ export async function GET() {
       status: 'ok',
       version: APP_VERSION,
       database: 'pending',
+      build: {
+        commit: process.env.PCP_BUILD_COMMIT || '',
+        target: process.env.PCP_BUILD_TARGET || process.env.VERCEL_ENV || 'local',
+      },
     });
   } catch (error) {
     logError({

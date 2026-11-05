@@ -7,6 +7,7 @@
 
    readme
    deployment-vercel-neon
+   deployment-jenkins
    agent-instructions
 
 .. toctree::

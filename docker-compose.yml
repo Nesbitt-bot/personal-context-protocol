@@ -1,11 +1,13 @@
 services:
   app:
-    image: personal-context-protocol:${PCP_VERSION:-0.1.22}
+    container_name: personal-context-protocol-app-v${PCP_VERSION:-0.1.25}
+    mem_limit: 1g
+    image: personal-context-protocol:${PCP_VERSION:-0.1.25}
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        APP_VERSION: "${PCP_VERSION:-0.1.22}"
+        APP_VERSION: "${PCP_VERSION:-0.1.25}"
     depends_on:
       db:
         condition: service_healthy
@@ -17,6 +19,8 @@ services:
       NODE_ENV: production
     ports:
       - "${PCP_PORT:-3000}:3000"
+    labels:
+      org.opencontainers.image.version: ${PCP_VERSION:-0.1.25}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -26,6 +30,8 @@ services:
       start_period: 30s
 
   db:
+    container_name: personal-context-protocol-db-v${PCP_VERSION:-0.1.25}
+    mem_limit: 512m
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: pcp
@@ -39,6 +45,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    labels:
+      org.opencontainers.image.version: ${PCP_VERSION:-0.1.25}
     restart: unless-stopped
 
 volumes:

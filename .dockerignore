@@ -18,3 +18,7 @@ coverage
 .DS_Store
 Thumbs.db
 tsconfig.tsbuildinfo
+
+# Private deployment diagnostics and test artifacts
+logs/
+reports/

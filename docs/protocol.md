@@ -358,8 +358,24 @@ routes return a structured envelope:
 
 ### GET `/r/:sessionId` (public)
 
-Recording URL entry point. Returns the protocol descriptor so an agent can
-discover where to upload. No token required.
+Recording URL entry point. By default it returns a **self-contained markdown
+instruction document** (`text/markdown`): consent framing, the upload and
+read-back routes with exact `curl` examples, the canonical transcript format,
+limits, and mode guidance. This is why the human prompt can be just "URL +
+token" — the agent fetches the URL and reads everything else there.
+
+Content negotiation: `?format=json` (or `Accept: application/json`) returns the
+structured protocol descriptor instead; `?format=md` forces markdown. No token
+required for either form (only non-secret session information is exposed).
+
+### GET `/r/:sessionId/transcript` (access token)
+
+Session read-back as a raw markdown transcript (`### @role` sections),
+authenticated with `Authorization: Bearer <access-token>`. This is the
+cross-device sync pull: an agent on a new device fetches this single URL and
+receives the recorded conversation in the same human-readable format it records
+in. The document is itself re-importable (paste or POST it to `ingest`). Also
+advertised as `read_transcript` in the protocol descriptor.
 
 ### GET `/api/v1/agent/resolve?url=<recording-url>` (public)
 
@@ -368,7 +384,9 @@ Resolves a recording URL to its protocol descriptor.
 ### GET `/api/v1/agent/sessions/:sessionId/protocol` (public)
 
 Returns the protocol descriptor: `auth`, `routes` (`read_messages`,
-`record_messages`, `record_compact`, `ingest_any`), `allowed_actions` (note
+`read_transcript`, `record_messages`, `record_compact`, `ingest_any`),
+`instructions_url` + `transcript_url` + `preferred_upload_format`,
+`allowed_actions` (note
 `manage_topics: false`), `limits` (`max_messages_per_request: 50`,
 `max_content_chars: 100000`), `existing_message_count`, a `hint`, and
 `recording_mode` + `recording_guidance`. The mode is `wild` (the agent may
@@ -394,19 +412,34 @@ Body (`summary` required):
 
 ### POST `/api/v1/agent/sessions/:sessionId/ingest`
 
-Forgiving ingestion. Accepts raw JSON with top-level `messages` or `summary`,
-`{ messages, compaction }` (mixed), `<PCP_INGEST>...</PCP_INGEST>`,
+Forgiving ingestion; the **primary upload route**. The preferred body is a raw
+markdown transcript — `### @user` / `### @assistant` section headings with the
+message text below each, optionally wrapped in
+`<PCP_TRANSCRIPT>...</PCP_TRANSCRIPT>` — sent as `text/markdown` or
+`text/plain`. No JSON escaping is required and the payload stays human-readable
+end to end. A content line that itself starts with `### @` is escaped as
+`\### @`.
+
+A `title="…"` attribute on the `<PCP_TRANSCRIPT>` tag (or a top-level
+`suggested_session_title` / `session_title` field in JSON payloads) suggests
+the session title; it is normalized, de-duplicated within the topic, and
+applied when the token has `can_rename_session` (the default for new tokens).
+A restricted token's suggestion is dropped silently rather than failing the
+ingest.
+
+Also accepted (backward compatible): raw JSON with top-level `messages` or
+`summary`, `{ messages, compaction }` (mixed), `<PCP_INGEST>...</PCP_INGEST>`,
 `<PCP_APPEND>...</PCP_APPEND>`, `<PCP_COMPACT>...</PCP_COMPACT>`, ChatML-like
-arrays, or raw transcript text. Messages already present are skipped. On failure
-it returns structured retry guidance (`code: "UNPARSEABLE_PAYLOAD"`), not a vague
-error. Response:
+arrays, or loose `User:` / `Assistant:` transcript lines. Messages already
+present are skipped. On failure it returns structured retry guidance
+(`code: "UNPARSEABLE_PAYLOAD"`), not a vague error. Response:
 
 ```json
 {
   "ok": true,
   "session_id": "ses_...",
   "imported": { "messages": 12, "compactions": 0, "events": 1, "duplicates_skipped": 0 },
-  "notice": "Imported message-level fallback JSON."
+  "notice": "Imported message-level content."
 }
 ```
 
@@ -490,7 +523,8 @@ Returns the JSON schema for the `POST record_compact` payload.
 ### GET `/agent/schema/ingest`
 
 The canonical fallback schema (public, no token). Returns `{ ok, schema_version,
-schema_name, accepted_content_types, accepted_wrappers, limits, modes, ingest_example,
+schema_name, accepted_content_types, accepted_wrappers, preferred_format,
+transcript_example, limits, modes, ingest_example,
 compact_example }`. `modes` defines `wild` (redaction allowed) and `strict`
 (exact preservation requested). This is the single source of truth shared with
 the generated copy-paste fallback prompts — agents should use ONLY these
@@ -511,3 +545,50 @@ the request origin. `PCP_APP_URL` is about constructing absolute URLs, not CORS.
 Exports app data as JSON for the UI token holder.
 
 The export omits plaintext tokens.
+
+## Diagnostics
+
+### GET `/diagnostics`
+
+What this deployment actually is, for the UI token holder. `/health` reports
+only that the process is up; a deployment can be healthy, authenticate, serve
+its data, and still be missing an entire feature line because it was built from
+a branch that never received it — from outside, that is indistinguishable from
+a bug, because the routes simply `404`.
+
+```json
+{
+  "build": { "version": "0.1.24", "commit": "d351bf85", "branch": "main",
+             "runtime": "node v20.11.0", "environment": "production" },
+  "database": { "ok": true, "latencyMs": 24, "error": null },
+  "counts": { "topics": 6, "sessions": 15, "messages": 258, "events": 312, "active_tokens": 3 },
+  "migrations": [{ "version": "001_initial", "appliedAt": "..." }],
+  "config": [{ "key": "PCP_INSTANCE_SECRET", "severity": "error", "problem": "is not set" }],
+  "features": [{ "id": "scoped-tokens", "label": "Scoped tokens and manager API",
+                 "migration": "008_scoped_tokens", "present": true,
+                 "routes": ["/api/v1/tokens"], "description": "..." }]
+}
+```
+
+Feature presence is decided by the migrations the database reports, not by the
+version number: two branches can share a version and differ completely in
+content, which is precisely what makes a version alone untrustworthy here.
+
+Each probe is isolated, so a database that is down still yields a report saying
+so rather than a `500` that says nothing.
+
+### GET `/events`
+
+The instance-wide activity log for the UI token holder. Every write path
+already records an event — `session.created`, `message.appended`,
+`token.created`, `token.deleted`, `topic.created`, `session.renamed`,
+`compaction.recorded` — but nothing read them back, so the table grew and
+answered no questions.
+
+Query parameters: `limit` (1–200, default 50), `action`, `actor`, `session_id`.
+Session titles are resolved in one extra query, since an id alone does not say
+which conversation a line is about.
+
+This is deliberately not a request log: on serverless each instance would keep
+its own in-memory buffer and show a partial picture, whereas these events are
+in Postgres and every reader sees the same history.
