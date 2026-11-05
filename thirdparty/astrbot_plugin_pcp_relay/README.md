@@ -15,6 +15,9 @@ OpenClaw through the PCP broker. Standard library only; tested with AstrBot
 - Fail closed: no stamp, unusable credentials, broker/PCP down, or any `401`
   → the event is stopped and nothing is sent (logged). OpenClaw failure
   (`502`) → AstrBot's normal failure message.
+- Other plugins' own LLM tasks (no platform session, e.g. summaries or group
+  analyses that fall back to the profile's provider) get an error response
+  and never touch the pending turn. Give such plugins an explicit provider.
 
 ## Install
 

@@ -8,7 +8,8 @@
   the OpenClaw gateway token; PCP picks the agent and the readable context.
 - Fail closed: no stamp, PCP or broker down, or any refusal -> no reply
   (logged). An OpenClaw failure behind a verified turn -> AstrBot's normal
-  failure message.
+  failure message. Calls without a platform session (other plugins' own LLM
+  tasks) get an error response and never touch the pending turn.
 
 No dependencies beyond AstrBot and the Python standard library.
 """
@@ -59,10 +60,13 @@ def _remember(turn: PendingTurn) -> None:
 
 
 def _take(session_id: str | None) -> PendingTurn | None:
+    """The pending turn of exactly this unified message origin, used once."""
+    if not session_id:
+        return None
     turn = _CURRENT.get()
-    if turn is None or (session_id and turn.umo != session_id):
-        turn = _BY_UMO.get(session_id or "")
-    if turn is None or time.monotonic() - turn.created > STAMP_TTL_S or (session_id and turn.umo != session_id):
+    if turn is None or turn.umo != session_id:
+        turn = _BY_UMO.get(session_id)
+    if turn is None or turn.umo != session_id or time.monotonic() - turn.created > STAMP_TTL_S:
         return None
     _BY_UMO.pop(turn.umo, None)
     _CURRENT.set(None)
@@ -108,6 +112,12 @@ class PcpRelayProvider(Provider):
         return LLMResponse(role="assistant", completion_text="")
 
     async def text_chat(self, prompt=None, session_id=None, **kwargs) -> LLMResponse:
+        if not session_id:
+            # Plugin utility calls (summaries, analyses) carry no platform
+            # message: never a broker turn. Leave the pending stamp and the
+            # event alone so the real reply is unaffected.
+            logger.warning("PCP relay: refused a call without a platform session (plugin task); configure another provider for plugin tasks.")
+            return LLMResponse(role="err", completion_text="pcp_relay answers platform messages only")
         turn = _take(session_id)
         if turn is None or turn.stamp is None:
             return self._silent(turn, "no platform identity stamp for this request")

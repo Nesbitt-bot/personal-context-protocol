@@ -165,6 +165,23 @@ class PluginTests(unittest.TestCase):
         again = asyncio.run(self.provider.text_chat(session_id=event.unified_msg_origin))
         self.assertEqual(again.completion_text, "")
 
+    def test_plugin_tasks_without_a_session_never_consume_the_turn_or_stop_the_event(self):
+        event = FakeEvent(text="hello")
+        sent = []
+
+        async def go():
+            await self.plugin.stamp_request(event, types.SimpleNamespace(prompt="hello"))
+            with mock.patch.object(main, "post_turn", lambda url, creds, body, timeout: sent.append(json.loads(body)) or core.BrokerResult(200, "real reply", "")):
+                side = await self.provider.text_chat(prompt="summarize this chat", system_prompt="you are a summarizer")
+                real = await self.provider.text_chat(prompt="hello", session_id=event.unified_msg_origin)
+            return side, real
+
+        side, real = asyncio.run(go())
+        self.assertEqual((side.role, event.stopped), ("err", False))
+        self.assertEqual(real.completion_text, "real reply")
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]["message"]["text"], "hello")
+
     def test_stream_yields_one_final_response(self):
         event = FakeEvent()
 

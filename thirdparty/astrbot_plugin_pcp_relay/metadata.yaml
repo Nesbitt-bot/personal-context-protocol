@@ -2,6 +2,6 @@ name: astrbot_plugin_pcp_relay
 display_name: PCP relay
 desc: Identity-stamped, fail-closed relay to OpenClaw through the Personal Context Protocol broker (provider type pcp_relay).
 help: See README.md. Configure a provider of type pcp_relay and select it in the profile.
-version: v0.1.0
+version: v0.1.1
 author: Nesbitt-bot
 repo: https://github.com/Nesbitt-bot/personal-context-protocol
