@@ -105,6 +105,10 @@ AI recording sessions, optionally within a topic.
 | `owner_user_id` | TEXT | Owning Casdoor user (`users.id`, nullable, `ON DELETE SET NULL`); NULL = unowned (admin-only) |
 | `principal` | TEXT | Platform identity the session belongs to, e.g. `telegram:8627151333` (nullable) |
 | `class` | TEXT | `trusted` \| `unattributed` (default) \| `group` (admin-only, never claimable) |
+| `project_id` | TEXT | Project this session belongs to (`projects.id`, nullable, `ON DELETE SET NULL`) |
+| `context_title` | TEXT | Per-task context title within the project (nullable) |
+| `context_summary` | TEXT | Per-task context summary (nullable) |
+| `sync_clock_json` | JSONB | Per-field `{ at, device }` clocks of the sync conflict policy (default `{}`) |
 
 **Constraints**:
 - Primary key: `id`
@@ -130,6 +134,44 @@ descriptor (`recording_mode` + `recording_guidance`) and the generated
 instruction. It is guidance to the agent, not a server-side filter.
 
 **AI access**: AI can only view/append to sessions for which it has a valid token.
+
+### projects, project_aliases, project_workspaces
+
+Cross-machine projects (migration 013, see [projects.md](projects.md)).
+
+`projects`: `id` (`prj_...`), `canonical_key` (unique; `git:<host/owner/repo>`
+or `name:<basename>`, lower-case), `display_name`, `description`,
+`git_remotes_json` (normalized `host/owner/repo` list, only ever extended),
+`owner_user_id` (nullable = admin-only, like sessions), `sync_clock_json`,
+`archived`, `created_at`, `updated_at`.
+
+`project_aliases`: `alias_key` (primary key, e.g. `name:old-folder`) →
+`project_id`, `source`, `created_at`. An alias resolves to exactly one project.
+
+`project_workspaces`: `id` (`pws_...`), `project_id`, `device_id` (plugin
+device id, e.g. `win-1a2b3c4d`, `openclaw-gateway`), `device_label`,
+`device_kind` (`openclaw-container` \| `linux` \| `linux-remote` \| `windows`
+\| `macos`), `directory` (absolute, normalized: forward slashes, upper-case
+drive letter, no trailing slash), `default_branch`, `last_seen_at`,
+`sync_clock_json`, timestamps. Unique `(project_id, device_id, directory)`;
+index `(device_id, directory)`.
+
+### sync_conflicts, merge_tasks
+
+`sync_conflicts`: the losing version of a reviewable field when two machines
+edited it concurrently: `entity_type` (`session` \| `project`), `entity_id`,
+`field`, `reason` (`concurrent_edit` \| `stale_write` \| `timestamp_tie` \|
+`clock_skew`), `kept_value_json` / `kept_at` / `kept_device`,
+`lost_value_json` / `lost_at` / `lost_device`, `status` (`open` \| `resolved`
+\| `dismissed`), `resolved_at`, `resolved_by`.
+
+`merge_tasks`: pending "AI merge suggestion" requests: `conflict_id`, entity,
+`field`, `versions_json` (both versions), `instructions`, `status` (`pending`
+\| `completed` \| `cancelled`), `requested_by`, `result_value_json`,
+`completed_by`, timestamps. PCP stores them; an agent resolves them.
+
+`messages.external_message_id` (nullable, unique per session when set) is the
+plugin's message id used by the append-only multi-machine merge.
 
 ### users
 
@@ -551,3 +593,9 @@ LIMIT 50;
 ### v0.2.1 (service sync)
 
 - `service_credentials`, `turn_grants`, `synced_turns` (migration 012)
+
+### v0.2.2 (projects)
+
+- `projects`, `project_aliases`, `project_workspaces`, `sync_conflicts`,
+  `merge_tasks`; `sessions.project_id`, `context_title`, `context_summary`,
+  `sync_clock_json`; `messages.external_message_id` (migration 013)

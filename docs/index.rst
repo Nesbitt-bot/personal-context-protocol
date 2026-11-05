@@ -15,6 +15,7 @@
    :caption: API Reference
 
    protocol
+   projects
    data-model
    export-format
    logging

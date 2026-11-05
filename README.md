@@ -28,6 +28,11 @@ Personal Context Protocol stores AI conversation context in user-managed topics 
   when full upload is impossible. They never manage topics. Tokens are scoped to
   one session and append-only, and the instruction page says so — which is what
   lets cautious agents pass their own safety screening instead of refusing.
+- **Projects** group sessions by repository across machines (OpenClaw
+  containers, Linux, Windows, macOS): git remotes, a workspace per machine with
+  a start-dev snippet, and a sync conflict policy (latest plugin timestamp
+  wins, losing edits kept for review or an AI merge). See
+  [docs/projects.md](docs/projects.md).
 - The admin dashboard previews sessions, events, token status, and exports;
   tokens can be revoked from a modal, and a session can be made public for a
   read-only shared view at `/s/<sessionId>`.

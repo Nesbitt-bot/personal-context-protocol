@@ -186,6 +186,20 @@ Service sync for channel plugins (idempotent, only additive): tables
 by `scripts/deploy-init.js` and `ensureDatabaseSchema()`. No existing data
 changes. Rollback to v0.2.0 is safe (the tables are ignored).
 
+### 0013_projects (v0.2.2)
+
+Cross-machine projects (idempotent, only additive): tables `projects`,
+`project_aliases`, `project_workspaces`, `sync_conflicts`, `merge_tasks`;
+nullable or defaulted columns `sessions.project_id`, `context_title`,
+`context_summary`, `sync_clock_json` and `messages.external_message_id`; their
+indexes. Applied by `scripts/deploy-init.js` and `ensureDatabaseSchema()`.
+Existing rows are untouched (all new columns NULL or `{}`), so a v0.2.1
+database upgrades in place; `tests/projects-db.test.ts` builds a v0.2.1
+database with data and upgrades it twice. Rollback to v0.2.1 is safe (the old
+code ignores the new tables and columns). Organizing existing sessions into
+projects is a separate, explicit operator step (see
+[projects.md](projects.md#reorganizing-imported-sessions-operator-runbook)).
+
 ## Checking migration status
 
 ```bash
