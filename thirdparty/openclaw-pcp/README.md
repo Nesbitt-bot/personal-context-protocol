@@ -12,7 +12,7 @@ channels: Telegram and OpenClaw-WeChat). No runtime dependencies; Node 18.19+.
 | `agent_end` | Uploads the last turn (user message plus assistant text; tool calls are not copied) to `POST /api/v1/service/sync`, external key `oc:<sessionId>:<user-message-timestamp>`. The injected `<pcp_context>` block is stripped first. |
 | `before_compaction` / `after_compaction` | Flushes the queue before history is rewritten, then uploads the new compaction summary (`oc-compaction:<sessionId>:<entry-id>`, role `system`). |
 | `after_tool_call` | Audits each `pcp_*` call into the home session (`oc-audit:…`, role `tool`): tool, query, result count, duration. |
-| `before_tool_call` | HTTP API backstop: for session keys matching `httpSessionKeyPatterns` (default `^agent:[^:]+:openai(?:[-:]|$)`, i.e. `/v1/chat/completions` runs), every tool except `httpToolAllowlist` (default `pcp_context`, `pcp_search`) is refused. Active even if PCP is unconfigured. |
+| `before_tool_call` | HTTP API backstop: for session keys matching `httpSessionKeyPatterns` (default `^agent:[^:]+:openai(?:[-:]|$)` and `(?:^|:)pcp:grt_`, i.e. `/v1/chat/completions` runs and PCP broker turns), every tool except `httpToolAllowlist` (default `pcp_context`, `pcp_search`) is refused. Active even if PCP is unconfigured. |
 | `message_sending` | Claim link: on the first reply of a new (no earlier messages), unlinked, direct session on a channel in `claimChannels` (default `telegram`), appends one single-use `…/claim?code=…` link returned by PCP. The code is never put in the prompt or transcript. Skipped for groups, unattributed sessions, linked principals, and channels whose plugin does not run `message_sending` (the bundled OpenClaw-WeChat build stubs that hook out). |
 
 Uploads are redacted (`lib/redact.js`: PCP's export patterns plus GitHub,
@@ -22,6 +22,15 @@ the retry queue. The queue (`<stateDir>/queue.json`, mode 600, atomic replace)
 holds at most `maxQueueItems` (500) items, retries with exponential backoff
 (5 s to 1 h, 12 attempts) and drops items PCP rejects with a 4xx. PCP
 deduplicates by external key, so a retried upload records nothing twice.
+
+## PCP broker turns (AstrBot path)
+
+Sessions keyed `pcp:grt_<48 hex>` (also as `agent:<id>:pcp:…`) are broker
+turns: PCP created the grant from a signed AstrBot stamp. The plugin then
+skips grants, context, sync and claims (the broker does those), and the tools
+call recall/search with this plugin's credential and that key; PCP accepts it
+only because this credential is the broker credential's delegate, read-only.
+The HTTP backstop covers these keys too, so only `pcp_*` tools ever run.
 
 ## Trusted principal
 

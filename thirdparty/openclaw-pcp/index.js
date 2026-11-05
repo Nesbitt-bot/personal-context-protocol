@@ -10,6 +10,10 @@
  * - before_tool_call: HTTP API runs may only call the pcp_* allowlist.
  * - message_sending: single-use claim link on the first reply of a new
  *   trusted DM session (the model never sees the code).
+ * - PCP broker turns (session key `pcp:<grant id>`, AstrBot path): PCP made
+ *   the grant; the tools read it with this plugin's credential (PCP checks it
+ *   is the broker's delegate). No local grant, context, sync or claims — the
+ *   broker injects context and records the turn.
  */
 import { readFileSync } from "node:fs";
 import { promises as fsp } from "node:fs";
@@ -17,7 +21,7 @@ import path from "node:path";
 import { createPcpClient, PcpError } from "./lib/client.js";
 import { DiskQueue } from "./lib/queue.js";
 import { redactSecrets } from "./lib/redact.js";
-import { compilePatterns, DEFAULT_HTTP_SESSION_PATTERNS, isHttpSessionKey, resolveTarget } from "./lib/session.js";
+import { compilePatterns, DEFAULT_HTTP_SESSION_PATTERNS, isBrokerSessionKey, isHttpSessionKey, resolveTarget } from "./lib/session.js";
 import { batches, buildContextBlock, clampContent, extractTurn, hasPriorConversation } from "./lib/turns.js";
 
 const DEFAULTS = {
@@ -141,6 +145,7 @@ export function createPlugin(api, deps = {}) {
   }
 
   function targetFor(sessionKey, channel, senderId) {
+    if (isBrokerSessionKey(sessionKey)) return null; // the broker owns these turns
     return resolveTarget({ sessionKey, channel, senderId, identityLinks, allowedPrefixes: cfg.allowedPrefixes });
   }
 
@@ -228,6 +233,15 @@ export function createPlugin(api, deps = {}) {
     const target = () => targetFor(sessionKey, ctx.messageChannel, ctx.requesterSenderId) || lastTargets.get(sessionKey) || null;
     const unavailable = () => ({ content: [{ type: "text", text: "PCP is not available for this conversation (no trusted sender identity)." }], details: { count: 0 } });
     const run = async (fn) => {
+      if (isBrokerSessionKey(sessionKey)) {
+        // PCP holds this broker turn's grant; present only our credential and the key.
+        try {
+          return await fn();
+        } catch (error) {
+          const message = error instanceof PcpError ? error.message : "PCP request failed: openclaw-pcp/tool — unexpected error.";
+          return { content: [{ type: "text", text: message }], details: { count: 0, error: true } };
+        }
+      }
       const t = target();
       if (!t) return unavailable();
       try {

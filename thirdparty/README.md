@@ -15,12 +15,12 @@ from the Docker image (`.dockerignore`).
   sessions into PCP projects with their workspaces per machine (PCP >= 0.2.2).
   See `pcp-session-import/README.md` and `docs/projects.md`.
 
-Planned:
+- `astrbot_plugin_pcp_relay/`: AstrBot plugin (design Phase 4) that stamps the
+  platform identity of QQ / WeChat official-account messages, signs it, and
+  relays the latest message through the loopback PCP broker; fail closed. See
+  its `README.md` and `docs/broker.md`.
 
-- `astrbot_plugin_pcp_relay/`: AstrBot plugin that stamps the platform identity
-  of QQ / WeChat official-account messages and relays them through the PCP
-  broker.
-
-Tests use Node's built-in runner, no install needed:
-`cd thirdparty/openclaw-pcp && npm test` and
-`cd thirdparty/pcp-session-import && node --test`.
+Tests need no install: `bash deploy/jenkins/thirdparty_test.sh` runs every
+suite (Node's built-in runner; Python `unittest`) in network-less containers,
+as Jenkins does. Deploy with `deploy/plugins/sync_openclaw_pcp.sh` and
+`deploy/plugins/sync_astrbot_relay.sh` (no-op unless changed).

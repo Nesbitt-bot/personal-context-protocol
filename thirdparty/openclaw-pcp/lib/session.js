@@ -16,7 +16,17 @@
 
 // Mirrors PCP src/lib/session-access.ts PRINCIPAL_PATTERN.
 export const PRINCIPAL_PATTERN = /^[a-z][a-z0-9_-]{0,63}(:[A-Za-z0-9._@+=-]{1,128}){1,3}$/;
-export const DEFAULT_HTTP_SESSION_PATTERNS = ["^agent:[^:]+:openai(?:[-:]|$)"];
+// HTTP API runs: OpenAI-compatible sessions and PCP broker turns
+// (`pcp:<grant id>`, sent by the broker as x-openclaw-session-key).
+export const DEFAULT_HTTP_SESSION_PATTERNS = ["^agent:[^:]+:openai(?:[-:]|$)", "(?:^|:)pcp:grt_"];
+
+// Mirrors PCP src/lib/turn-grants.ts BROKER_SESSION_KEY_PATTERN.
+export const BROKER_SESSION_KEY_PATTERN = /^(?:agent:[a-z0-9][a-z0-9_-]{0,63}:)?pcp:(grt_[0-9a-f]{48})$/i;
+
+/** True for a PCP broker turn: PCP already holds that turn's grant. */
+export function isBrokerSessionKey(sessionKey) {
+  return typeof sessionKey === "string" && BROKER_SESSION_KEY_PATTERN.test(sessionKey);
+}
 
 export function compilePatterns(patterns) {
   return (patterns || []).map((pattern) => new RegExp(pattern));

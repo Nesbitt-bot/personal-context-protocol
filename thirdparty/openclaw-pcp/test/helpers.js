@@ -27,8 +27,10 @@ export function fakePcp({ linked = false } = {}) {
       const claim = body.issue_claim && !linked ? { code: "CODE123", claim_url: "https://pcp.example.test/claim?code=CODE123", expires_at: new Date(Date.now() + 9e5).toISOString() } : null;
       return json(200, { grant_id: `grt_${++state.seq}`, session_id: home, readable_session_ids: grant.readable, expires_at: new Date(Date.now() + 6e5).toISOString(), linked, claim });
     }
-    const grant = state.grants.get(body.session_key);
+    // Broker grants are made by PCP itself; the plugin only presents the key.
+    const grant = state.grants.get(body.session_key) || state.brokerGrants?.get(body.session_key);
     if (!grant) return json(403, { code: "GRANT_REQUIRED" });
+    if (grant.broker && pathname === "/api/v1/service/sync") return json(403, { code: "FORBIDDEN" });
     if (pathname === "/api/v1/service/sync") {
       if (state.synced.has(body.external_key)) return json(200, { success: true, duplicate: true });
       state.synced.set(body.external_key, { home: grant.home, messages: body.messages });

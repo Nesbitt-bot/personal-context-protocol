@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { compilePatterns, DEFAULT_HTTP_SESSION_PATTERNS, isHttpSessionKey, resolveTarget } from "../lib/session.js";
+import { compilePatterns, DEFAULT_HTTP_SESSION_PATTERNS, isBrokerSessionKey, isHttpSessionKey, resolveTarget } from "../lib/session.js";
 import { redactSecrets } from "../lib/redact.js";
 import { batches, buildContextBlock, extractTurn } from "../lib/turns.js";
 import { DiskQueue } from "../lib/queue.js";
@@ -297,3 +297,58 @@ test("configuration: non-loopback http base URL is rejected; missing token disab
   assert.ok(!off.hooks.has("before_prompt_build"));
   assert.equal(off.tools.length, 0);
 });
+
+// ------------------------------------------------------- PCP broker (Phase 4)
+const BROKER_KEY = `pcp:grt_${"ab".repeat(24)}`;
+
+test("broker session keys: detected in both shapes, never a trusted target, always an HTTP run", () => {
+  for (const key of [BROKER_KEY, `agent:relay-owner:${BROKER_KEY}`, BROKER_KEY.toUpperCase().replace("PCP:GRT_", "pcp:grt_")]) {
+    assert.equal(isBrokerSessionKey(key), true, key);
+    assert.equal(target(key, "webchat"), null);
+    assert.equal(isHttpSessionKey(key, compilePatterns(DEFAULT_HTTP_SESSION_PATTERNS)), true);
+  }
+  for (const key of ["pcp:grt_123", "pcp:grt_1793904467977_c4fe0053", `x${BROKER_KEY}`, "agent:main:direct:owner", `agent:relay:pcp:grt_${"a".repeat(47)}`]) {
+    assert.equal(isBrokerSessionKey(key), false, key);
+  }
+});
+
+test("broker turns: tools read PCP's grant with the plugin credential, no local grant, no sync, no context, no claims", async () => {
+  const { pcp, tools, hook } = setup({ linked: true });
+  pcp.brokerGrants = new Map([[BROKER_KEY, { broker: true, home: "ses_home_wx", readable: ["ses_home_tg", "ses_home_wx"] }]]);
+  const ctx = { agentId: "relay-owner", sessionKey: BROKER_KEY, sessionId: "sid-b", channelId: "webchat", trigger: "user" };
+  assert.equal(await hook("before_prompt_build")({ prompt: "x", messages: [] }, ctx), undefined);
+  hook("agent_end")({ messages: [{ role: "user", content: "hi", timestamp: 1 }, { role: "assistant", content: [{ type: "text", text: "yo" }] }] }, ctx);
+  assert.equal(pcp.calls.length, 0, "no grant request, recall or sync for broker turns");
+
+  const list = tools[0].factory({ agentId: "relay-owner", sessionKey: BROKER_KEY, messageChannel: "webchat" });
+  const found = await list.find((t) => t.name === "pcp_search").execute("c1", { query: "dentist" });
+  assert.match(found.content[0].text, /dentist/);
+  const recalled = await list.find((t) => t.name === "pcp_context").execute("c2", { limit: 5 });
+  assert.match(recalled.content[0].text, /telegram home message/);
+  assert.deepEqual(pcp.calls.map((c) => c.pathname), ["/api/v1/service/search", "/api/v1/service/recall"]);
+  for (const call of pcp.calls) {
+    assert.equal(call.body.session_key, BROKER_KEY);
+    assert.equal(call.auth, "Bearer pcps_test");
+    assert.equal(call.body.principal, undefined);
+  }
+});
+
+test("broker turns: an ended or foreign grant gives a clear tool error, never a fallback grant", async () => {
+  const { pcp, tools } = setup({ linked: true });
+  const list = tools[0].factory({ agentId: "relay", sessionKey: BROKER_KEY, messageChannel: "webchat" });
+  const result = await list.find((t) => t.name === "pcp_context").execute("c", {});
+  assert.equal(result.details.error, true);
+  assert.deepEqual(pcp.calls.map((c) => c.pathname), ["/api/v1/service/recall"]);
+});
+
+test("HTTP backstop also covers broker turns: only pcp_* tools run", () => {
+  const { hook } = setup();
+  const before = hook("before_tool_call");
+  for (const key of [BROKER_KEY, `agent:relay-owner:${BROKER_KEY}`]) {
+    for (const tool of ["exec", "process", "read", "write", "browser", "web_fetch", "sessions_history", "message"]) {
+      assert.equal(before({ toolName: tool, params: {} }, { sessionKey: key, toolName: tool }).block, true, `${key} ${tool}`);
+    }
+    assert.equal(before({ toolName: "pcp_context", params: {} }, { sessionKey: key, toolName: "pcp_context" }), undefined);
+  }
+});
+

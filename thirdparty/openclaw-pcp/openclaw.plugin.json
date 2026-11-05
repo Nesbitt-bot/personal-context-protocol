@@ -1,7 +1,7 @@
 {
   "id": "openclaw-pcp",
   "name": "Personal Context Protocol",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "PCP turn grants and cross-channel context, grant-checked pcp_* tools, async turn sync, HTTP-run tool backstop, claim links.",
   "configSchema": {
     "type": "object",
