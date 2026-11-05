@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link2, Loader2, Plus, X } from 'lucide-react';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { uiAuthHeaders } from '@/lib/client-auth';
 
 interface LinkRecord {
   id: string;
@@ -11,11 +12,6 @@ interface LinkRecord {
   other_title: string | null;
   label: string | null;
   created_at: string | null;
-}
-
-function getUiToken() {
-  if (typeof window === 'undefined') return '';
-  return localStorage.getItem('ui_token') || '';
 }
 
 /** Inline, self-contained linked-sessions panel for the session workspace. */
@@ -26,7 +22,7 @@ export function LinkedSessions({ sessionId }: { sessionId: string }) {
   const [busy, setBusy] = useState(false);
 
   function authHeaders(): Record<string, string> {
-    return { Authorization: `Bearer ${getUiToken()}` };
+    return uiAuthHeaders();
   }
 
   async function load() {

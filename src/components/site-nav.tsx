@@ -6,29 +6,28 @@ import { useRouter } from 'next/navigation';
 import { Code2, Database, KeyRound } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { ScopedTokenManager } from './dashboard/scoped-token-manager';
-
-function hasUiToken() {
-  if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem('ui_token'));
-}
+import { fetchSignedInUser, signOut, SignedInUser } from '@/lib/client-auth';
 
 /**
  * Shared top navigation for public and authenticated app pages.
- * After login the "Login portal" button changes to "Logout" so the
- * user always knows whether a session is active.
+ * After sign-in the "Login" button changes to "Logout" so the user always
+ * knows whether a session is active. Admin-only tools (scoped tokens,
+ * settings) are shown only to admins; the server enforces this regardless.
  */
 export function SiteNav() {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [user, setUser] = useState<SignedInUser | null>(null);
   const [showTokens, setShowTokens] = useState(false);
   const router = useRouter();
+  const loggedIn = Boolean(user);
+  const isAdmin = Boolean(user?.is_admin);
 
   useEffect(() => {
-    setLoggedIn(hasUiToken());
+    fetchSignedInUser().then(setUser);
   }, []);
 
-  function logout() {
-    localStorage.removeItem('ui_token');
-    setLoggedIn(false);
+  async function logout() {
+    await signOut();
+    setUser(null);
     router.push('/');
   }
 
@@ -51,7 +50,7 @@ export function SiteNav() {
             <Code2 size={16} />
             <span className="ml-2">Source</span>
           </a>
-          {loggedIn && (
+          {isAdmin && (
             <button
               className="hidden rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white sm:inline-flex"
               onClick={() => setShowTokens(true)}
@@ -61,13 +60,18 @@ export function SiteNav() {
               <span className="ml-2">Tokens</span>
             </button>
           )}
-          {loggedIn && (
+          {isAdmin && (
             <Link
               className="hidden rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white sm:inline-flex"
               href="/settings"
             >
               Settings
             </Link>
+          )}
+          {user && (
+            <span className="hidden max-w-[12rem] truncate text-sm text-slate-500 dark:text-slate-400 md:inline" title={user.method === 'break_glass' ? 'Break-glass admin token' : 'Signed in with Casdoor'}>
+              {user.display_name}
+            </span>
           )}
           <ThemeToggle />
           {loggedIn ? (

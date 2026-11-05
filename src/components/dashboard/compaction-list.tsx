@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { FileText } from 'lucide-react';
 import { formatDate } from './format';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { uiAuthHeaders } from '@/lib/client-auth';
 
 interface Compaction {
   id: string;
@@ -71,7 +72,7 @@ export function CompactionList({ sessionId, onLoaded }: CompactionListProps) {
     (async () => {
       try {
         const res = await fetch(`/api/v1/sessions/${sessionId}/compactions`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('ui_token')}` },
+          headers: { ...uiAuthHeaders() },
         });
         const data = await res.json().catch(() => ({}));
         if (!active) return;

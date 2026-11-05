@@ -3,10 +3,18 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Clipboard, Database, KeyRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Clipboard, Database, KeyRound, LogIn } from 'lucide-react';
 import { SiteNav } from '@/components/site-nav';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { loginErrorMessage } from '@/lib/oidc-config';
+import { BREAK_GLASS_STORAGE_KEY } from '@/lib/client-auth';
+
+interface AuthConfig {
+  oidc_enabled: boolean;
+  oidc_error: string | null;
+  break_glass_enabled: boolean;
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -19,11 +27,31 @@ function LoginForm() {
   const [initialized, setInitialized] = useState(true);
   const [setupMessage, setSetupMessage] = useState('');
   const [generatedToken, setGeneratedToken] = useState('');
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const nextPath = searchParams.get('next') || '/dashboard';
+  const authError = searchParams.get('auth_error');
+  const safeNext = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/dashboard';
 
   useEffect(() => {
     checkSetupStatus();
+    loadAuthConfig();
   }, []);
+
+  async function loadAuthConfig() {
+    try {
+      const response = await fetch('/api/v1/auth/config', { cache: 'no-store' });
+      const data = (await response.json()) as AuthConfig;
+      setAuthConfig(data);
+      // A token saved before break-glass was disabled would only cause 401s.
+      if (!data.break_glass_enabled) localStorage.removeItem(BREAK_GLASS_STORAGE_KEY);
+    } catch (err) {
+      setAuthConfig({
+        oidc_enabled: false,
+        oidc_error: diagnosticMessage({ consequence: 'Unable to sign in', moduleProcess: 'login page / auth configuration probe', cause: `browser could not reach /api/v1/auth/config; ${errorCause(err)}` }),
+        break_glass_enabled: false,
+      });
+    }
+  }
 
   async function checkSetupStatus() {
     try {
@@ -75,7 +103,7 @@ function LoginForm() {
       setInitialized(true);
       setSetupMessage(data.message || 'Database initialized.');
       if (data.ui_token) {
-        localStorage.setItem('ui_token', data.ui_token);
+        localStorage.setItem(BREAK_GLASS_STORAGE_KEY, data.ui_token);
         setGeneratedToken(data.ui_token);
       }
     } catch (err) {
@@ -122,8 +150,8 @@ function LoginForm() {
         return;
       }
 
-      localStorage.setItem('ui_token', candidate);
-      router.push(nextPath.startsWith('/') ? nextPath : '/dashboard');
+      localStorage.setItem(BREAK_GLASS_STORAGE_KEY, candidate);
+      router.push(safeNext);
     } catch (err) {
       setError(diagnosticMessage({
         consequence: 'Unable to log in',
@@ -136,7 +164,7 @@ function LoginForm() {
     }
   }
 
-  if (checkingSetup) {
+  if (checkingSetup || !authConfig) {
     return (
       <div className="rounded-md border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-soft dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
         Checking setup status...
@@ -214,20 +242,60 @@ function LoginForm() {
     );
   }
 
+  const oidcCard = (
+    <div className="rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="rounded-md bg-slate-950 p-3 text-white dark:bg-sky-400 dark:text-slate-950">
+          <LogIn size={22} />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Sign in</p>
+          <h1 className="text-xl font-semibold text-slate-950 dark:text-white">Sign in with Casdoor</h1>
+        </div>
+      </div>
+      {authError && (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+          <p>{`Unable to sign in: OIDC login / callback - ${loginErrorMessage(authError)} (${authError})`}</p>
+        </div>
+      )}
+      {authConfig.oidc_enabled ? (
+        <>
+          <p className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            PCP uses your Casdoor account. Admins see every session; other members see the sessions they own or have claimed.
+          </p>
+          <a
+            className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
+            href={`/auth/login?next=${encodeURIComponent(safeNext)}`}
+          >
+            Continue with Casdoor <ArrowRight size={16} />
+          </a>
+        </>
+      ) : (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+          {authConfig.oidc_error}
+        </div>
+      )}
+    </div>
+  );
+
+  if (!authConfig.break_glass_enabled) return oidcCard;
+
   return (
+    <div className="w-full space-y-6">
+      {oidcCard}
     <form className="rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900" onSubmit={submitToken}>
       <div className="mb-5 flex items-center gap-3">
         <div className="rounded-md bg-slate-950 p-3 text-white dark:bg-sky-400 dark:text-slate-950">
           <KeyRound size={22} />
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Admin login</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Break-glass admin login</p>
           <h1 className="text-xl font-semibold text-slate-950 dark:text-white">Enter UI token</h1>
         </div>
       </div>
 
       <p className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
-        Use the admin token. If you did not set <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_ADMIN_TOKEN</code>, it is the token PCP printed once in your deploy/build logs and a fresh one is generated on each deploy. To set your own stable token, define <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_ADMIN_TOKEN</code> (32+ chars) and redeploy, or change it in Settings after login.
+        Emergency access only (enabled by <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_BREAK_GLASS_ADMIN_LOGIN=1</code>). Use the admin token. If you did not set <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_ADMIN_TOKEN</code>, it is the token PCP printed once in your deploy/build logs and a fresh one is generated on each deploy. To set your own stable token, define <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_ADMIN_TOKEN</code> (32+ chars) and redeploy, or change it in Settings after login.
       </p>
 
       {error && (
@@ -265,6 +333,7 @@ function LoginForm() {
         </Link>
       </div>
     </form>
+    </div>
   );
 }
 

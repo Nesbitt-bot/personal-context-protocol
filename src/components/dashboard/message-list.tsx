@@ -5,6 +5,7 @@ import { ArrowDown, Check, MessageSquare, Pencil, Trash2, X } from 'lucide-react
 import { formatDate } from './format';
 import { Message } from './types';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { uiAuthHeaders } from '@/lib/client-auth';
 
 interface MessageListProps {
   sessionId: string;
@@ -67,7 +68,7 @@ export function MessageList({ sessionId, messages, onChanged, hasCompactions = f
   }
 
   function authHeaders(): Record<string, string> {
-    return { Authorization: `Bearer ${localStorage.getItem('ui_token')}` };
+    return { ...uiAuthHeaders() };
   }
 
   function exitSelect() {

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Check, TerminalSquare, Upload } from 'lucide-react';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { uiAuthHeaders } from '@/lib/client-auth';
 
 interface ImportPanelProps {
   sessionId: string;
@@ -30,7 +31,7 @@ export function ImportPanel({ sessionId, onImported }: ImportPanelProps) {
     try {
       const res = await fetch(`/api/v1/sessions/${sessionId}/import`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ui_token')}` },
+        headers: { 'Content-Type': 'application/json', ...uiAuthHeaders() },
         body: JSON.stringify({ payload }),
       });
       const data = await res.json().catch(() => ({}));

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { KeyRound, Loader2, Pencil, Trash2, Undo2, X } from 'lucide-react';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
+import { uiAuthHeaders } from '@/lib/client-auth';
 
 interface TokenRecord {
   id: string;
@@ -52,7 +53,7 @@ export function TokenModal({ sessionId, sessionTitle, onClose }: TokenModalProps
   }, [sessionId]);
 
   function authHeaders(): Record<string, string> {
-    return { Authorization: `Bearer ${localStorage.getItem('ui_token')}` };
+    return { ...uiAuthHeaders() };
   }
 
   async function load() {
