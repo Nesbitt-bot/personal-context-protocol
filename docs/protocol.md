@@ -138,6 +138,37 @@ Linked principals: all for admins, the caller's own otherwise.
 Body `{ "principal": "telegram:..." }`. Unlinks a principal; existing session
 owners are kept.
 
+## Service sync (channel plugins)
+
+Authenticated with `Authorization: Bearer pcps_...` service credentials only.
+Full semantics in [service-sync.md](service-sync.md).
+
+### GET|POST|DELETE `/service-credentials` (admin, web UI)
+
+List, mint (`{ name, principal_prefixes, expires_in? }`, token shown once) or
+revoke (`{ id }`) service credentials.
+
+### POST|DELETE `/service/grants`
+
+Create the turn grant for `{ session_key, principal, chat, group_id?, ttl_seconds?, issue_claim? }`
+or end it (`{ session_key }`). Returns `{ grant_id, session_id, readable_session_ids, expires_at, linked, claim }`.
+`403 PRINCIPAL_NOT_ALLOWED` when the credential may not assert that principal.
+
+### POST `/service/sync`
+
+`{ session_key, external_key, messages }`: append one turn to the grant's home
+session, idempotent by `external_key` (`duplicate: true` on replay).
+
+### POST `/service/recall`
+
+`{ session_key, session_id?, limit? }`: recent messages from the grant's
+readable sessions. A session outside the grant is `403`.
+
+### POST `/service/search`
+
+`{ session_key, query, limit? }`: substring search within the grant's readable
+sessions. Without a live grant every service read/write is `403 GRANT_REQUIRED`.
+
 ## Break-glass admin token
 
 ### GET `/auth/check`

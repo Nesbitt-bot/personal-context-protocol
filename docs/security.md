@@ -24,6 +24,19 @@ can see which session.
   stored only as SHA-256 hashes, are rate limited per user, and grant nothing
   outside the signed-in web UI.
 
+## Service Credentials and Turn Grants
+
+- Channel plugins use `pcps_` service credentials (salted scrypt hash, shown
+  once, admin-minted, revocable). They are accepted only on
+  `/api/v1/service/*`, never as admin, UI login or agent recording token.
+- Each credential may assert only principals under its configured prefixes.
+- What a turn may read is a server-side grant (readable session set, TTL,
+  bound to the credential and the OpenClaw session key). Plugins never pass
+  session ids they want to read beyond that set; models never see a grant.
+- Group turns read only the group's own session; unlinked direct chats read
+  only their own session. Writes go only to the grant's home session.
+  See [service-sync.md](service-sync.md).
+
 ## Token Rules
 
 - UI token (break-glass admin token) is created during deploy initialization or fallback setup. It only opens the UI while `PCP_BREAK_GLASS_ADMIN_LOGIN=1`.

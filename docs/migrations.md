@@ -179,6 +179,13 @@ Rollout notes:
   Agent recording tokens and scoped manager tokens are unaffected.
 - Rollback to v0.1.x is safe: the old code ignores the new tables and columns.
 
+### 0012_service_sync (v0.2.1)
+
+Service sync for channel plugins (idempotent, only additive): tables
+`service_credentials`, `turn_grants`, `synced_turns` and their indexes. Applied
+by `scripts/deploy-init.js` and `ensureDatabaseSchema()`. No existing data
+changes. Rollback to v0.2.0 is safe (the tables are ignored).
+
 ## Checking migration status
 
 ```bash

@@ -181,6 +181,16 @@ value and of its CSRF token, the user, and `expires_at` (12 hours).
 PKCE `code_verifier`, `return_to`) for 10 minutes, keyed by the SHA-256 of the
 `__Host-pcp_oidc` cookie value, and is deleted when the callback consumes it.
 
+### service_credentials, turn_grants, synced_turns
+
+Migration 012. `service_credentials` stores plugin credentials (salted hash,
+16-character lookup prefix, `principal_prefixes_json`, revoked/expiry).
+`turn_grants` stores one live grant per (credential, `session_key`):
+`principal`, `home_session_id`, `readable_session_ids_json`, `expires_at`,
+`revoked_at`. `synced_turns` is the idempotency ledger (primary key
+`session_id`, `external_key`) for `POST /service/sync`. Grants and ledger rows
+cascade when their session is deleted.
+
 ### session_tokens
 
 Scoped tokens for AI agents.
@@ -537,3 +547,7 @@ LIMIT 50;
 - `users`, `identities`, `claims`, `claim_attempts`, `web_sessions`,
   `oidc_login_states`; `sessions.owner_user_id`, `sessions.principal`,
   `sessions.class` (migration 011)
+
+### v0.2.1 (service sync)
+
+- `service_credentials`, `turn_grants`, `synced_turns` (migration 012)

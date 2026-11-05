@@ -26,6 +26,7 @@
 
    security
    auth-oidc
+   service-sync
    limitations
 
 .. toctree::

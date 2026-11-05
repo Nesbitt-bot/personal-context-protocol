@@ -292,3 +292,11 @@ Append what this round actually did below:
     `/auth/login` without OIDC env redirects to `OIDC_DISABLED`.
   - Real Casdoor login not exercised (IdP stubbed in tests); first live check
     happens after the owner deploys with the `PCP_OIDC_*` env set.
+
+- 2026-11-05 — Identity phase 2: service credentials, turn grants, sync (v0.2.1)
+  - Separate commits on feat/identity-phase1 after phase 1 was complete.
+  - Builder image ran `npm run build`; typecheck passed; `npm run test:run`
+    passed 13 files / 244 tests with a disposable Postgres (218 + 26 skipped without it)
+    (`tests/service-sync-db.test.ts` uses its own `<db>_service` database);
+    without `PCP_TEST_DATABASE_URL` both DB files are skipped.
+  - No broker, plugins or broker→OpenClaw call (later phases).
