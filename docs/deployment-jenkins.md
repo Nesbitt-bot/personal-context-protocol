@@ -62,6 +62,22 @@ as `personal-context-protocol-app-v0.1.25`. PostgreSQL keeps its upstream
 create a new data directory. OCI labels and `/api/v1/health` expose build
 identity.
 
+## Tests, broker and plugin sync (v0.3.0)
+
+After build and unit tests, Jenkins runs `deploy/jenkins/db_test.sh` (all
+`tests/*-db.test.ts` against a throwaway tmpfs PostgreSQL on an internal
+network), `deploy/jenkins/thirdparty_test.sh` (every `thirdparty/` suite in
+network-less containers) and `deploy/jenkins/test_check_storage.sh`.
+
+`deploy.sh` starts the loopback broker (`--profile broker`) when
+`PCP_BROKER_SECRETS_DIR` exists (see [broker.md](broker.md)). Then
+`deploy/plugins/sync_openclaw_pcp.sh` and `deploy/plugins/sync_astrbot_relay.sh`
+compare the installed plugins with `thirdparty/`; only on a difference they
+back up the installed copy under `PCP_PLUGIN_BACKUP_DIR` (default
+`DockerVolumes/pcp/plugin-backups`), install, restart the gateway / AstrBot,
+and require health, plugin load and (gateway) Telegram plus openclaw-weixin
+running, else they restore the backup and fail the build.
+
 ## PostgreSQL storage
 
 The cluster lives in the host directory `PCP_POSTGRES_DATA_DIR` (default

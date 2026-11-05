@@ -2,6 +2,16 @@
 
 Owner-visible future work for Personal Context Protocol. Keep this list focused on versioned product work, not per-round scratch notes.
 
+## v0.3.0 Broker — follow-ups
+
+- [x] Broker process, AstrBot ingress credential + HMAC stamp + replay window, loopback only
+- [x] `thirdparty/astrbot_plugin_pcp_relay`, `relay-owner` policy, delegate tool reads
+- [x] Jenkins stages: DB tests, plugin tests, plugin sync to the gateway and AstrBot
+- [ ] Claim links for AstrBot DMs (today: link with `pcp-operator.js identity link`)
+- [ ] Images in AstrBot turns (only text is relayed)
+- [ ] Prune OpenClaw `pcp:<grant>` session files (one per broker turn) with `session.maintenance`
+- [ ] OpenCode session-manager: send `provider_timestamp` for every turn so the server-side dedupe always applies
+
 ## v0.2.2 Projects — follow-ups
 
 - [x] Projects, aliases, workspaces per machine, session project link and task context (migration 013)
@@ -18,11 +28,11 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
 - [x] Session ownership (`owner_user_id`, `principal`, `class`) and admin-sees-all
 - [x] Single-use claim codes and `/claim` page
 - [ ] Hide admin-only dashboard controls (topic create/rename, trash, message edit) for non-admin users; the API already returns 403
-- [ ] Run `tests/identity-db.test.ts` in CI (needs `PCP_TEST_DATABASE_URL` pointing at a throwaway Postgres)
+- [x] Run the DB-backed tests in CI (`deploy/jenkins/db_test.sh`, throwaway PostgreSQL)
 - [ ] Admin UI for issuing claim codes and managing linked identities (API exists)
 - [ ] Revoke a user's web sessions when an admin removes them (today: group changes apply at next login, sessions expire after 12 h)
 - [x] Phase 2 (v0.2.1): service credentials, turn grants, grant-scoped sync/recall/search
-- [ ] Phase 2b+: broker process (AstrBot HMAC stamp + replay window, loopback only), plugins under `thirdparty/`, broker→OpenClaw call
+- [x] Phase 2b+: broker process (AstrBot HMAC stamp + replay window, loopback only), plugins under `thirdparty/`, broker→OpenClaw call (v0.3.0)
 - [ ] Admin UI for service credentials (API exists)
 
 ## v0.1 Completed

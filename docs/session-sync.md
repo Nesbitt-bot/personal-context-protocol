@@ -38,6 +38,14 @@ The plugin creates or reuses the PCP session using `external_key`, then appends
 only the turns after its local PCP cursor. Source growth is therefore append
 only. The local cursor is persisted in `session-index.json` under `entry.pcp`.
 
+PCP also makes the append itself idempotent: a message whose role, content
+and `provider_timestamp` already exist in the session is not stored again
+(the response marks it `duplicate`), under a per-session lock. A push that
+replays from a stale local cursor (crash after a successful append, a lost
+index, a second device) therefore records nothing twice, as long as the
+messages carry their timestamps. Messages without a timestamp have no
+identity to compare and are stored as sent.
+
 The existing OpenCode import cursor (`entry.imported`) remains independent from
 the PCP cursor. A session can be imported locally, pushed remotely, or both.
 

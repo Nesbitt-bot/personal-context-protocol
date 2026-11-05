@@ -105,7 +105,7 @@ export async function POST(
             { status: FAILURE_STATUS[appended.code] || 500 },
           );
         }
-        messagesImported = appended.messages.length;
+        messagesImported = appended.messages.length - appended.duplicates;
       }
     }
 

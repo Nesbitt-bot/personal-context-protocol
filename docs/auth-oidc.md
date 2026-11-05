@@ -76,7 +76,7 @@ attach that header on their own.
 | Anyone else | Nothing (`401`) |
 
 Sessions carry `owner_user_id`, `principal` (platform identity such as
-`telegram:8627151333`, `openclaw-weixin:<id>`, `astrbot:qq:<id>`) and `class`:
+`telegram:100000001`, `openclaw-weixin:<id>`, `astrbot:qq:<id>`) and `class`:
 
 - `trusted` — a verified one-to-one identity, or a session created by a
   signed-in user (who becomes its owner);

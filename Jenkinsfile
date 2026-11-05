@@ -34,6 +34,9 @@ pipeline {
     stage('Build, typecheck and test') {
       steps { sh 'bash deploy/jenkins/build_test.sh "$WORKSPACE/$DEPLOY_ENV"' }
     }
+    stage('Database tests') {
+      steps { sh 'timeout 15m bash deploy/jenkins/db_test.sh' }
+    }
     stage('Plugin tests') {
       steps { sh 'timeout 10m bash deploy/jenkins/thirdparty_test.sh' }
     }
@@ -46,10 +49,18 @@ pipeline {
     stage('Deploy full stack') {
       steps { sh 'bash deploy/jenkins/deploy.sh "$WORKSPACE/$DEPLOY_ENV"' }
     }
+    stage('Sync channel plugins') {
+      // Each step is a no-op unless the plugin changed; on change it backs up,
+      // installs, restarts and verifies health and channels, else restores.
+      steps {
+        sh 'timeout 10m bash deploy/plugins/sync_openclaw_pcp.sh'
+        sh 'timeout 10m bash deploy/plugins/sync_astrbot_relay.sh'
+      }
+    }
   }
   post {
     always {
-      junit testResults: 'reports/pcp-junit.xml', allowEmptyResults: true
+      junit testResults: 'reports/*.xml', allowEmptyResults: true
       sh 'rm -f "$WORKSPACE/$DEPLOY_ENV"'
     }
     success { echo 'Deployment verified: PCP.Jenkins/complete — remote source tests, database backup, version and database checks passed.' }

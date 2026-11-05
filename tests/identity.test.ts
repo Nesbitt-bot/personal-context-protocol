@@ -70,7 +70,7 @@ describe('claim codes', () => {
 
 describe('principals', () => {
   it('accepts platform principals', () => {
-    for (const ok of ['telegram:8627151333', 'openclaw-weixin:o9cq800abc@im.wechat', 'astrbot:qq:123456']) {
+    for (const ok of ['telegram:100000001', 'openclaw-weixin:o9cq800abc@im.wechat', 'astrbot:qq:123456']) {
       expect(isValidPrincipal(ok)).toBe(true);
     }
   });

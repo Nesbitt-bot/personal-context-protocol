@@ -6,6 +6,11 @@
  * insertion live in one place. Invariants enforced here:
  *
  *   - messages are append-only with a monotonically increasing ordinal;
+ *   - appends are idempotent for timestamped messages: a message whose role,
+ *     content and provider_timestamp already exist in the session is not
+ *     stored again (a sync client replaying from a stale cursor, e.g. the
+ *     OpenCode session-manager after a crash, records nothing twice). The
+ *     session row is locked so concurrent replays cannot both insert;
  *   - AI-suggested session titles are normalized and de-duplicated within the
  *     topic, and a rename event is recorded;
  *   - compactions are additional records and never replace raw messages;
@@ -34,7 +39,9 @@ export type StoreFailureCode = 'NOT_FOUND' | 'SESSION_ARCHIVED' | 'FORBIDDEN';
 
 export interface AppendSuccess {
   ok: true;
-  messages: Array<{ id: string; ordinal: number }>;
+  /** One entry per input message; `duplicate` marks one that already existed. */
+  messages: Array<{ id: string; ordinal: number; duplicate?: boolean }>;
+  duplicates: number;
   session: { id: string; title: string; last_message_at: string };
 }
 
@@ -105,17 +112,39 @@ export async function appendMessagesToSession(params: {
 
   const now = new Date();
 
-  const { inserted, finalTitle } = await db.transaction(async (tx) => {
+  const { inserted, finalTitle, duplicates } = await db.transaction(async (tx) => {
+    // Serialize appends per session: ordinals and the duplicate check below.
+    await tx.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)).for('update');
     const [maxOrdinal] = await tx
       .select({ max: sql<number>`max(${messages.ordinal})` })
       .from(messages)
       .where(eq(messages.sessionId, sessionId));
 
     let currentOrdinal = maxOrdinal?.max ? Number(maxOrdinal.max) : 0;
-    const insertedRows: Array<{ id: string; ordinal: number }> = [];
+    const insertedRows: Array<{ id: string; ordinal: number; duplicate?: boolean }> = [];
+    let duplicateCount = 0;
+    let firstNewOrdinal: number | null = null;
 
     for (const msg of newMessages) {
+      if (msg.provider_timestamp) {
+        const [existing] = await tx
+          .select({ id: messages.id, ordinal: messages.ordinal })
+          .from(messages)
+          .where(and(
+            eq(messages.sessionId, sessionId),
+            eq(messages.role, msg.role),
+            eq(messages.providerTimestamp, new Date(msg.provider_timestamp)),
+            eq(messages.content, msg.content),
+          ))
+          .limit(1);
+        if (existing) {
+          insertedRows.push({ id: existing.id, ordinal: existing.ordinal, duplicate: true });
+          duplicateCount += 1;
+          continue;
+        }
+      }
       currentOrdinal += 1;
+      if (firstNewOrdinal === null) firstNewOrdinal = currentOrdinal;
       const messageId = createId('msg');
       await tx.insert(messages).values({
         id: messageId,
@@ -136,7 +165,10 @@ export async function appendMessagesToSession(params: {
       insertedRows.push({ id: messageId, ordinal: currentOrdinal });
     }
 
-    await tx.update(sessions).set({ lastMessageAt: now }).where(eq(sessions.id, sessionId));
+    const newCount = newMessages.length - duplicateCount;
+    if (newCount > 0) {
+      await tx.update(sessions).set({ lastMessageAt: now }).where(eq(sessions.id, sessionId));
+    }
 
     await tx.insert(events).values({
       id: createId('evt'),
@@ -145,8 +177,9 @@ export async function appendMessagesToSession(params: {
       action: 'message.appended',
       actor,
       detailsJson: {
-        message_count: newMessages.length,
-        first_ordinal: currentOrdinal - newMessages.length + 1,
+        message_count: newCount,
+        first_ordinal: firstNewOrdinal,
+        ...(duplicateCount > 0 ? { skipped_duplicates: duplicateCount } : {}),
       },
       createdAt: now,
     });
@@ -156,12 +189,13 @@ export async function appendMessagesToSession(params: {
       title = await applySuggestedSessionTitle(tx, sessionId, session.topicId, session.title, suggestedTitle, actor);
     }
 
-    return { inserted: insertedRows, finalTitle: title };
+    return { inserted: insertedRows, finalTitle: title, duplicates: duplicateCount };
   });
 
   return {
     ok: true,
     messages: inserted,
+    duplicates,
     session: { id: sessionId, title: finalTitle, last_message_at: now.toISOString() },
   };
 }

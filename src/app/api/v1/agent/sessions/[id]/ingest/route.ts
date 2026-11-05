@@ -90,7 +90,7 @@ export async function POST(
           const { status, body } = agentErrorBody(result.code);
           return NextResponse.json(body, { status });
         }
-        messagesImported = result.messages.length;
+        messagesImported = result.messages.length - result.duplicates;
       }
     }
 
