@@ -4,6 +4,10 @@ PCP is a Vercel + Neon Postgres web app for scoped AI session recording.
 Humans create topics and sessions; AI agents record messages into assigned
 sessions using only a recording URL + access token.
 
+The [AstrBot relay](broker.md) preserves group speaker IDs in recalled
+history. Historical private context can be backfilled into its linked PCP session
+for OpenClaw recall across the owner's connected channels.
+
 ---
 
 ## Quick Deploy

@@ -7,6 +7,10 @@ OpenClaw through the PCP broker. Standard library only; tested with AstrBot
 - `on_llm_request` builds a stamp from the platform event: platform (from the
   adapter type), private/group, group id, sender id, message id, time, nonce.
   Message text never feeds the stamp.
+- Group messages retain a platform-derived sender principal and an escaped,
+  explicitly untrusted display name in recorded text. Later context recall
+  distinguishes members after the turn grant expires. Private message text
+  is unchanged; display names never grant identity or access.
 - Provider type `pcp_relay` signs `{stamp, message}` with HMAC-SHA256 and
   posts it with the AstrBot ingress credential to the loopback broker, which
   verifies nothing itself and forwards to PCP; PCP decides the agent and the

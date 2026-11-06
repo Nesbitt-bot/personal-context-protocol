@@ -4,6 +4,18 @@ Design Phase 4. AstrBot (QQ, WeChat official accounts, ...) reaches OpenClaw
 only through PCP, and the sender's identity comes from the platform event,
 never from message text.
 
+Group messages include the platform-derived sender principal in stored text,
+so recalled history retains speaker attribution after the turn grant expires.
+Display names are escaped and marked untrusted; only the signed sender ID
+determines identity and permissions. The relay handles LLM-triggering messages,
+not passive group traffic or non-message platform notices.
+
+Historical AstrBot context must be backfilled separately: the relay sends only
+the latest event. Import private conversation and LivingMemory records into the
+existing linked DM session, preserve source IDs and timestamps where known,
+and keep group history in its own group session. Back up first, use stable
+external message IDs for retries, and verify OpenClaw recall after importing.
+
 ```
 QQ ─▶ AstrBot (wake, mention, rate limit, profile routing unchanged)
    ─▶ thirdparty/astrbot_plugin_pcp_relay   provider type pcp_relay

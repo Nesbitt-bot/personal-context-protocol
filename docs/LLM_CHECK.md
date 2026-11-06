@@ -320,3 +320,36 @@ Append what this round actually did below:
     (`tests/service-sync-db.test.ts` uses its own `<db>_service` database);
     without `PCP_TEST_DATABASE_URL` both DB files are skipped.
   - No broker, plugins or broker→OpenClaw call (later phases).
+
+- 2026-11-05 — AstrBot history backfill and relay speaker attribution (plugin v0.1.2)
+  - Root cause: `thirdparty/astrbot_plugin_pcp_relay/main.py` retained sender
+    identity in the stamp but sent bare text to PCP. The broker recorded that
+    bare text, so subsequent group recall lost the speaker identity.
+  - Group text now carries its platform-derived principal and an escaped,
+    explicitly untrusted display name. Signed IDs still determine access;
+    private text, agent policy, group isolation and wake rules are unchanged.
+    Nearby provider errors now include consequence, module/process and cause.
+  - Backfilled the requested linked QQ DM from two AstrBot conversations and
+    LivingMemory: 58 source records, seven overlaps, 51 imported messages.
+    Added an append-only chronology note for source records without individual
+    timestamps. Existing six PCP records and owner identity were preserved.
+    Raw sources, rollback snapshots and replay scripts remain private under
+    the host-backed PCP context-sync directory, outside Git. Attachments stay
+    in the source snapshot with an explicit reference in recalled text.
+  - Passed all 22 standard-library plugin tests; the new group-history test
+    fails against the original source. Actual installed OpenClaw PCP tools
+    recalled imported messages. Live signed fixture turns retained separate
+    speakers and group recall returned 403 for the private DM. No message
+    was sent to QQ or another external channel during verification.
+  - Import replay inserted zero duplicates. Verified content equality, source
+    IDs, unique ordinals, unchanged original rows and private session scope.
+    Installed through the existing backup/restart helper; plugin/provider/IM
+    startup and source checksums passed. Existing persistent mounts retained.
+  - Reviewed README, docs/readme and broker documentation. No new env vars,
+    runtime, ports, schema or API routes. Node build/typecheck/full app tests
+    skipped: only the standalone Python relay changed. Plugin version bumped;
+    PCP app version is unchanged. No repo-root Bark config was present.
+  - Diff, changed-file line limits, secret/size/gitignore and unrelated-change
+    audits passed. Work on fix/astrbot-group-context; main unchanged. Commit
+    locally without pushing; remote Jenkins plugin sync can replace this
+    local installation until the source change is merged upstream.
