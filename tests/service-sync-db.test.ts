@@ -236,6 +236,22 @@ describe.skipIf(!enabled)('service credentials, turn grants, sync and recall (da
     expect(aliceList.body.sessions.map((s: { id: string }) => s.id)).not.toContain(g.body.session_id);
   });
 
+  it('linked admin DMs read globally while admin groups remain isolated', async () => {
+    await lib.db.execute(lib.sql`INSERT INTO identities (principal, user_id, link_method) VALUES ('telegram:333', 'usr_admin', 'admin')`);
+    await lib.db.execute(lib.sql`INSERT INTO sessions (id, title, class, archived) VALUES
+      ('ses_admin_group', 'group archive', 'group', false),
+      ('ses_archived', 'archived', 'unattributed', true)`);
+    const dm = await grant(openclaw, { session_key: 'agent:main:telegram:direct:333', principal: 'telegram:333', chat: 'direct' });
+    expect(dm.status).toBe(200);
+    expect(dm.body.readable_session_ids).toEqual(expect.arrayContaining(['ses_alice_notes', 'ses_bob_notes', 'ses_unowned', 'ses_admin_group']));
+    expect(dm.body.readable_session_ids).not.toContain('ses_archived');
+    const found = await call('search', 'POST', { bearer: openclaw, body: { session_key: 'agent:main:telegram:direct:333', query: 'bob secret plan' } });
+    expect(found.body.results.map((r: { session_id: string }) => r.session_id)).toContain('ses_bob_notes');
+    const group = await grant(openclaw, { session_key: 'agent:main:telegram:group:admin-test', principal: 'telegram:333', chat: 'group', group_id: 'admin-test' });
+    expect(group.body.readable_session_ids).toEqual([group.body.session_id]);
+    expect((await call('recall', 'POST', { bearer: openclaw, body: { session_key: 'agent:main:telegram:group:admin-test', session_id: 'ses_bob_notes' } })).status).toBe(403);
+  });
+
   it('an unlinked DM reads only its own session and can get a claim code', async () => {
     const u = await grant(openclaw, { session_key: 'agent:main:telegram:999', principal: 'telegram:999', chat: 'direct', issue_claim: true });
     expect(u.status).toBe(200);

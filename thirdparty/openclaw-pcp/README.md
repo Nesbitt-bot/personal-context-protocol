@@ -129,3 +129,44 @@ cd thirdparty/openclaw-pcp && npm test   # node:test, no install needed
 - Cross-channel recall needs the principals linked to a PCP user (claim flow,
   or the operator CLI for owner-bound channels). Until then each principal
   only reads its own DM session.
+
+## Historical backfill
+
+Live `agent_end` sync records new turns; installation does not scan old session
+files. Use `scripts/backfill.mjs` to replay operator-selected snapshots through
+the installed plugin's `agent_end`, redaction, durable queue, grants and sync
+client. No model is run and no channel reply is sent.
+
+Create a private JSON array manifest with one entry per immutable snapshot:
+
+```json
+[{"file":"/private/transcript.jsonl","source_sha256":"<snapshot-sha256>",
+  "sessionId":"<original-session-id>",
+  "sessionKey":"agent:main:telegram:direct:<verified-peer-id>",
+  "channel":"telegram","userMessageIds":["<original-user-message-id>"]}]
+```
+
+Verify the peer using the session's transport metadata; quoted names in chat
+text are not identity evidence. Select only turns from that peer and chat.
+The manifest must not relabel group history as a private conversation. Each
+selected user message includes its assistant continuation, stopping at the
+next user message. Tool results and thinking are excluded as in normal sync.
+
+Run inside the gateway with its existing credential and private configuration:
+
+```sh
+node /path/to/openclaw-pcp/scripts/backfill.mjs /private/manifest.json /private/openclaw.json /private/backfill-state
+# Review counts, then apply:
+node /path/to/openclaw-pcp/scripts/backfill.mjs /private/manifest.json /private/openclaw.json /private/backfill-state --apply
+```
+
+Use a dedicated state directory, separate from the gateway's live queue.
+Snapshot hashes are verified; original session IDs and user timestamps retain
+the normal `oc:<session>:<timestamp>` idempotency keys. Rerunning the same
+manifest resumes safely and does not duplicate existing turns. Logs report
+counts, never conversation content. Queue failures stop replay for inspection.
+Verify remote message counts and search from an authorized channel afterward.
+
+PCP v0.3.2 gives verified admin DMs read access to all active sessions; other
+users and groups retain their existing restrictions. Admin status is resolved
+by PCP from the linked identity, never from a display name or tool argument.

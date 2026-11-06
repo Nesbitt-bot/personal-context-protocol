@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { and, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { db } from './db';
-import { events, identities, sessions, turnGrants } from './schema';
+import { events, identities, sessions, turnGrants, users } from './schema';
 import { createId } from './auth';
 import { createClaim, ownerForPrincipal } from './claims';
 import { credentialAllowsPrincipal, INGRESS_PREFIX, ResolvedServiceCredential } from './service-auth';
@@ -15,8 +15,9 @@ import { isValidPrincipal } from './session-access';
  * its own service credential plus the session key, so neither the model nor
  * the plugin can widen it.
  *
- * - Direct chat, principal linked to a user: the user's own non-group
- *   sessions (owned or principal-linked, as a non-admin would see them).
+ * - Direct chat, linked administrator: every non-archived session.
+ * - Direct chat, other linked user: owned or principal-linked non-group
+ *   sessions that are not archived.
  * - Direct chat, unlinked principal: only that principal's own DM session.
  * - Group chat: only the group's own session.
  * Writes always go to the grant's home session only.
@@ -167,17 +168,20 @@ export async function createTurnGrant(credential: ResolvedServiceCredential, inp
 
   let readable = [home.id];
   if (sessionClass === 'trusted' && ownerUserId) {
+    const [owner] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, ownerUserId)).limit(1);
     const linked = db.select({ principal: identities.principal }).from(identities).where(eq(identities.userId, ownerUserId));
-    const rows = await db
+    // Admin authority comes from the linked PCP user, never from the caller.
+    // Group turns never enter this branch, even when their sender is an admin.
+    const scope = owner?.isAdmin ? undefined : and(
+      ne(sessions.sessionClass, 'group'),
+      or(eq(sessions.ownerUserId, ownerUserId), inArray(sessions.principal, linked)),
+    );
+    const query = db
       .select({ id: sessions.id })
       .from(sessions)
-      .where(and(
-        ne(sessions.sessionClass, 'group'),
-        eq(sessions.archived, false),
-        or(eq(sessions.ownerUserId, ownerUserId), inArray(sessions.principal, linked)),
-      ))
-      .orderBy(desc(sessions.lastMessageAt), desc(sessions.createdAt))
-      .limit(MAX_READABLE_SESSIONS);
+      .where(and(eq(sessions.archived, false), scope))
+      .orderBy(desc(sessions.lastMessageAt), desc(sessions.createdAt));
+    const rows = owner?.isAdmin ? await query : await query.limit(MAX_READABLE_SESSIONS);
     readable = Array.from(new Set([home.id, ...rows.map((row) => row.id)]));
   }
 

@@ -156,7 +156,7 @@ describe.skipIf(!enabled)('PCP broker: AstrBot identity, policy, grants and reco
     const [system, user] = res.body.messages;
     expect(system.content).toMatch(/^Verified sender \(PCP-attested\): astrbot:qq:200001, private chat on QQ; linked PCP user "owner" \(the verified owner\)/);
     expect(system.content).toContain('BLUE HERON'); // owner's other sessions, bounded
-    expect(system.content).not.toContain('4471');
+    expect(system.content).toContain('4471'); // verified admin DM has global read access
     expect(user).toEqual({ role: 'user', content: 'what is the trip codename from Telegram?' });
 
     // openclaw-pcp tools: its own credential + the session key (as OpenClaw may store it).

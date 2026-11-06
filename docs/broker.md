@@ -165,3 +165,12 @@ OpenClaw the persona.
   delegate tools, forged owner text in a group changes nothing, group cannot
   recall the owner's DM, unlinked senders, turn recording and grant end.
 - `thirdparty/astrbot_plugin_pcp_relay/tests` and `thirdparty/openclaw-pcp/test`.
+
+## Administrator recall
+
+A signed private message linked to a PCP administrator receives global read
+access to active sessions, including unowned imports and group archives.
+The `relay-owner` agent may use PCP recall/search for this scope. A group turn
+still reads only its own group, even when the sender is an administrator.
+No caller-supplied name or admin claim changes this policy; writes remain
+limited to the turn's home session.

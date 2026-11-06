@@ -353,3 +353,25 @@ Append what this round actually did below:
     audits passed. Work on fix/astrbot-group-context; main unchanged. Commit
     locally without pushing; remote Jenkins plugin sync can replace this
     local installation until the source change is merged upstream.
+
+- 2026-11-05 — Telegram historical sync and admin recall (PCP v0.3.2; plugin v0.2.2)
+  - Verified the installed PCP plugin and identity links. Root causes: live
+    `agent_end` sync never backfilled pre-install transcripts; `createTurnGrant`
+    applied non-admin ownership filters even to linked administrators.
+  - Added operator-manifest backfill through the actual installed plugin hook,
+    redaction, queue and service client. Immutable source hashes, stable native
+    turn IDs, bounded progress logging and a separate queue make replay safe.
+    Selected 470 Telegram turns from 16 snapshots; 2,268 records added to the
+    existing session. A full replay kept the remote total at 2,270. Tool results,
+    thinking and attachments follow the existing text-only plugin policy.
+  - Admin DMs now receive every active session, including unowned imports and
+    group archives; non-admin and group grants retain their existing scopes.
+    Admin status is read from the linked PCP user. Writes stay home-session-only.
+  - Passed TypeScript checks, 335 tests against isolated PostgreSQL (two existing
+    source-excluded planner tests skipped in the CI image), all 32 plugin tests,
+    and production Docker build before the release metadata bump. Verified
+    installed plugin search returns the Telegram display name and numeric ID.
+    Private database/source snapshots and logs stay under DockerVolumes/pcp.
+  - Updated README, docs/readme, broker/service-sync documentation and plugin
+    backfill instructions. App and plugin patch versions aligned. Runtime
+    deployment and final checks are recorded in the following log entry.

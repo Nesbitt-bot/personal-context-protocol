@@ -157,3 +157,8 @@ webhooks. [Jenkins runbook](deployment-jenkins.md) covers private env setup, ver
 images, backups, tests, and the verified Neon-to-local import. The Neon
 source is retained; the local runtime keeps its PostgreSQL data in a host
 bind mount (`PCP_POSTGRES_DATA_DIR`).
+
+Verified administrator DMs can recall all active PCP sessions. Group replies
+remain restricted to their own conversation. Existing OpenClaw transcripts can
+be replayed through the [PCP plugin backfill tool](../thirdparty/openclaw-pcp/README.md#historical-backfill)
+with stable turn IDs and the same redaction and retry path as live sync.
