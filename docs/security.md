@@ -30,6 +30,10 @@ can see which session.
   once, admin-minted, revocable). They are accepted only on
   `/api/v1/service/*`, never as admin, UI login or agent recording token.
 - Each credential may assert only principals under its configured prefixes.
+- Owner-bound channels (openclaw-pcp `ownerBoundChannels`, e.g.
+  OpenClaw-WeChat) trust only the exact pinned `ownerPrincipals`; the pin is
+  linked to the owner by the operator, never by a claim in that channel. Any
+  other principal there is treated as unlinked (home session only).
 - What a turn may read is a server-side grant (readable session set, TTL,
   bound to the credential and the OpenClaw session key). Plugins never pass
   session ids they want to read beyond that set; models never see a grant.

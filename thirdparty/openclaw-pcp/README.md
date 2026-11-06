@@ -13,6 +13,7 @@ channels: Telegram and OpenClaw-WeChat). No runtime dependencies; Node 18.19+.
 | `before_compaction` / `after_compaction` | Flushes the queue before history is rewritten, then uploads the new compaction summary (`oc-compaction:<sessionId>:<entry-id>`, role `system`). |
 | `after_tool_call` | Audits each `pcp_*` call into the home session (`oc-audit:…`, role `tool`): tool, query, result count, duration. |
 | `before_tool_call` | HTTP API backstop: for session keys matching `httpSessionKeyPatterns` (default `^agent:[^:]+:openai(?:[-:]|$)` and `(?:^|:)pcp:grt_`, i.e. `/v1/chat/completions` runs and PCP broker turns), every tool except `httpToolAllowlist` (default `pcp_context`, `pcp_search`) is refused. Active even if PCP is unconfigured. |
+| `ownerBoundChannels` | Owner-bound channels (default none): no claim links; a DM there is the owner only if its principal is exactly a pinned `ownerPrincipals` entry. Any other DM principal on that channel is restricted to its own home session (no cross-session context, tool results filtered to the home session, even if PCP reports it linked) and a warning is logged. See below. |
 | `message_sending` | Claim link: on the first reply of a new (no earlier messages), unlinked, direct session on a channel in `claimChannels` (default `telegram`), appends one single-use `…/claim?code=…` link returned by PCP. The code is never put in the prompt or transcript. Skipped for groups, unattributed sessions, linked principals, and channels whose plugin does not run `message_sending` (the bundled OpenClaw-WeChat build stubs that hook out). |
 
 Uploads are redacted (`lib/redact.js`: PCP's export patterns plus GitHub,
@@ -49,6 +50,34 @@ peer, never from message text or tool arguments:
 Only principals with a prefix in `allowedPrefixes` (default `telegram:`,
 `openclaw-weixin:`) are asserted; the service credential is bounded the same
 way server-side.
+
+## Owner-bound channels
+
+Some channels are bound 1:1 to the owner's own account: the bundled
+OpenClaw-WeChat plugin logs in as one WeChat account and every DM it gets is
+from the owner, always on the `main` agent. For those, set
+
+```json
+"ownerBoundChannels": ["openclaw-weixin"],
+"ownerPrincipals": ["openclaw-weixin:<owner wxid>@im.wechat"]
+```
+
+- The pin is compared exactly (case-sensitive) with the trusted principal.
+  OpenClaw lowercases peer ids in session keys, so route the owner through
+  `session.identityLinks` (`agent:<a>:direct:owner`), which keeps the
+  platform's case, and pin the same string.
+- PCP still decides what the turn reads: the pinned principal must be linked
+  to the owner's PCP user (operator CLI `identity link`, since the channel
+  cannot show claim links). Then its grant reads every non-group session of
+  that user (Telegram, QQ via `relay-owner`, WeChat), and those channels see
+  its turns. A pinned but unlinked owner logs one warning.
+- Not a blanket rule: an unpinned principal on an owner-bound channel is an
+  unlinked sender (home session only, no claim) and logs a warning that does
+  not echo the sender id. Pins that are malformed, on another channel or
+  outside `allowedPrefixes` are ignored with a warning; an owner-bound
+  channel with no valid pin restricts every DM on it.
+- Groups, other channels, the HTTP backstop and the service credential scope
+  are unchanged.
 
 ## Configuration
 
@@ -97,5 +126,6 @@ cd thirdparty/openclaw-pcp && npm test   # node:test, no install needed
   the gateway token is operator-level, so this is a backstop, not a boundary.
 - Agents with file or exec tools in the same gateway can read the token file.
   Keep the credential platform-scoped (it is never admin).
-- Cross-channel recall needs the principals linked to a PCP user (claim flow).
-  Until then each principal only reads its own DM session.
+- Cross-channel recall needs the principals linked to a PCP user (claim flow,
+  or the operator CLI for owner-bound channels). Until then each principal
+  only reads its own DM session.

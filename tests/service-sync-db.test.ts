@@ -174,6 +174,43 @@ describe.skipIf(!enabled)('service credentials, turn grants, sync and recall (da
     expect((await call('search', 'POST', { bearer: openclaw, body: { session_key: 'agent:main:weixin:aaa', query: 'secret plan' } })).body.results).toEqual([]);
   });
 
+  it('owner-bound WeChat: the linked owner reads Telegram, QQ (relay-owner) and WeChat turns both ways; another WeChat principal reads only its own', async () => {
+    // The owner's QQ DM session, as the broker records it (principal astrbot:qq:<id>, unowned until a grant runs).
+    await lib.db.execute(lib.sql`INSERT INTO identities (principal, user_id, link_method) VALUES ('astrbot:qq:333', 'usr_alice', 'admin')`);
+    await lib.db.execute(lib.sql`INSERT INTO sessions (id, external_key, title, principal, class) VALUES
+      ('ses_alice_qq', 'pcp:dm:astrbot:qq:333', 'Chat astrbot:qq:333', 'astrbot:qq:333', 'trusted')`);
+    await lib.db.execute(lib.sql`INSERT INTO messages (id, session_id, ordinal, role, content, observed_at) VALUES
+      ('msg_q1', 'ses_alice_qq', 1, 'user', 'qq owner turn: the parcel code is OSPREY', now())`);
+
+    const wx = await grant(openclaw, { session_key: 'agent:main:direct:owner', principal: 'openclaw-weixin:aaa', chat: 'direct' });
+    expect(wx.status).toBe(200);
+    expect(wx.body).toMatchObject({ linked: true, claim: null });
+    const wxHome = wx.body.session_id as string;
+    const wxRow = await lib.db.execute(lib.sql`SELECT owner_user_id, principal FROM sessions WHERE id = ${wxHome}`);
+    expect(wxRow[0]).toMatchObject({ owner_user_id: 'usr_alice', principal: 'openclaw-weixin:aaa' });
+    expect(wx.body.readable_session_ids).toEqual(expect.arrayContaining([wxHome, 'ses_alice_qq']));
+    const fromWx = await call('recall', 'POST', { bearer: openclaw, body: { session_key: 'agent:main:direct:owner', limit: 50 } });
+    expect(JSON.stringify(fromWx.body.messages)).toContain('HERON');
+    expect(JSON.stringify(fromWx.body.messages)).toContain('OSPREY');
+    expect(JSON.stringify(fromWx.body.messages)).not.toContain('bob secret plan');
+    expect((await call('sync', 'POST', { bearer: openclaw, body: {
+      session_key: 'agent:main:direct:owner', external_key: 'wx-turn-1', messages: [{ role: 'user', content: 'wechat owner turn: KESTREL' }],
+    } })).body.session_id).toBe(wxHome);
+
+    // Telegram owner (same OpenClaw key, next turn) sees the WeChat turn.
+    await grant(openclaw, { session_key: 'agent:main:direct:owner', principal: 'telegram:111', chat: 'direct' });
+    const fromTg = await call('search', 'POST', { bearer: openclaw, body: { session_key: 'agent:main:direct:owner', query: 'kestrel' } });
+    expect(fromTg.body.results.map((r: { session_id: string }) => r.session_id)).toEqual([wxHome]);
+
+    // Any other openclaw-weixin principal is an ordinary unlinked sender.
+    const stranger = await grant(openclaw, { session_key: 'agent:main:direct:bbb', principal: 'openclaw-weixin:bbb', chat: 'direct' });
+    expect(stranger.body.linked).toBe(false);
+    expect(stranger.body.readable_session_ids).toEqual([stranger.body.session_id]);
+    for (const query of ['kestrel', 'osprey', 'heron']) {
+      expect((await call('search', 'POST', { bearer: openclaw, body: { session_key: 'agent:main:direct:bbb', query } })).body.results).toEqual([]);
+    }
+  });
+
   it('sync is idempotent by external key', async () => {
     const body = { session_key: 'agent:main:telegram:111', external_key: 'tg-turn-1', messages: [{ role: 'user', content: 'the launch codename is HERON' }] };
     const again = await call('sync', 'POST', { bearer: openclaw, body });

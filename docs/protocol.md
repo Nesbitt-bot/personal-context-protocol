@@ -157,6 +157,9 @@ AstrBot ingress credential and is only ever asserted through the broker.
 Create the turn grant for `{ session_key, principal, chat, group_id?, ttl_seconds?, issue_claim? }`
 or end it (`{ session_key }`). Returns `{ grant_id, session_id, readable_session_ids, expires_at, linked, claim }`.
 `403 PRINCIPAL_NOT_ALLOWED` when the credential may not assert that principal.
+A linked direct-chat principal reads all of its user's non-group sessions; owner-bound
+channels (OpenClaw-WeChat) rely on this plus a plugin-side pin (see
+[service-sync.md](service-sync.md#owner-bound-channels-openclaw-pcp-021)).
 
 ### POST `/service/sync`
 

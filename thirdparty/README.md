@@ -8,7 +8,9 @@ from the Docker image (`.dockerignore`).
   OpenClaw-WeChat). It provides turn grants and a bounded cross-session context
   summary, grant-checked `pcp_context` / `pcp_search` tools, async redacted
   turn, compaction and PCP-access sync through an on-disk retry queue, the
-  HTTP-run tool backstop, and claim links. See `openclaw-pcp/README.md`.
+  HTTP-run tool backstop, claim links, and owner-bound channels (a pinned
+  owner principal on a channel bound to the owner's own account, e.g.
+  OpenClaw-WeChat). See `openclaw-pcp/README.md`.
 - `pcp-session-import/`: rerunnable, idempotent upload of the coding sessions
   collected by the OpenCode `session-manager` plugin (Claude Code, Codex, dsh,
   OpenCode; all devices), and `organize-projects.mjs`, which groups those

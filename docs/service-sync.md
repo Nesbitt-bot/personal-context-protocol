@@ -60,6 +60,20 @@ chat also gets a single-use claim code and `/claim?code=` URL for the plugin
 
 Response: `{ grant_id, session_id, readable_session_ids, expires_at, linked, claim }`.
 
+### Owner-bound channels (openclaw-pcp 0.2.1)
+
+A channel bound 1:1 to the owner's own account (OpenClaw-WeChat) needs no PCP
+change: the operator links the owner's exact principal on that channel to
+the owner's user (`pcp-operator.js identity link`), and the linked-direct-chat
+rule above gives its grant every non-group session of that user (Telegram, QQ
+via the broker's `relay-owner` turns, WeChat), in both directions. The trust
+pin lives in the plugin (`ownerBoundChannels` + `ownerPrincipals`, see
+`thirdparty/openclaw-pcp/README.md`): it never asks for a claim there, and any
+other principal on that channel is held to its home session even if a link
+exists. Unlinked principals of that platform get the unlinked rule (home only).
+The service credential's prefixes are unchanged (`telegram:`,
+`openclaw-weixin:`).
+
 ## Sync, recall, search
 
 All need a live grant for `session_key` issued to the same credential, or

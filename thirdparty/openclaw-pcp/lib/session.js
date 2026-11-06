@@ -103,3 +103,36 @@ export function resolveTarget({ sessionKey, channel, senderId, identityLinks, al
   if (!allowed(principal)) return null;
   return { principal, chat: "direct", channel: effectiveChannel, peer: parsed.peer };
 }
+
+/**
+ * Owner-bound channels (operator decision, e.g. `openclaw-weixin`, which is
+ * bound 1:1 to the owner's own account). A direct-chat target on such a
+ * channel is the owner only when its principal is exactly one of the pinned
+ * `ownerPrincipals` (case-sensitive; identityLinks keep the platform's case,
+ * session keys are lowercased). Any other principal there is restricted: it
+ * is treated as an unlinked sender (home session only), whatever PCP says.
+ * Groups and other channels are returned unchanged.
+ *
+ * @returns {object|null} the target, plus `ownerBound: true` or `restricted: true`
+ */
+export function applyOwnerBinding(target, { ownerBoundChannels = [], ownerPrincipals = [] } = {}) {
+  if (!target || target.chat !== "direct" || !ownerBoundChannels.includes(target.channel)) return target;
+  if (ownerPrincipals.includes(target.principal)) return { ...target, ownerBound: true };
+  return { ...target, restricted: true };
+}
+
+/**
+ * Pinned owner principals that can apply: well-formed, on an owner-bound
+ * channel and assertable by this credential. Returns { valid, rejected, unpinnedChannels }.
+ */
+export function checkOwnerPrincipals({ ownerBoundChannels = [], ownerPrincipals = [], allowedPrefixes = [] }) {
+  const valid = [];
+  const rejected = [];
+  for (const principal of ownerPrincipals) {
+    const ok = typeof principal === "string" && PRINCIPAL_PATTERN.test(principal) && !principal.includes(":group:")
+      && ownerBoundChannels.includes(channelOf(principal)) && allowedPrefixes.some((prefix) => principal.startsWith(prefix));
+    (ok ? valid : rejected).push(principal);
+  }
+  const unpinnedChannels = ownerBoundChannels.filter((channel) => !valid.some((principal) => channelOf(principal) === channel));
+  return { valid, rejected, unpinnedChannels };
+}

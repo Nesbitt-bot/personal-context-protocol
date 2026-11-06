@@ -1,8 +1,8 @@
 {
   "id": "openclaw-pcp",
   "name": "Personal Context Protocol",
-  "version": "0.2.0",
-  "description": "PCP turn grants and cross-channel context, grant-checked pcp_* tools, async turn sync, HTTP-run tool backstop, claim links.",
+  "version": "0.2.1",
+  "description": "PCP turn grants and cross-channel context, grant-checked pcp_* tools, async turn sync, HTTP-run tool backstop, claim links, owner-bound channels.",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -23,7 +23,9 @@
       "contextEnabled": { "type": "boolean" },
       "syncEnabled": { "type": "boolean" },
       "claimsEnabled": { "type": "boolean" },
-      "maxQueueItems": { "type": "integer", "minimum": 10, "maximum": 10000 }
+      "maxQueueItems": { "type": "integer", "minimum": 10, "maximum": 10000 },
+      "ownerBoundChannels": { "type": "array", "items": { "type": "string" } },
+      "ownerPrincipals": { "type": "array", "items": { "type": "string" } }
     }
   }
 }

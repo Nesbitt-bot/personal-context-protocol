@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { compilePatterns, DEFAULT_HTTP_SESSION_PATTERNS, isBrokerSessionKey, isHttpSessionKey, resolveTarget } from "../lib/session.js";
+import { applyOwnerBinding, checkOwnerPrincipals, compilePatterns, DEFAULT_HTTP_SESSION_PATTERNS, isBrokerSessionKey, isHttpSessionKey, resolveTarget } from "../lib/session.js";
 import { redactSecrets } from "../lib/redact.js";
 import { batches, buildContextBlock, extractTurn } from "../lib/turns.js";
 import { DiskQueue } from "../lib/queue.js";
@@ -352,3 +352,92 @@ test("HTTP backstop also covers broker turns: only pcp_* tools run", () => {
   }
 });
 
+
+// ------------------------------------------------ owner-bound channels (0.2.1)
+const WX_OWNER = "openclaw-weixin:wxid-test@im.wechat";
+const OWNER_BOUND = { ownerBoundChannels: ["openclaw-weixin"], ownerPrincipals: [WX_OWNER] };
+const strangerCtx = (key = "agent:main:direct:wxid-stranger@im.wechat") => ({ agentId: "main", sessionKey: key, sessionId: "sid-x", channelId: "openclaw-weixin", trigger: "user" });
+
+test("owner binding: exact pinned principal only; other principals restricted; groups and other channels unchanged", () => {
+  const bind = (key, channel, senderId) => applyOwnerBinding(target(key, channel, senderId), OWNER_BOUND);
+  assert.equal(bind("agent:main:direct:owner", "openclaw-weixin").ownerBound, true);
+  assert.equal(bind("agent:main:direct:owner", "openclaw-weixin").principal, WX_OWNER);
+  const stranger = bind("agent:main:direct:wxid-other@im.wechat", "openclaw-weixin");
+  assert.deepEqual([stranger.restricted, stranger.ownerBound], [true, undefined]);
+  // Session keys are lowercased by OpenClaw; a case-only variant of the pin is not the owner.
+  assert.equal(applyOwnerBinding({ principal: "openclaw-weixin:WXID-TEST@im.wechat", chat: "direct", channel: "openclaw-weixin" }, OWNER_BOUND).restricted, true);
+  assert.equal(bind("agent:main:openclaw-weixin:direct:wxid-test@im.wechat", undefined).ownerBound, true, "per-channel key with the exact id");
+  const tg = bind("agent:main:direct:owner", "telegram");
+  assert.equal(tg.ownerBound, undefined);
+  assert.equal(tg.restricted, undefined);
+  assert.deepEqual(bind("agent:main:openclaw-weixin:group:g1", "openclaw-weixin", "wxid-test@im.wechat"), target("agent:main:openclaw-weixin:group:g1", "openclaw-weixin", "wxid-test@im.wechat"));
+  assert.equal(applyOwnerBinding(null, OWNER_BOUND), null);
+  assert.equal(applyOwnerBinding(target("agent:main:direct:owner", "openclaw-weixin"), {}).ownerBound, undefined, "off by default");
+});
+
+test("owner pins are validated: wrong channel, malformed and out-of-prefix entries are rejected", () => {
+  const checked = checkOwnerPrincipals({
+    ownerBoundChannels: ["openclaw-weixin", "discord"],
+    ownerPrincipals: [WX_OWNER, "telegram:100000001", "openclaw-weixin:group:x", "nope", "discord:1"],
+    allowedPrefixes: prefixes,
+  });
+  assert.deepEqual(checked.valid, [WX_OWNER]);
+  assert.deepEqual(checked.rejected, ["telegram:100000001", "openclaw-weixin:group:x", "nope", "discord:1"]);
+  assert.deepEqual(checked.unpinnedChannels, ["discord"]);
+});
+
+test("owner-bound WeChat owner: cross-channel context, never a claim (even if claims are enabled for the channel)", async () => {
+  const { pcp, hook, warnings } = setup({ linked: true, pluginConfig: { ...OWNER_BOUND, claimChannels: ["telegram", "openclaw-weixin"] } });
+  const result = await hook("before_prompt_build")({ prompt: "hi", messages: [] }, ownerCtx("openclaw-weixin"));
+  assert.match(result.prependContext, /telegram home message/);
+  const grant = pcp.calls.find((c) => c.pathname.endsWith("/grants"));
+  assert.equal(grant.body.principal, WX_OWNER);
+  assert.equal(grant.body.issue_claim, undefined);
+  assert.equal(hook("message_sending")({ to: "wxid-test@im.wechat", content: "x" }, { channelId: "openclaw-weixin" }), undefined);
+  assert.equal(warnings.length, 0);
+});
+
+test("owner-bound channel: the pinned owner not linked in PCP logs one warning and gets no claim", async () => {
+  const { pcp, hook, warnings } = setup({ pluginConfig: { ...OWNER_BOUND, claimChannels: ["openclaw-weixin"] } });
+  await hook("before_prompt_build")({ prompt: "hi", messages: [] }, ownerCtx("openclaw-weixin"));
+  await hook("before_prompt_build")({ prompt: "hi", messages: [] }, ownerCtx("openclaw-weixin"));
+  assert.ok(pcp.calls.every((c) => c.body.issue_claim === undefined));
+  assert.equal(warnings.filter((w) => /PCP owner not linked/.test(w)).length, 1);
+});
+
+test("owner-bound channel: an unpinned principal is an unlinked sender (warned, no claim, home session only) even if PCP links it", async () => {
+  const { pcp, hook, tools, warnings } = setup({ linked: true, pluginConfig: { ...OWNER_BOUND, claimChannels: ["openclaw-weixin"] } });
+  const ctx = strangerCtx();
+  assert.equal(await hook("before_prompt_build")({ prompt: "who am I", messages: [] }, ctx), undefined, "no cross-session context");
+  const grant = pcp.calls.find((c) => c.pathname.endsWith("/grants"));
+  assert.equal(grant.body.principal, "openclaw-weixin:wxid-stranger@im.wechat");
+  assert.equal(grant.body.issue_claim, undefined);
+  assert.equal(pcp.calls.filter((c) => c.pathname.endsWith("/recall")).length, 0);
+  assert.ok(warnings.some((w) => /not a pinned owner principal/.test(w)));
+  assert.ok(warnings.some((w) => /PCP links an unpinned/.test(w)));
+  assert.ok(warnings.every((w) => !w.includes("wxid-stranger")), "warnings do not echo the sender id");
+
+  const list = tools[0].factory({ agentId: "main", sessionKey: ctx.sessionKey, messageChannel: "openclaw-weixin" });
+  const recalled = await list.find((t) => t.name === "pcp_context").execute("c1", {});
+  assert.doesNotMatch(recalled.content[0].text, /telegram home message/);
+  assert.match(recalled.content[0].text, /dentist/, "its own home session is still readable");
+  const found = await list.find((t) => t.name === "pcp_search").execute("c2", { query: "telegram home" });
+  assert.equal(found.details.count, 0);
+});
+
+test("owner-bound channel without a pin: every DM there is restricted, with a startup warning", async () => {
+  const { hook, pcp, warnings } = setup({ linked: true, pluginConfig: { ownerBoundChannels: ["openclaw-weixin"] } });
+  assert.ok(warnings.some((w) => /PCP owner pin missing/.test(w)));
+  assert.equal(await hook("before_prompt_build")({ prompt: "hi", messages: [] }, ownerCtx("openclaw-weixin")), undefined);
+  assert.equal(pcp.calls.filter((c) => c.pathname.endsWith("/recall")).length, 0);
+});
+
+test("owner-bound WeChat leaves Telegram claims, groups and the HTTP backstop unchanged", async () => {
+  const { pcp, hook } = setup({ pluginConfig: OWNER_BOUND });
+  await hook("before_prompt_build")({ prompt: "hello", messages: [] }, ownerCtx("telegram"));
+  assert.equal(pcp.calls[0].body.issue_claim, true, "Telegram still gets claim links");
+  await hook("before_prompt_build")({ prompt: "x", messages: [] }, { ...ownerCtx("openclaw-weixin"), sessionKey: "agent:main:openclaw-weixin:group:g1" });
+  assert.equal(pcp.calls.length, 1, "groups: no grant, context or claim at prompt build");
+  const before = hook("before_tool_call");
+  assert.equal(before({ toolName: "exec", params: {} }, { sessionKey: "agent:main:openai:1", toolName: "exec" }).block, true);
+});
