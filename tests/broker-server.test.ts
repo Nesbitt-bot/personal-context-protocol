@@ -120,7 +120,7 @@ describe('PCP broker process', () => {
 
   it('rejects oversize bodies and unknown routes', async () => {
     await start(harness({}));
-    const big = await fetch(`${base}/v1/turn`, { method: 'POST', body: 'x'.repeat(40 * 1024) }).catch(() => null);
+    const big = await fetch(`${base}/v1/turn`, { method: 'POST', body: 'x'.repeat(13 * 1024 * 1024) }).catch(() => null);
     expect(big === null || big.status === 413).toBe(true);
     expect((await fetch(`${base}/v1/chat/completions`, { method: 'POST', body: '{}' })).status).toBe(404);
   });

@@ -27,8 +27,10 @@ from astrbot.api.star import Context, Star
 from astrbot.core.provider.register import provider_cls_map, register_provider_adapter
 
 try:
+    from .pcp_media import collect_images
     from .pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, attributed_text, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
 except ImportError:  # loaded as a top-level module (tests)
+    from pcp_media import collect_images
     from pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, attributed_text, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
 
 PROVIDER_TYPE = "pcp_relay"
@@ -42,6 +44,7 @@ class PendingTurn:
     stamp: dict | None
     text: str
     event: object
+    media: list = field(default_factory=list)
     created: float = field(default_factory=time.monotonic)
 
 
@@ -128,7 +131,7 @@ class PcpRelayProvider(Provider):
         creds = load_credentials(self.credentials_file)
         if creds is None:
             return self._silent(turn, "ingress credentials file missing, unreadable or not private")
-        body = encode_body(turn.stamp, turn.text)
+        body = encode_body(turn.stamp, turn.text, turn.media)
         result = await asyncio.to_thread(post_turn, self.broker_url, creds, body, self.timeout_s)
         verdict = outcome(result)
         if verdict == "reply":
@@ -179,4 +182,8 @@ class PcpRelayPlugin(Star):
         """Attach the platform identity to this LLM request (pcp_relay reads it)."""
         text = (event.get_message_str() or "").strip() or str(getattr(req, "prompt", "") or "").strip()
         stamp = stamp_from_event(event)
-        _remember(PendingTurn(umo=str(event.unified_msg_origin), stamp=stamp, text=attributed_text(stamp, text), event=event))
+        segments = event.get_messages() if hasattr(event, "get_messages") else []
+        media, notes = await asyncio.to_thread(collect_images, segments)
+        if notes:
+            text += "\n" + "\n".join(notes)
+        _remember(PendingTurn(umo=str(event.unified_msg_origin), stamp=stamp, text=attributed_text(stamp, text), event=event, media=media))

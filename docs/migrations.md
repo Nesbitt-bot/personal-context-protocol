@@ -237,3 +237,9 @@ Drizzle doesn't support automatic rollbacks. Manual approach:
 Schema version is stored in `app_instance.version` and updated when migrations are applied.
 
 Current version: `0.1.15`
+
+## 015 — attachments
+
+Additive `attachments` table with session/message foreign keys, replay identity
+and blob metadata. Both schema bootstrap paths register `015_attachments`.
+No existing message or identity is rewritten. Blobs are backed up separately.

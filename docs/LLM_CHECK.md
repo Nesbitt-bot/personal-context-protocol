@@ -395,3 +395,20 @@ Append what this round actually did below:
     ignore rules and staged credentials. Main remains unchanged. No root Bark
     config exists. Package-lock is the existing generated dependency lockfile;
     only its two project version fields changed.
+
+## 2026-11-06 — AstrBot execution and media integration
+
+- Consolidated previously unmerged 0.3.2 fixes into the canonical PCP checkout
+  on `integration/ai-infra-execution-media`; archived redundant clones to Trash
+  only after checking ancestry, clean status, active processes and mounts.
+- Added per-tool execution authorization from signed AstrBot identity, live
+  broker grants, exact agent binding and the dashboard-managed policy.
+- Added sanitized image/GIF storage, authenticated previews and grant-based
+  image recall; native inline image uploads use the durable bounded queue.
+- Current-source typecheck and 349 Vitest tests against disposable PostgreSQL
+  passed; 34 OpenClaw plugin and 24 AstrBot plugin tests passed.
+- Production Docker build passed; no production database used for tests.
+- Private backup/evidence stays under DockerVolumes/ai-infra/releases. Reviewed
+  runtime settings, docs, source sizes, whitespace and staged paths.
+- GitHub credentials unavailable in this session; no remote push or webhook
+  deployment is claimed. Local rollout verification will be recorded separately.

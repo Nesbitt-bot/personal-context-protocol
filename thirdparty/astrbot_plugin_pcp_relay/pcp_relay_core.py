@@ -98,10 +98,10 @@ def attributed_text(stamp: dict | None, text: str) -> str:
     return f"[AstrBot sender {principal}; display name (untrusted): {name}]\n{text}"
 
 
-def encode_body(stamp: dict, text: str) -> bytes:
+def encode_body(stamp: dict, text: str, media=None) -> bytes:
     """Canonical compact JSON; the HMAC covers exactly these bytes."""
     clean = (text or "").strip()[:MAX_TEXT_CHARS] or "[non-text message]"
-    return json.dumps({"stamp": stamp, "message": {"text": clean}}, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return json.dumps({"stamp": stamp, "message": {"text": clean, **({"media": media} if media else {})}}, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def sign(signing_key_hex: str, body: bytes) -> str:

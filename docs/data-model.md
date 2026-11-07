@@ -605,3 +605,9 @@ LIMIT 50;
 - `projects`, `project_aliases`, `project_workspaces`, `sync_conflicts`,
   `merge_tasks`; `sessions.project_id`, `context_title`, `context_summary`,
   `sync_clock_json`; `messages.external_message_id` (migration 013)
+
+## Attachments (015)
+
+`attachments` links immutable sanitized blobs to messages and sessions. Unique
+`(session_id, external_key)` identifies retries; upload and blob SHA-256 values
+distinguish source identity from normalized storage. No blob hash grants access.

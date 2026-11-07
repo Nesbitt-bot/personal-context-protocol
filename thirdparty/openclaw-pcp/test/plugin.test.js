@@ -182,7 +182,7 @@ test("HTTP backstop refuses every tool except pcp_* and works without PCP creden
 
 test("pcp_* tools use the service credential and ctx.sessionKey only", async () => {
   const { pcp, tools } = setup({ linked: true });
-  assert.deepEqual(tools[0].opts, { optional: true, names: ["pcp_context", "pcp_search"] });
+  assert.deepEqual(tools[0].opts, { optional: true, names: ["pcp_context", "pcp_search", "pcp_attachment"] });
   const list = tools[0].factory({ agentId: "main", sessionKey: "agent:main:direct:owner", messageChannel: "telegram", requesterSenderId: "100000001" });
   const search = list.find((t) => t.name === "pcp_search");
   assert.equal(search.parameters.additionalProperties, false);
@@ -341,12 +341,12 @@ test("broker turns: an ended or foreign grant gives a clear tool error, never a 
   assert.deepEqual(pcp.calls.map((c) => c.pathname), ["/api/v1/service/recall"]);
 });
 
-test("HTTP backstop also covers broker turns: only pcp_* tools run", () => {
+test("HTTP backstop also covers broker turns: execution requires server authorization", async () => {
   const { hook } = setup();
   const before = hook("before_tool_call");
   for (const key of [BROKER_KEY, `agent:relay-owner:${BROKER_KEY}`]) {
     for (const tool of ["exec", "process", "read", "write", "browser", "web_fetch", "sessions_history", "message"]) {
-      assert.equal(before({ toolName: tool, params: {} }, { sessionKey: key, toolName: tool }).block, true, `${key} ${tool}`);
+      assert.equal((await before({ toolName: tool, params: {} }, { sessionKey: key, toolName: tool })).block, true, `${key} ${tool}`);
     }
     assert.equal(before({ toolName: "pcp_context", params: {} }, { sessionKey: key, toolName: "pcp_context" }), undefined);
   }
@@ -440,4 +440,26 @@ test("owner-bound WeChat leaves Telegram claims, groups and the HTTP backstop un
   assert.equal(pcp.calls.length, 1, "groups: no grant, context or claim at prompt build");
   const before = hook("before_tool_call");
   assert.equal(before({ toolName: "exec", params: {} }, { sessionKey: "agent:main:openai:1", toolName: "exec" }).block, true);
+});
+
+test("execution backstop checks every tool against PCP and rejects outages or mismatched agents", async () => {
+  let allowed = true, calls = 0;
+  const hooks = new Map();
+  createPlugin({ pluginConfig: { baseUrl: "http://127.0.0.1:3000" }, config: {}, logger: { warn() {} },
+    on: (name, fn) => hooks.set(name, fn), registerTool() {}, registerService() {} }, {
+    token: "test", queue: { due: () => [] }, fetch: async () => { calls++; return { ok: true, json: async () => ({ allowed, agent: "astrbot-exec" }) }; },
+  });
+  const ctx = { sessionKey: `agent:astrbot-exec:pcp:grt_${"a".repeat(48)}` };
+  assert.equal(await hooks.get("before_tool_call")({ toolName: "exec" }, ctx), undefined);
+  allowed = false;
+  assert.equal((await hooks.get("before_tool_call")({ toolName: "exec" }, ctx)).block, true);
+  allowed = true;
+  assert.equal((await hooks.get("before_tool_call")({ toolName: "exec" }, { sessionKey: ctx.sessionKey.replace("astrbot-exec", "main") })).block, true);
+  assert.equal(calls, 3);
+});
+
+test("inline user images are preserved for durable sync, including image-only messages", () => {
+  const turn = extractTurn([{ role: "user", content: [{ type: "image", data: "aGVsbG8=", mimeType: "image/png" }], timestamp: 123 }]);
+  assert.equal(turn.messages[0].content, "[image]");
+  assert.deepEqual(turn.messages[0].media, [{ name: "image-1", data: "aGVsbG8=" }]);
 });

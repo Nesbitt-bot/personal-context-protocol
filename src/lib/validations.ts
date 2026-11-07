@@ -1,3 +1,4 @@
+import { mediaInputSchema } from './media';
 import { z } from 'zod';
 import { MAX_CONTENT_CHARS, MAX_MESSAGES_PER_REQUEST } from './agent-protocol';
 import { EXPIRATION_CHOICES } from './token-expiration';
@@ -178,6 +179,7 @@ export const createGrantSchema = z.object({
 export const endGrantSchema = z.object({ session_key: sessionKeySchema }).strict();
 
 export const syncTurnSchema = z.object({
+  media: z.array(mediaInputSchema.extend({ message_index: z.number().int().min(0).max(49) })).max(4).optional(),
   session_key: sessionKeySchema,
   external_key: z.string().min(1).max(200),
   messages: z.array(messageInputSchema).min(1).max(MAX_MESSAGES_PER_REQUEST),

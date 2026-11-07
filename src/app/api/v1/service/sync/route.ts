@@ -1,3 +1,5 @@
+import { MediaError, normalizeMedia } from '@/lib/media';
+import { attachMedia } from '@/lib/attachments';
 import { NextRequest, NextResponse } from 'next/server';
 import { syncTurnSchema } from '@/lib/validations';
 import { serviceInternalError, serviceRequest } from '@/lib/service-route';
@@ -18,8 +20,15 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       );
     }
+    const inputs = ctx.body.media || [];
+    if (inputs.some(m => m.message_index >= ctx.body.messages.length)) return NextResponse.json({ error: 'Unable to sync media: service/message index - attachment references a missing message' }, { status: 400 });
+    const media = await normalizeMedia(inputs);
     const result = await appendTurn(ctx.grant!, ctx.body.external_key, ctx.body.messages, `service:${ctx.credential.id}`);
     if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+    for (const index of new Set(inputs.map(m => m.message_index))) {
+      await attachMedia(ctx.grant!.homeSessionId, result.firstOrdinal + index, `${ctx.body.external_key}:m${index}`,
+        media.filter((_, i) => inputs[i].message_index === index));
+    }
     return NextResponse.json({
       success: true,
       duplicate: result.duplicate,
@@ -28,6 +37,7 @@ export async function POST(request: NextRequest) {
       message_count: result.messageCount,
     });
   } catch (error) {
+    if (error instanceof MediaError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     return serviceInternalError(consequence, 'service sync / append turn', 'turn ledger or message insert failed', error);
   }
 }

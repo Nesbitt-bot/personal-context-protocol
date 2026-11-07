@@ -151,3 +151,16 @@ Unable to append messages: AI session recording / append message transaction - s
 ```
 
 Future hardening work is tracked in [TODO.md](TODO.md).
+
+## Execution grants and media
+
+Adapter execution requires signed platform identity, current operator policy,
+exact agent-bound live grant and tool allowlist. Group rules require isolated
+agent workspaces; group PCP context remains group-only. Policy changes take
+effect at the next tool request. Native HTTP routes retain their default deny.
+
+Media is private even for publicly shared sessions. PCP checks session or grant
+authorization on every content request; hashes are storage identifiers only.
+Only sanitized images are stored; no EXIF/GPS originals or user-supplied SVG.
+The optional nginx internal location cannot be requested directly. Native
+upload queues contain private image source bytes and must remain mode 600.

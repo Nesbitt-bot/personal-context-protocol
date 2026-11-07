@@ -174,3 +174,17 @@ The `relay-owner` agent may use PCP recall/search for this scope. A group turn
 still reads only its own group, even when the sender is an administrator.
 No caller-supplied name or admin claim changes this policy; writes remain
 limited to the turn's home session.
+
+## Execution and media (0.4.0)
+
+The policy file `PCP_EXECUTION_POLICY_FILE` can select `astrbot-exec` for verified
+admin DMs and a distinct sandboxed agent for each allowed group. The dashboard
+`/adapters` edits group/sender lists; the initial list is empty. Non-PCP tools
+require `/service/execution` authorization on every call. The gateway token
+alone, an agent name, or text claiming ownership cannot grant execution.
+Group access never expands PCP history beyond the group's session.
+
+Signed `message.media` carries bounded image bytes. PCP strips metadata and
+persists sanitized content before returning vision parts for OpenClaw. The
+broker still verifies policy upstream and holds the gateway credential; there
+is no direct AstrBot gateway access. See `versions/v0.4.0.md`.

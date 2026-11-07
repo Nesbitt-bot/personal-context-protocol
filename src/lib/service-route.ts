@@ -1,3 +1,4 @@
+import { boundedText } from './bounded-body';
 import { NextRequest, NextResponse } from 'next/server';
 import { ZodSchema } from 'zod';
 import { verifyServiceCredential, ResolvedServiceCredential } from './service-auth';
@@ -20,7 +21,11 @@ export async function serviceRequest<T extends { session_key: string }>(
     return { response: NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status }) };
   }
 
-  const raw = await request.json().catch(() => null);
+  let raw;
+  try { raw = JSON.parse(await boundedText(request)); }
+  catch (error) {
+    return { response: NextResponse.json({ error: `${consequence}: service/request body - invalid JSON or body exceeds twelve MiB`, code: 'INVALID_BODY' }, { status: error instanceof Error && error.message === 'BODY_TOO_LARGE' ? 413 : 400 }) };
+  }
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     return {

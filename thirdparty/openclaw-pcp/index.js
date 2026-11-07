@@ -37,7 +37,7 @@ const DEFAULTS = {
   flushIntervalMs: 30000,
   allowedPrefixes: ["telegram:", "openclaw-weixin:"],
   claimChannels: ["telegram"],
-  httpToolAllowlist: ["pcp_context", "pcp_search"],
+  httpToolAllowlist: ["pcp_context", "pcp_search", "pcp_attachment"],
   httpSessionKeyPatterns: DEFAULT_HTTP_SESSION_PATTERNS,
   contextEnabled: true,
   syncEnabled: true,
@@ -47,7 +47,7 @@ const DEFAULTS = {
   ownerPrincipals: [],
 };
 const CLAIM_TTL_MS = 15 * 60 * 1000;
-const TOOL_NAMES = ["pcp_context", "pcp_search"];
+const TOOL_NAMES = ["pcp_context", "pcp_search", "pcp_attachment"];
 
 function withTimeout(promise, ms) {
   let timer;
@@ -70,14 +70,19 @@ export function createPlugin(api, deps = {}) {
   const logger = api.logger || console;
   const now = deps.now || Date.now;
   const httpPatterns = compilePatterns(cfg.httpSessionKeyPatterns);
-  const httpAllow = new Set(cfg.httpToolAllowlist);
+  const httpAllow = new Set([...cfg.httpToolAllowlist, "pcp_attachment"]);
   const identityLinks = api.config?.session?.identityLinks || {};
   const stats = { synced: 0, redactions: 0, contextInjected: 0, contextSkipped: 0, blocked: 0, claims: 0 };
+
+  let authorizeExecution = null;
 
   // ---- HTTP tool backstop: registered first and independent of PCP health.
   api.on("before_tool_call", (event, ctx) => {
     if (!isHttpSessionKey(ctx?.sessionKey, httpPatterns)) return undefined;
     if (httpAllow.has(event?.toolName)) return undefined;
+    if (isBrokerSessionKey(ctx?.sessionKey) && authorizeExecution) {
+      return authorizeExecution(event, ctx);
+    }
     stats.blocked += 1;
     logger.warn(`Tool refused: openclaw-pcp/http backstop — ${String(event?.toolName).slice(0, 64)} is not allowed for HTTP API runs.`);
     return { block: true, blockReason: `Tool "${event?.toolName}" is not available to HTTP API runs (openclaw-pcp backstop). Only ${[...httpAllow].join(", ") || "no tools"} may be used.` };
@@ -92,6 +97,15 @@ export function createPlugin(api, deps = {}) {
     return { stats, flush: async () => undefined, enabled: false };
   }
   const client = createPcpClient({ baseUrl: cfg.baseUrl, token, fetchImpl: deps.fetch });
+
+  authorizeExecution = async (event, ctx) => {
+    try {
+      const verdict = await client.execution({ session_key: ctx.sessionKey, tool_name: event.toolName }, cfg.toolTimeoutMs);
+      if (verdict?.allowed === true && ctx.sessionKey.startsWith(`agent:${verdict.agent}:pcp:`)) return undefined;
+    } catch { /* Missing/expired grant or unavailable PCP always denies execution. */ }
+    stats.blocked += 1;
+    return { block: true, blockReason: "Execution refused: openclaw-pcp/tool authorization — no live PCP grant permits this tool." };
+  };
 
   // ---- Owner-bound channels: pinned principals only, checked once at start.
   const ownerBoundChannels = Array.isArray(cfg.ownerBoundChannels) ? cfg.ownerBoundChannels.filter((c) => typeof c === "string" && c) : [];
@@ -197,7 +211,9 @@ export function createPlugin(api, deps = {}) {
       for (const item of queue.due()) {
         try {
           await withGrant(item.sessionKey, item.target, (grant) => client.sync({
-            session_key: item.sessionKey, external_key: item.key, messages: item.messages,
+            session_key: item.sessionKey, external_key: item.key,
+            messages: item.messages.map(({ media, ...message }) => message),
+            ...(item.messages.some(m => m.media?.length) ? { media: item.messages.flatMap((m, index) => (m.media || []).map(image => ({ ...image, message_index: index }))) } : {}),
           }, cfg.syncTimeoutMs), { timeoutMs: cfg.syncTimeoutMs });
           queue.ack(item.key);
           stats.synced += 1;
@@ -295,8 +311,22 @@ export function createPlugin(api, deps = {}) {
     };
     // Defence in depth for restricted grants: keep the home session's rows only.
     const visible = (rows, grant) => (grant?.restricted ? rows.filter((m) => m.session_id === grant.homeSessionId) : rows);
-    const format = (rows, titles) => rows.map((m) => `[${titles.get(m.session_id) || m.session_id}] #${m.ordinal} ${m.role}: ${String(m.content).slice(0, 500)}`).join("\n");
+    const format = (rows, titles) => rows.map((m) => `[${titles.get(m.session_id) || m.session_id}] #${m.ordinal} ${m.role}: ${String(m.content).slice(0, 500)}${(m.attachments || []).map(a => ` [image ${a.id}]`).join("")}`).join("\n");
+    let recalledImages = 0;
     return [
+      {
+        name: "pcp_attachment", label: "PCP image",
+        description: "Read a sanitized image ID from PCP context/search within this conversation's authorized sessions. At most four image reads per tool instance.",
+        parameters: { type: "object", additionalProperties: false, required: ["attachment_id"], properties: { attachment_id: { type: "string", maxLength: 100 } } },
+        async execute(_id, params) {
+          return run(async (grant) => {
+            if (grant?.restricted || recalledImages >= 4) return { content: [{ type: "text", text: "Image recall refused: openclaw-pcp/media — restricted identity or four-image budget reached." }], details: { error: true } };
+            recalledImages++;
+            const image = await client.attachment({ session_key: sessionKey, attachment_id: params.attachment_id }, cfg.toolTimeoutMs);
+            return { content: [{ type: "image", data: image.data, mimeType: image.mime_type }], details: {} };
+          });
+        },
+      },
       {
         name: "pcp_context",
         label: "PCP context",

@@ -8,7 +8,7 @@ Owner-visible future work for Personal Context Protocol. Keep this list focused 
 - [x] `thirdparty/astrbot_plugin_pcp_relay`, `relay-owner` policy, delegate tool reads
 - [x] Jenkins stages: DB tests, plugin tests, plugin sync to the gateway and AstrBot
 - [ ] Claim links for AstrBot DMs (today: link with `pcp-operator.js identity link`)
-- [ ] Images in AstrBot turns (only text is relayed)
+- [x] Images/GIFs in AstrBot and native OpenClaw turns, sanitized PCP history (0.4.0)
 - [ ] Prune OpenClaw `pcp:<grant>` session files (one per broker turn) with `session.maintenance`
 - [ ] OpenCode session-manager: send `provider_timestamp` for every turn so the server-side dedupe always applies
 
@@ -705,3 +705,10 @@ transcript is now the canonical, human-readable wire format in both directions.
 - [x] Completed and tested
 - [ ] Planned or not started
 
+
+## Integration release follow-ups
+
+- [ ] Remote promotion and webhook deployment after GitHub authentication is restored.
+- [ ] Provision isolated group executors before adding groups in `/adapters`; initial allowlist stays empty.
+- [ ] Documents/audio/video, resumable media upload, historical media mapping, OCR/captions and media retention/GC.
+- [ ] Independent watchdog/LKG, build/deploy isolation and OpenClaw state relocation from the checkout.

@@ -170,3 +170,13 @@ Verify remote message counts and search from an authorized channel afterward.
 PCP v0.3.2 gives verified admin DMs read access to all active sessions; other
 users and groups retain their existing restrictions. Admin status is resolved
 by PCP from the linked identity, never from a display name or tool argument.
+
+## Execution and media update
+
+PCP 0.4.0 authorizes execution per tool through a live broker grant and the
+private dashboard-managed adapter policy. Unlisted groups remain restricted.
+Image/GIF turns are bounded, signed, normalized without metadata and retained
+in authorized PCP history. Native images use the durable sync queue; AstrBot
+collects only platform image segments. No source URLs or credentials enter
+public streams. The PCP plugin also provides `pcp_attachment` for authorized
+image recall.

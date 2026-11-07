@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
 import { db } from './db';
-import { events, messages, sessions, syncedTurns } from './schema';
+import { attachments, events, messages, sessions, syncedTurns } from './schema';
 import { createId } from './auth';
 import type { AppendInput } from './recording-store';
 import type { ActiveGrant } from './turn-grants';
@@ -93,6 +93,7 @@ export interface RecalledMessage {
   role: string;
   content: string;
   created_at: Date;
+  attachments?: Array<{ id: string; filename: string }>;
 }
 
 /** Most recent messages across the readable set (or one readable session). */
@@ -108,7 +109,7 @@ export async function recallMessages(sessionIds: string[], limit: number): Promi
     .where(inArray(messages.sessionId, sessionIds))
     .orderBy(desc(messages.createdAt), desc(messages.ordinal))
     .limit(limit);
-  return { sessions: sessionRows, messages: rows.reverse() };
+  return { sessions: sessionRows, messages: await withAttachments(rows.reverse()) };
 }
 
 function escapeLike(value: string) {
@@ -118,10 +119,19 @@ function escapeLike(value: string) {
 /** Case-insensitive substring search over the readable set. */
 export async function searchMessages(sessionIds: string[], query: string, limit: number): Promise<RecalledMessage[]> {
   if (sessionIds.length === 0) return [];
-  return db
+  const rows = await db
     .select({ session_id: messages.sessionId, ordinal: messages.ordinal, role: messages.role, content: messages.content, created_at: messages.createdAt })
     .from(messages)
     .where(and(inArray(messages.sessionId, sessionIds), ilike(messages.content, `%${escapeLike(query)}%`)))
     .orderBy(desc(messages.createdAt))
     .limit(limit);
+  return withAttachments(rows);
+}
+
+async function withAttachments(rows: RecalledMessage[]): Promise<RecalledMessage[]> {
+  if (!rows.length) return rows;
+  const media = await db.select({ id: attachments.id, filename: attachments.filename, sessionId: messages.sessionId, ordinal: messages.ordinal })
+    .from(attachments).innerJoin(messages, eq(messages.id, attachments.messageId))
+    .where(inArray(attachments.sessionId, [...new Set(rows.map(row => row.session_id))]));
+  return rows.map(row => ({ ...row, attachments: media.filter(m => m.sessionId === row.session_id && m.ordinal === row.ordinal).map(({ id, filename }) => ({ id, filename })) }));
 }

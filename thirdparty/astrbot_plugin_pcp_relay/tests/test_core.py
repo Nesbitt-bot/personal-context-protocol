@@ -136,3 +136,20 @@ class BrokerCallTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class MediaTests(unittest.TestCase):
+    def test_image_bytes_are_covered_by_the_turn_signature(self):
+        import base64
+        from pcp_relay_core import encode_body, sign
+        first = encode_body({'v': 1}, 'photo', [{'name': 'x', 'data': base64.b64encode(b'first').decode()}])
+        second = encode_body({'v': 1}, 'photo', [{'name': 'x', 'data': base64.b64encode(b'second').decode()}])
+        self.assertNotEqual(sign('11' * 32, first), sign('11' * 32, second))
+
+    def test_platform_media_does_not_read_arbitrary_local_files(self):
+        from pcp_media import read_image, collect_images
+        with self.assertRaises(ValueError):
+            read_image('/etc/passwd')
+        Image = type('Image', (), {'url': '', 'file': 'base64://aGVsbG8='})
+        images, warnings = collect_images([Image()])
+        self.assertEqual(images[0]['data'], 'aGVsbG8=')
+        self.assertEqual(warnings, [])

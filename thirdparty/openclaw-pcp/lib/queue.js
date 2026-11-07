@@ -54,7 +54,9 @@ export class DiskQueue {
   /** Add an item unless its key is already queued. Returns false for duplicates. */
   push(item) {
     if (this.items.some((existing) => existing.key === item.key)) return false;
-    while (this.items.length >= this.maxItems) {
+    const bytes = value => Buffer.byteLength(JSON.stringify(value));
+    if (bytes(item) > 12 * 1024 * 1024) { this.logger?.warn("PCP upload refused: queue/size limit — turn exceeds twelve MiB."); return false; }
+    while (this.items.length >= this.maxItems || bytes(this.items) + bytes(item) > 64 * 1024 * 1024) {
       const dropped = this.items.shift();
       this.logger?.warn(`PCP sync item dropped: openclaw-pcp/queue bound — ${this.maxItems} items queued; oldest (${dropped.kind}) discarded.`);
     }

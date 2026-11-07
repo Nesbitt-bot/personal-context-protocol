@@ -174,3 +174,14 @@ hashes remained identical and the previous database was retained for rollback.
 Private evidence is under the `latest-run` directory described above. The
 existing plaintext Settings-managed admin token is still needed for browser
 login; it cannot be recovered from its stored hash and was not reset.
+
+## 0.4.0 persistent media and adapter policy
+
+Before deploying, create `DockerVolumes/pcp/blobs` and `DockerVolumes/pcp/adapters`
+(mode 700). `adapters/execution-policy.json` is owned by dashboard uid 1000,
+mode 600; initialize with `{"groups":[]}` until the execution agent is installed.
+The app mounts blobs read/write and adapters read-only. Include both directories
+in backups with the PostgreSQL dump. `PCP_BLOB_HOST_DIR` and
+`PCP_ADAPTER_CONFIG_HOST_DIR` override the host paths. Compose refuses missing
+bind paths. Optional nginx configuration is `deploy/nginx/pcp.conf`; it does
+not enable public caching of private images.

@@ -162,3 +162,10 @@ Verified administrator DMs can recall all active PCP sessions. Group replies
 remain restricted to their own conversation. Existing OpenClaw transcripts can
 be replayed through the [PCP plugin backfill tool](../thirdparty/openclaw-pcp/README.md#historical-backfill)
 with stable turn IDs and the same redaction and retry path as live sync.
+
+## AstrBot execution and image history (0.4.0)
+
+Verified owner DMs and explicitly selected groups can use OpenClaw execution
+through PCP grants. Manage access in the agent dashboard `/adapters`. Groups
+start empty. Image/GIF turns reach the model and appear in authorized PCP history.
+See [release details](versions/v0.4.0.md) for storage, limits and deployment.
