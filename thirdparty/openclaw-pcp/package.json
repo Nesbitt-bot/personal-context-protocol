@@ -4,15 +4,7 @@
   "private": true,
   "type": "module",
   "description": "OpenClaw plugin: PCP turn grants, cross-channel context, pcp_* tools, async sync, HTTP tool backstop and claim links.",
-  "openclaw": {
-    "extensions": [
-      "./index.js"
-    ]
-  },
-  "scripts": {
-    "test": "node --test test/*.test.js"
-  },
-  "engines": {
-    "node": ">=18.19"
-  }
+  "openclaw": { "extensions": ["./index.js"] },
+  "scripts": { "test": "node --test test/*.test.js" },
+  "engines": { "node": ">=18.19" }
 }

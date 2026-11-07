@@ -6,94 +6,26 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "required": [
-      "baseUrl",
-      "tokenFile"
-    ],
+    "required": ["baseUrl", "tokenFile"],
     "properties": {
-      "baseUrl": {
-        "type": "string"
-      },
-      "tokenFile": {
-        "type": "string"
-      },
-      "stateDir": {
-        "type": "string"
-      },
-      "contextTimeoutMs": {
-        "type": "integer",
-        "minimum": 100,
-        "maximum": 10000
-      },
-      "toolTimeoutMs": {
-        "type": "integer",
-        "minimum": 500,
-        "maximum": 30000
-      },
-      "syncTimeoutMs": {
-        "type": "integer",
-        "minimum": 500,
-        "maximum": 60000
-      },
-      "grantTtlSeconds": {
-        "type": "integer",
-        "minimum": 30,
-        "maximum": 3600
-      },
-      "flushIntervalMs": {
-        "type": "integer",
-        "minimum": 1000
-      },
-      "allowedPrefixes": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "claimChannels": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "httpToolAllowlist": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "httpSessionKeyPatterns": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "contextEnabled": {
-        "type": "boolean"
-      },
-      "syncEnabled": {
-        "type": "boolean"
-      },
-      "claimsEnabled": {
-        "type": "boolean"
-      },
-      "maxQueueItems": {
-        "type": "integer",
-        "minimum": 10,
-        "maximum": 10000
-      },
-      "ownerBoundChannels": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "ownerPrincipals": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      }
+      "baseUrl": { "type": "string" },
+      "tokenFile": { "type": "string" },
+      "stateDir": { "type": "string" },
+      "contextTimeoutMs": { "type": "integer", "minimum": 100, "maximum": 10000 },
+      "toolTimeoutMs": { "type": "integer", "minimum": 500, "maximum": 30000 },
+      "syncTimeoutMs": { "type": "integer", "minimum": 500, "maximum": 60000 },
+      "grantTtlSeconds": { "type": "integer", "minimum": 30, "maximum": 3600 },
+      "flushIntervalMs": { "type": "integer", "minimum": 1000 },
+      "allowedPrefixes": { "type": "array", "items": { "type": "string" } },
+      "claimChannels": { "type": "array", "items": { "type": "string" } },
+      "httpToolAllowlist": { "type": "array", "items": { "type": "string" } },
+      "httpSessionKeyPatterns": { "type": "array", "items": { "type": "string" } },
+      "contextEnabled": { "type": "boolean" },
+      "syncEnabled": { "type": "boolean" },
+      "claimsEnabled": { "type": "boolean" },
+      "maxQueueItems": { "type": "integer", "minimum": 10, "maximum": 10000 },
+      "ownerBoundChannels": { "type": "array", "items": { "type": "string" } },
+      "ownerPrincipals": { "type": "array", "items": { "type": "string" } }
     }
   }
 }

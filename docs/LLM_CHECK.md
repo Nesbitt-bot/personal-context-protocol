@@ -375,3 +375,23 @@ Append what this round actually did below:
   - Updated README, docs/readme, broker/service-sync documentation and plugin
     backfill instructions. App and plugin patch versions aligned. Runtime
     deployment and final checks are recorded in the following log entry.
+
+  - Final rollout: PCP v0.3.2 production build passed and the app was recreated
+    from its inspected runtime environment, ports and network. Database and
+    broker containers stayed in place. Deployment is labeled local-admin-context;
+    no GitHub push or Jenkins webhook build is claimed. Previous image/config
+    and a pre-sync PostgreSQL dump are retained for rollback.
+  - Live admin grants include all 426 active sessions. The installed PCP search
+    tool resolves the Telegram display name and numeric ID from WeChat admin
+    context. Signed group probes still receive 403 for private recall. Public
+    health reports v0.3.2 and the implementation commit. Plugin v0.2.2 loaded;
+    Telegram and WeChat channels report running after the standard sync helper.
+  - Final plugin tests: 32 passed. Exact plugin-output comparison verified all
+    2,268 imported records and original timestamps; 466 unique native turn keys
+    represent the 470 selected source turns. Full replay added zero records.
+    No chat message was sent during validation. Runtime images and source
+    commits remain local; upstream deployment must include this fix to retain it.
+  - Reviewed docs, config/env consistency, unchanged host ports, source sizes,
+    ignore rules and staged credentials. Main remains unchanged. No root Bark
+    config exists. Package-lock is the existing generated dependency lockfile;
+    only its two project version fields changed.
