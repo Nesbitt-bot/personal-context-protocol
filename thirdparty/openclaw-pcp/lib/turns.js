@@ -49,11 +49,16 @@ export function extractTurn(messages) {
   const out = [];
   for (const message of messages.slice(start)) {
     if (message?.role !== "user" && message?.role !== "assistant") continue;
+    const media = message.role === "user" && Array.isArray(message.content) ? message.content
+      .filter(part => part?.type === "image" && typeof part.data === "string" && part.data.length <= 8 * 1024 * 1024)
+      .slice(0, 4).map((part, i) => ({ name: `image-${i + 1}`, data: part.data })) : [];
     let text = textOf(message.content);
     if (message.role === "user") text = stripInjected(text);
     text = text.trim();
+    if (!text && media.length) text = "[image]";
     if (!text) continue;
     const entry = { role: message.role, content: text };
+    if (media.length) entry.media = media;
     if (message.role === "assistant") {
       if (typeof message.provider === "string" && message.provider) entry.provider = message.provider.slice(0, 100);
       if (typeof message.model === "string" && message.model) entry.base_model = message.model.slice(0, 100);

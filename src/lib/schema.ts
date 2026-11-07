@@ -394,3 +394,17 @@ export const mergeTasks = pgTable('merge_tasks', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
 });
+
+// Immutable sanitized media. Authorization follows the associated session.
+export const attachments = pgTable('attachments', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  messageId: text('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  externalKey: text('external_key').notNull(),
+  blobSha256: text('blob_sha256').notNull(),
+  uploadSha256: text('upload_sha256').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  mimeType: text('mime_type').notNull(),
+  filename: text('filename').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

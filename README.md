@@ -2,6 +2,10 @@
 
 Vercel + Neon Postgres web app for scoped AI session recording.
 
+The [AstrBot relay](docs/broker.md) preserves group speaker IDs in recalled
+history. Historical private context can be backfilled into its linked PCP session
+for OpenClaw recall across the owner's connected channels.
+
 [![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNesbitt-bot%2Fpersonal-context-protocol&envDescription=Add%20Neon%20database%20and%20environment%20variables%20after%20deployment)
 
 [Documentation](https://nesbitt-bot.github.io/personal-context-protocol/) | [API Spec](docs/protocol.md) | [Vercel Deploy](docs/deployment-vercel-neon.md) | [Docker Compose](docs/deployment-docker-compose.md)
@@ -203,3 +207,15 @@ webhooks. [Jenkins runbook](docs/deployment-jenkins.md) covers private env setup
 images, backups, tests, and the verified Neon-to-local import. The Neon
 source is retained; the local runtime keeps its PostgreSQL data in a host
 bind mount (`PCP_POSTGRES_DATA_DIR`).
+
+Verified administrator DMs can recall all active PCP sessions. Group replies
+remain restricted to their own conversation. Existing OpenClaw transcripts can
+be replayed through the [PCP plugin backfill tool](thirdparty/openclaw-pcp/README.md#historical-backfill)
+with stable turn IDs and the same redaction and retry path as live sync.
+
+## AstrBot execution and image history (0.4.0)
+
+Verified owner DMs and explicitly selected groups can use OpenClaw execution
+through PCP grants. Manage access in the agent dashboard `/adapters`. Groups
+start empty. Image/GIF turns reach the model and appear in authorized PCP history.
+See [release details](docs/versions/v0.4.0.md) for storage, limits and deployment.

@@ -6,6 +6,10 @@
  * name contains "test"; uses its own `<name>_broker` database (needs CREATEDB).
  */
 import crypto from 'crypto';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import sharp from 'sharp';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { NextRequest } from 'next/server';
 import postgres from 'postgres';
@@ -156,7 +160,7 @@ describe.skipIf(!enabled)('PCP broker: AstrBot identity, policy, grants and reco
     const [system, user] = res.body.messages;
     expect(system.content).toMatch(/^Verified sender \(PCP-attested\): astrbot:qq:200001, private chat on QQ; linked PCP user "owner" \(the verified owner\)/);
     expect(system.content).toContain('BLUE HERON'); // owner's other sessions, bounded
-    expect(system.content).not.toContain('4471');
+    expect(system.content).toContain('4471'); // verified admin DM has global read access
     expect(user).toEqual({ role: 'user', content: 'what is the trip codename from Telegram?' });
 
     // openclaw-pcp tools: its own credential + the session key (as OpenClaw may store it).
@@ -252,4 +256,54 @@ describe.skipIf(!enabled)('PCP broker: AstrBot identity, policy, grants and reco
     const all = await lib.db.execute(lib.sql`SELECT count(*)::int AS n FROM messages WHERE session_id = 'ses_sync'`) as unknown as Array<{ n: number }>;
     expect(all[0].n).toBe(6);
   });
+  it('execution is tied to a live grant, exact agent, identity, and revocable policy', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pcp-execution-'));
+    const file = path.join(dir, 'policy.json');
+    process.env.PCP_EXECUTION_POLICY_FILE = file;
+    fs.writeFileSync(file, JSON.stringify({ owner: { agent: 'astrbot-exec', tools: ['exec'] }, groups: [] }));
+    try {
+      const execute = (await import('../src/app/api/v1/service/execution/route')).POST;
+      const allowed = await prepare(body(stamp(), 'run a task'));
+      expect(allowed.body.agent).toBe('astrbot-exec');
+      const check = async (key: string, token = tok.openclaw) => execute(req({ authorization: `Bearer ${token}` }, JSON.stringify({ session_key: key, tool_name: 'exec' })));
+      expect((await check(allowed.body.session_key)).status).toBe(200);
+      expect((await check(allowed.body.session_key, tok.other)).status).toBe(403);
+      expect((await check(allowed.body.session_key.replace('astrbot-exec:', 'main:'))).status).toBe(403);
+      const group = await prepare(body(stamp({ chat: 'group', group_id: GROUP }), 'run a task'));
+      expect(group.body.agent).toBe('relay');
+      expect((await check(group.body.session_key)).status).toBe(403);
+      fs.writeFileSync(file, JSON.stringify({ groups: [] }));
+      expect((await check(allowed.body.session_key)).status).toBe(403);
+      await complete(allowed.body.turn_id, 'done');
+      expect((await check(allowed.body.session_key)).status).toBe(403);
+    } finally { delete process.env.PCP_EXECUTION_POLICY_FILE; fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('image bytes are signed, sanitized, persisted, and served only to authorized users', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pcp-media-'));
+    process.env.PCP_BLOB_DIR = dir;
+    try {
+      const data = (await sharp({ create: { width: 3, height: 2, channels: 3, background: '#cc1100' } }).png().toBuffer()).toString('base64');
+      const raw = JSON.stringify({ stamp: stamp(), message: { text: 'describe this image', media: [{ name: 'sample.png', data }] } });
+      expect((await prepare(raw.replace('sample.png', 'changed.png'), signed(raw))).status).toBe(401);
+      const turn = await prepare(raw);
+      expect(turn.status).toBe(200);
+      expect(turn.body.messages[1].content[1].image_url.url).toMatch(/^data:image\/webp;base64,/);
+      const rows = await lib.db.execute(lib.sql`SELECT * FROM attachments`) as unknown as Array<{ id: string; blob_sha256: string; session_id: string; message_id: string }>;
+      expect(rows).toHaveLength(1);
+      expect(fs.existsSync(path.join(dir, rows[0].blob_sha256.slice(0, 2), rows[0].blob_sha256))).toBe(true);
+      const { GET } = await import('../src/app/api/v1/attachments/[id]/content/route');
+      const { createWebSession, SESSION_COOKIE } = await import('../src/lib/web-session');
+      const owner = await createWebSession('usr_owner');
+      const alice = await createWebSession('usr_alice');
+      const get = (cookie = '') => GET(new NextRequest('https://pcp.example.test/media', { headers: { cookie } }), { params: { id: rows[0].id } });
+      expect((await get()).status).toBe(401);
+      expect((await get(`${SESSION_COOKIE}=${alice.sessionValue}`)).status).toBe(403);
+      const response = await get(`${SESSION_COOKIE}=${owner.sessionValue}`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toContain('no-store');
+      expect((await sharp(Buffer.from(await response.arrayBuffer())).metadata()).format).toBe('webp');
+    } finally { delete process.env.PCP_BLOB_DIR; fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
 });

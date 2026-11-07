@@ -320,3 +320,95 @@ Append what this round actually did below:
     (`tests/service-sync-db.test.ts` uses its own `<db>_service` database);
     without `PCP_TEST_DATABASE_URL` both DB files are skipped.
   - No broker, plugins or broker→OpenClaw call (later phases).
+
+- 2026-11-05 — AstrBot history backfill and relay speaker attribution (plugin v0.1.2)
+  - Root cause: `thirdparty/astrbot_plugin_pcp_relay/main.py` retained sender
+    identity in the stamp but sent bare text to PCP. The broker recorded that
+    bare text, so subsequent group recall lost the speaker identity.
+  - Group text now carries its platform-derived principal and an escaped,
+    explicitly untrusted display name. Signed IDs still determine access;
+    private text, agent policy, group isolation and wake rules are unchanged.
+    Nearby provider errors now include consequence, module/process and cause.
+  - Backfilled the requested linked QQ DM from two AstrBot conversations and
+    LivingMemory: 58 source records, seven overlaps, 51 imported messages.
+    Added an append-only chronology note for source records without individual
+    timestamps. Existing six PCP records and owner identity were preserved.
+    Raw sources, rollback snapshots and replay scripts remain private under
+    the host-backed PCP context-sync directory, outside Git. Attachments stay
+    in the source snapshot with an explicit reference in recalled text.
+  - Passed all 22 standard-library plugin tests; the new group-history test
+    fails against the original source. Actual installed OpenClaw PCP tools
+    recalled imported messages. Live signed fixture turns retained separate
+    speakers and group recall returned 403 for the private DM. No message
+    was sent to QQ or another external channel during verification.
+  - Import replay inserted zero duplicates. Verified content equality, source
+    IDs, unique ordinals, unchanged original rows and private session scope.
+    Installed through the existing backup/restart helper; plugin/provider/IM
+    startup and source checksums passed. Existing persistent mounts retained.
+  - Reviewed README, docs/readme and broker documentation. No new env vars,
+    runtime, ports, schema or API routes. Node build/typecheck/full app tests
+    skipped: only the standalone Python relay changed. Plugin version bumped;
+    PCP app version is unchanged. No repo-root Bark config was present.
+  - Diff, changed-file line limits, secret/size/gitignore and unrelated-change
+    audits passed. Work on fix/astrbot-group-context; main unchanged. Commit
+    locally without pushing; remote Jenkins plugin sync can replace this
+    local installation until the source change is merged upstream.
+
+- 2026-11-05 — Telegram historical sync and admin recall (PCP v0.3.2; plugin v0.2.2)
+  - Verified the installed PCP plugin and identity links. Root causes: live
+    `agent_end` sync never backfilled pre-install transcripts; `createTurnGrant`
+    applied non-admin ownership filters even to linked administrators.
+  - Added operator-manifest backfill through the actual installed plugin hook,
+    redaction, queue and service client. Immutable source hashes, stable native
+    turn IDs, bounded progress logging and a separate queue make replay safe.
+    Selected 470 Telegram turns from 16 snapshots; 2,268 records added to the
+    existing session. A full replay kept the remote total at 2,270. Tool results,
+    thinking and attachments follow the existing text-only plugin policy.
+  - Admin DMs now receive every active session, including unowned imports and
+    group archives; non-admin and group grants retain their existing scopes.
+    Admin status is read from the linked PCP user. Writes stay home-session-only.
+  - Passed TypeScript checks, 335 tests against isolated PostgreSQL (two existing
+    source-excluded planner tests skipped in the CI image), all 32 plugin tests,
+    and production Docker build before the release metadata bump. Verified
+    installed plugin search returns the Telegram display name and numeric ID.
+    Private database/source snapshots and logs stay under DockerVolumes/pcp.
+  - Updated README, docs/readme, broker/service-sync documentation and plugin
+    backfill instructions. App and plugin patch versions aligned. Runtime
+    deployment and final checks are recorded in the following log entry.
+
+  - Final rollout: PCP v0.3.2 production build passed and the app was recreated
+    from its inspected runtime environment, ports and network. Database and
+    broker containers stayed in place. Deployment is labeled local-admin-context;
+    no GitHub push or Jenkins webhook build is claimed. Previous image/config
+    and a pre-sync PostgreSQL dump are retained for rollback.
+  - Live admin grants include all 426 active sessions. The installed PCP search
+    tool resolves the Telegram display name and numeric ID from WeChat admin
+    context. Signed group probes still receive 403 for private recall. Public
+    health reports v0.3.2 and the implementation commit. Plugin v0.2.2 loaded;
+    Telegram and WeChat channels report running after the standard sync helper.
+  - Final plugin tests: 32 passed. Exact plugin-output comparison verified all
+    2,268 imported records and original timestamps; 466 unique native turn keys
+    represent the 470 selected source turns. Full replay added zero records.
+    No chat message was sent during validation. Runtime images and source
+    commits remain local; upstream deployment must include this fix to retain it.
+  - Reviewed docs, config/env consistency, unchanged host ports, source sizes,
+    ignore rules and staged credentials. Main remains unchanged. No root Bark
+    config exists. Package-lock is the existing generated dependency lockfile;
+    only its two project version fields changed.
+
+## 2026-11-06 — AstrBot execution and media integration
+
+- Consolidated previously unmerged 0.3.2 fixes into the canonical PCP checkout
+  on `integration/ai-infra-execution-media`; archived redundant clones to Trash
+  only after checking ancestry, clean status, active processes and mounts.
+- Added per-tool execution authorization from signed AstrBot identity, live
+  broker grants, exact agent binding and the dashboard-managed policy.
+- Added sanitized image/GIF storage, authenticated previews and grant-based
+  image recall; native inline image uploads use the durable bounded queue.
+- Current-source typecheck and 349 Vitest tests against disposable PostgreSQL
+  passed; 34 OpenClaw plugin and 24 AstrBot plugin tests passed.
+- Production Docker build passed; no production database used for tests.
+- Private backup/evidence stays under DockerVolumes/ai-infra/releases. Reviewed
+  runtime settings, docs, source sizes, whitespace and staged paths.
+- GitHub credentials unavailable in this session; no remote push or webhook
+  deployment is claimed. Local rollout verification will be recorded separately.

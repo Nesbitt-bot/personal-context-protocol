@@ -4,6 +4,18 @@ Design Phase 4. AstrBot (QQ, WeChat official accounts, ...) reaches OpenClaw
 only through PCP, and the sender's identity comes from the platform event,
 never from message text.
 
+Group messages include the platform-derived sender principal in stored text,
+so recalled history retains speaker attribution after the turn grant expires.
+Display names are escaped and marked untrusted; only the signed sender ID
+determines identity and permissions. The relay handles LLM-triggering messages,
+not passive group traffic or non-message platform notices.
+
+Historical AstrBot context must be backfilled separately: the relay sends only
+the latest event. Import private conversation and LivingMemory records into the
+existing linked DM session, preserve source IDs and timestamps where known,
+and keep group history in its own group session. Back up first, use stable
+external message IDs for retries, and verify OpenClaw recall after importing.
+
 ```
 QQ ─▶ AstrBot (wake, mention, rate limit, profile routing unchanged)
    ─▶ thirdparty/astrbot_plugin_pcp_relay   provider type pcp_relay
@@ -153,3 +165,26 @@ OpenClaw the persona.
   delegate tools, forged owner text in a group changes nothing, group cannot
   recall the owner's DM, unlinked senders, turn recording and grant end.
 - `thirdparty/astrbot_plugin_pcp_relay/tests` and `thirdparty/openclaw-pcp/test`.
+
+## Administrator recall
+
+A signed private message linked to a PCP administrator receives global read
+access to active sessions, including unowned imports and group archives.
+The `relay-owner` agent may use PCP recall/search for this scope. A group turn
+still reads only its own group, even when the sender is an administrator.
+No caller-supplied name or admin claim changes this policy; writes remain
+limited to the turn's home session.
+
+## Execution and media (0.4.0)
+
+The policy file `PCP_EXECUTION_POLICY_FILE` can select `astrbot-exec` for verified
+admin DMs and a distinct sandboxed agent for each allowed group. The dashboard
+`/adapters` edits group/sender lists; the initial list is empty. Non-PCP tools
+require `/service/execution` authorization on every call. The gateway token
+alone, an agent name, or text claiming ownership cannot grant execution.
+Group access never expands PCP history beyond the group's session.
+
+Signed `message.media` carries bounded image bytes. PCP strips metadata and
+persists sanitized content before returning vision parts for OpenClaw. The
+broker still verifies policy upstream and holds the gateway credential; there
+is no direct AstrBot gateway access. See `versions/v0.4.0.md`.

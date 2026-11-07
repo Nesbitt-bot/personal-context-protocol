@@ -1,13 +1,13 @@
 services:
   app:
-    container_name: personal-context-protocol-app-v${PCP_VERSION:-0.3.1}
+    container_name: personal-context-protocol-app-v${PCP_VERSION:-0.4.0}
     mem_limit: 1g
-    image: personal-context-protocol:${PCP_VERSION:-0.3.1}
+    image: personal-context-protocol:${PCP_VERSION:-0.4.0}
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        APP_VERSION: "${PCP_VERSION:-0.3.1}"
+        APP_VERSION: "${PCP_VERSION:-0.4.0}"
     depends_on:
       db:
         condition: service_healthy
@@ -25,12 +25,26 @@ services:
       PCP_OIDC_ADMIN_GROUP: ${PCP_OIDC_ADMIN_GROUP:-}
       # Legacy admin-token UI login; disabled unless explicitly set to 1.
       PCP_BREAK_GLASS_ADMIN_LOGIN: ${PCP_BREAK_GLASS_ADMIN_LOGIN:-}
+      PCP_BLOB_DIR: /app/blobs
+      PCP_EXECUTION_POLICY_FILE: /run/pcp-adapters/execution-policy.json
       NODE_ENV: production
+    volumes:
+      - type: bind
+        source: ${PCP_BLOB_HOST_DIR:-/home/motuariki/Documents/DockerVolumes/pcp/blobs}
+        target: /app/blobs
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${PCP_ADAPTER_CONFIG_HOST_DIR:-/home/motuariki/Documents/DockerVolumes/pcp/adapters}
+        target: /run/pcp-adapters
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       # Loopback by default; put a TLS reverse proxy in front for remote use.
       - "${PCP_PORT:-127.0.0.1:3000}:3000"
     labels:
-      org.opencontainers.image.version: ${PCP_VERSION:-0.3.1}
+      org.opencontainers.image.version: ${PCP_VERSION:-0.4.0}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -46,8 +60,8 @@ services:
   # profile (deploy.sh enables it when the secrets directory exists).
   broker:
     profiles: ["broker"]
-    container_name: personal-context-protocol-broker-v${PCP_VERSION:-0.3.1}
-    image: personal-context-protocol:${PCP_VERSION:-0.3.1}
+    container_name: personal-context-protocol-broker-v${PCP_VERSION:-0.4.0}
+    image: personal-context-protocol:${PCP_VERSION:-0.4.0}
     command: ["node", "broker/server.js"]
     network_mode: host
     mem_limit: 128m
@@ -70,7 +84,7 @@ services:
         bind:
           create_host_path: false
     labels:
-      org.opencontainers.image.version: ${PCP_VERSION:-0.3.1}
+      org.opencontainers.image.version: ${PCP_VERSION:-0.4.0}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:'+(process.env.PCP_BROKER_PORT||3101)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -80,7 +94,7 @@ services:
       start_period: 10s
 
   db:
-    container_name: personal-context-protocol-db-v${PCP_VERSION:-0.3.1}
+    container_name: personal-context-protocol-db-v${PCP_VERSION:-0.4.0}
     mem_limit: 512m
     image: postgres:16-alpine
     environment:
@@ -105,5 +119,5 @@ services:
       retries: 10
       start_period: 10s
     labels:
-      org.opencontainers.image.version: ${PCP_VERSION:-0.3.1}
+      org.opencontainers.image.version: ${PCP_VERSION:-0.4.0}
     restart: unless-stopped

@@ -59,6 +59,7 @@ def build_stamp(
     group_id: str | None,
     sender_id: str | None,
     message_id: str | None,
+    sender_name: str | None = None,
     now: float | None = None,
     nonce: str | None = None,
 ) -> dict | None:
@@ -83,13 +84,24 @@ def build_stamp(
         if not _ID_RE.match(group):
             return None
         stamp["group_id"] = group
+    if sender_name:
+        stamp["sender_name"] = str(sender_name)[:64]
     return stamp
 
 
-def encode_body(stamp: dict, text: str) -> bytes:
+def attributed_text(stamp: dict | None, text: str) -> str:
+    """Keep platform sender identity in group history after the turn grant ends."""
+    if not stamp or stamp.get("chat") != "group":
+        return text
+    principal = f"astrbot:{stamp['platform']}:{stamp['sender_id']}"
+    name = json.dumps(stamp.get("sender_name", ""), ensure_ascii=False)
+    return f"[AstrBot sender {principal}; display name (untrusted): {name}]\n{text}"
+
+
+def encode_body(stamp: dict, text: str, media=None) -> bytes:
     """Canonical compact JSON; the HMAC covers exactly these bytes."""
     clean = (text or "").strip()[:MAX_TEXT_CHARS] or "[non-text message]"
-    return json.dumps({"stamp": stamp, "message": {"text": clean}}, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return json.dumps({"stamp": stamp, "message": {"text": clean, **({"media": media} if media else {})}}, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def sign(signing_key_hex: str, body: bytes) -> str:

@@ -27,9 +27,11 @@ from astrbot.api.star import Context, Star
 from astrbot.core.provider.register import provider_cls_map, register_provider_adapter
 
 try:
-    from .pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
+    from .pcp_media import collect_images
+    from .pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, attributed_text, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
 except ImportError:  # loaded as a top-level module (tests)
-    from pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
+    from pcp_media import collect_images
+    from pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, attributed_text, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
 
 PROVIDER_TYPE = "pcp_relay"
 DEFAULT_CREDENTIALS_FILE = "/AstrBot/data/plugin_data/astrbot_plugin_pcp_relay/credentials.json"
@@ -42,6 +44,7 @@ class PendingTurn:
     stamp: dict | None
     text: str
     event: object
+    media: list = field(default_factory=list)
     created: float = field(default_factory=time.monotonic)
 
 
@@ -81,6 +84,7 @@ def stamp_from_event(event: AstrMessageEvent) -> dict | None:
         is_private=event.is_private_chat(),
         group_id=event.get_group_id(),
         sender_id=event.get_sender_id(),
+        sender_name=event.get_sender_name(),
         message_id=getattr(message, "message_id", None),
     )
 
@@ -105,7 +109,7 @@ class PcpRelayProvider(Provider):
         return ["broker"]
 
     def _silent(self, turn: PendingTurn | None, reason: str) -> LLMResponse:
-        logger.warning(f"PCP relay: no reply (fail closed) — {reason}.")
+        logger.warning(f"No reply sent: PCP relay / ingress — {reason}.")
         event = getattr(turn, "event", None)
         if event is not None and hasattr(event, "stop_event"):
             event.stop_event()
@@ -116,8 +120,9 @@ class PcpRelayProvider(Provider):
             # Plugin utility calls (summaries, analyses) carry no platform
             # message: never a broker turn. Leave the pending stamp and the
             # event alone so the real reply is unaffected.
-            logger.warning("PCP relay: refused a call without a platform session (plugin task); configure another provider for plugin tasks.")
-            return LLMResponse(role="err", completion_text="pcp_relay answers platform messages only")
+            reason = "Plugin task cannot run: PCP relay / request — no platform session; configure another provider for plugin tasks."
+            logger.warning(reason)
+            return LLMResponse(role="err", completion_text=reason)
         turn = _take(session_id)
         if turn is None or turn.stamp is None:
             return self._silent(turn, "no platform identity stamp for this request")
@@ -126,14 +131,15 @@ class PcpRelayProvider(Provider):
         creds = load_credentials(self.credentials_file)
         if creds is None:
             return self._silent(turn, "ingress credentials file missing, unreadable or not private")
-        body = encode_body(turn.stamp, turn.text)
+        body = encode_body(turn.stamp, turn.text, turn.media)
         result = await asyncio.to_thread(post_turn, self.broker_url, creds, body, self.timeout_s)
         verdict = outcome(result)
         if verdict == "reply":
             return LLMResponse(role="assistant", completion_text=result.reply)
         if verdict == "error":
-            logger.warning(f"PCP relay: OpenClaw did not reply ({result.code or 'error'}).")
-            return LLMResponse(role="err", completion_text="the assistant is unavailable right now")
+            reason = f"Assistant cannot reply: PCP relay / OpenClaw request — broker returned HTTP {result.status}, code {result.code or 'OPENCLAW_ERROR'}."
+            logger.warning(reason)
+            return LLMResponse(role="err", completion_text=reason)
         return self._silent(turn, f"broker answered {result.status or 'unreachable'} {result.code}".strip())
 
     async def text_chat_stream(self, prompt=None, session_id=None, **kwargs):
@@ -142,7 +148,7 @@ class PcpRelayProvider(Provider):
     async def test(self, timeout: float = 45.0) -> None:
         # No stamp outside a real platform event: verify configuration only.
         if not broker_url_ok(self.broker_url) or load_credentials(self.credentials_file) is None:
-            raise RuntimeError("pcp_relay: broker_url or ingress credentials file is not usable")
+            raise RuntimeError("Provider cannot connect: PCP relay / configuration — broker_url or ingress credentials file is not usable")
 
 
 # Re-registration on plugin hot reload must not raise.
@@ -175,4 +181,9 @@ class PcpRelayPlugin(Star):
     async def stamp_request(self, event: AstrMessageEvent, req: ProviderRequest) -> None:
         """Attach the platform identity to this LLM request (pcp_relay reads it)."""
         text = (event.get_message_str() or "").strip() or str(getattr(req, "prompt", "") or "").strip()
-        _remember(PendingTurn(umo=str(event.unified_msg_origin), stamp=stamp_from_event(event), text=text, event=event))
+        stamp = stamp_from_event(event)
+        segments = event.get_messages() if hasattr(event, "get_messages") else []
+        media, notes = await asyncio.to_thread(collect_images, segments)
+        if notes:
+            text += "\n" + "\n".join(notes)
+        _remember(PendingTurn(umo=str(event.unified_msg_origin), stamp=stamp, text=attributed_text(stamp, text), event=event, media=media))

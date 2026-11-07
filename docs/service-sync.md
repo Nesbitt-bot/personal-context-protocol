@@ -47,8 +47,10 @@ never from message text. PCP then:
 2. if the principal is linked to a user, makes that user the owner of an
    unowned home session (later sessions are owned automatically);
 3. stores the **readable set**:
-   - linked direct chat: the user's non-group, non-archived sessions (owned or
-     principal-linked), as that user would see them without admin rights;
+   - linked admin direct chat: every non-archived session, including unowned
+     imports and group archives; admin status comes from the linked PCP user;
+   - other linked direct chat: the user's non-group, non-archived sessions
+     (owned or principal-linked);
    - unlinked direct chat: the home session only;
    - group chat: the group's home session only;
 4. replaces any previous live grant for the same credential and session key.

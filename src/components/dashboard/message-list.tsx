@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, Check, MessageSquare, Pencil, Trash2, X } from 'lucide-react';
 import { formatDate } from './format';
 import { Message } from './types';
+import { Attachment, MessageMedia } from './message-media';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { uiAuthHeaders } from '@/lib/client-auth';
 
@@ -31,6 +32,16 @@ function isUserRole(role: string) {
  * its parent container. Multi-select, inline edit, and bulk delete remain.
  */
 export function MessageList({ sessionId, messages, onChanged, hasCompactions = false }: MessageListProps) {
+  const [media, setMedia] = useState<Record<string, Attachment[]>>({});
+  useEffect(() => {
+    const controller = new AbortController();
+    setMedia({});
+    fetch(`/api/v1/sessions/${encodeURIComponent(sessionId)}/attachments`, { headers: uiAuthHeaders(), signal: controller.signal })
+      .then(async r => { if (!r.ok) throw new Error(`Images unavailable: media/session list - HTTP ${r.status}`); return r.json(); })
+      .then(data => { const grouped: Record<string, Attachment[]> = {}; for (const item of data.attachments) (grouped[item.messageId] ||= []).push(item); setMedia(grouped); })
+      .catch(e => { if (!controller.signal.aborted) setError(e.message); });
+    return () => controller.abort();
+  }, [sessionId, messages]);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lastIndex, setLastIndex] = useState<number | null>(null);
@@ -295,7 +306,8 @@ export function MessageList({ sessionId, messages, onChanged, hasCompactions = f
                         </div>
                       </div>
                     ) : (
-                      <p className={`break-words text-sm leading-6 ${isUser ? 'text-white' : 'text-slate-900 dark:text-slate-100'} ${selectMode ? 'line-clamp-5' : 'whitespace-pre-wrap'}`}>{message.content}</p>
+                      <><p className={`break-words text-sm leading-6 ${isUser ? 'text-white' : 'text-slate-900 dark:text-slate-100'} ${selectMode ? 'line-clamp-5' : 'whitespace-pre-wrap'}`}>{message.content}</p>
+                      {media[message.id] && <MessageMedia items={media[message.id]} />}</>
                     )}
 
                     {/* Meta footer — only for non-user messages (user/human has no LLM provider) */}

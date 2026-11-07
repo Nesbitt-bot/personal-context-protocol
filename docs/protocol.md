@@ -938,3 +938,25 @@ which conversation a line is about.
 This is deliberately not a request log: on serverless each instance would keep
 its own in-memory buffer and show a partial picture, whereas these events are
 in Postgres and every reader sees the same history.
+
+## Execution and image attachments (0.4.0)
+
+- `POST /api/v1/service/execution`: channel service credential plus
+  `{session_key, tool_name}`. Requires the exact delegated broker agent key,
+  an active grant and current operator policy. Returns `allowed`, `agent`,
+  `expires_at`; failure denies execution. Never accepts ingress credentials.
+- `GET /api/v1/sessions/:id/attachments`: Casdoor UI authentication and
+  session authorization; returns message IDs and attachment metadata.
+- `GET /api/v1/attachments/:id/content`: the same authorization on every read;
+  sanitized WebP bytes, private/no-store, never a public hash lookup.
+- Broker signed `message.media`: optional array of `{name, data}` (base64),
+  maximum four images and six MiB total decoded input, twelve MiB request.
+- Native `/api/v1/service/sync` accepts optional `media` entries with
+  `{name, data, message_index}`. Writes only to the grant's home session.
+
+Images are re-encoded without metadata and bounded by pixels/frames; unsupported
+or malformed images are rejected. The server stores only sanitized derivatives.
+
+- `POST /api/v1/service/attachments/content`: channel credential and live grant,
+  `{session_key, attachment_id}`; returns sanitized image data only within the
+  grant readable set. The `pcp_attachment` tool uses this route.
