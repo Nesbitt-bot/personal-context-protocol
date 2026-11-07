@@ -22,7 +22,7 @@ const http = require('http');
 const fs = require('fs');
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', 'localhost']);
-const MAX_BODY_BYTES = 32 * 1024;
+const MAX_BODY_BYTES = 12 * 1024 * 1024;
 
 function loadConfig(env = process.env) {
   const trim = (value) => String(value || '').replace(/\/+$/, '');
@@ -65,9 +65,11 @@ function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    let exceeded = false;
     req.on('data', (chunk) => {
+      if (exceeded) return;
       size += chunk.length;
-      if (size > MAX_BODY_BYTES) { reject(Object.assign(new Error('too large'), { status: 413 })); req.destroy(); return; }
+      if (size > MAX_BODY_BYTES) { exceeded = true; chunks.length = 0; reject(Object.assign(new Error('too large'), { status: 413 })); return; }
       chunks.push(chunk);
     });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
