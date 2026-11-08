@@ -138,7 +138,7 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     const exported = await cli.exportSessions(raw);
     expect(exported.has_projects).toBe(true);
     // Latest applied migration (schema_migrations versions sort lexically).
-    expect(exported.schema_version).toBe('015_attachments');
+    expect(exported.schema_version).toBe('016_message_sync_keys');
     expect(exported.sessions.find((x: { id: string }) => x.id === 'ses_win_codex')).toEqual({ id: 'ses_win_codex', external_key: 'win-384de1b4:codex:019f', title: 'opencode:win-384de1b4:circtime [codex] deploy page', project_id: null, archived: false });
     expect(JSON.stringify(exported)).not.toContain('deploy via actions');
     // The transaction really is read-only.
@@ -338,4 +338,23 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     expect(Number((await raw`SELECT count(*)::int AS n FROM sessions`)[0].n)).toBe(before.sessions);
     expect(Number((await raw`SELECT count(*)::int AS n FROM messages WHERE id IN ('msg_1', 'msg_2', 'msg_3')`)[0].n)).toBe(3);
   });
+  it('adopts legacy message identities once, preserving IDs, ordinals and repeated identical turns', async () => {
+    const { mergeSessionMessages } = await import('../src/lib/sync-store');
+    await raw`INSERT INTO sessions (id, title) VALUES ('ses_legacy_ids', 'legacy migration')`;
+    await raw`INSERT INTO messages (id, session_id, ordinal, role, content, provider, observed_at) VALUES
+      ('msg_legacy_1', 'ses_legacy_ids', 1, 'user', 'ok', 'codex', now()),
+      ('msg_legacy_2', 'ses_legacy_ids', 2, 'user', 'ok', 'codex', now())`;
+    const input = [0, 1, 2].map(i => ({ external_id: `stable-${i}`, role: 'user' as const, content: 'ok', provider: 'codex' }));
+    const first = await mergeSessionMessages('ses_legacy_ids', input, 'linux-test', 'test');
+    expect(first).toMatchObject({ ok: true, adopted: 2, appended: 1 });
+    const replay = await mergeSessionMessages('ses_legacy_ids', input, 'linux-test', 'test');
+    expect(replay).toMatchObject({ ok: true, adopted: 0, appended: 0, duplicates: 3 });
+    const rows = await raw`SELECT id, ordinal, external_message_id FROM messages WHERE session_id = 'ses_legacy_ids' ORDER BY ordinal`;
+    expect((await raw`SELECT external_id FROM message_sync_keys WHERE session_id = 'ses_legacy_ids'`).length).toBe(2);
+    expect(rows.slice(0, 2)).toEqual([
+      { id: 'msg_legacy_1', ordinal: 1, external_message_id: null },
+      { id: 'msg_legacy_2', ordinal: 2, external_message_id: null },
+    ]);
+  });
+
 });

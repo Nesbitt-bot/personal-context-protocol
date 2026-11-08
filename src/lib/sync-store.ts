@@ -1,6 +1,6 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from './db';
-import { events, mergeTasks, messages, projects, sessions, syncConflicts } from './schema';
+import { events, mergeTasks, messages, messageSyncKeys, projects, sessions, syncConflicts } from './schema';
 import { createId } from './auth';
 import { decideFieldWrite, planMessageMerge, readClock, type ClockMap, type ConflictRecord } from './sync-policy';
 
@@ -175,7 +175,25 @@ export async function mergeSessionMessages(sessionId: string, incoming: MergeMes
     const existing = ids.length
       ? await tx.select({ id: messages.externalMessageId }).from(messages).where(and(eq(messages.sessionId, session.id), inArray(messages.externalMessageId, ids)))
       : [];
-    const plan = planMessageMerge(new Set(existing.map((r) => r.id as string)), incoming);
+    const aliases = await tx.select().from(messageSyncKeys).where(eq(messageSyncKeys.sessionId, session.id));
+    const known = new Set([...existing.map((r) => r.id as string), ...aliases.map(row => row.externalId)]);
+    const claimed = new Set(aliases.map(row => row.messageId));
+    // Upgrade earlier append-only imports to external IDs without changing
+    // message IDs, ordinals, text, timestamps or attachment foreign keys.
+    const legacy = await tx.select().from(messages).where(and(eq(messages.sessionId, session.id), isNull(messages.externalMessageId))).orderBy(messages.ordinal);
+    let adopted = 0;
+    for (const message of incoming) {
+      if (known.has(message.external_id)) continue;
+      const timestamp = message.provider_timestamp ? new Date(message.provider_timestamp).getTime() : null;
+      const index = legacy.findIndex(row => !claimed.has(row.id) && row.role === message.role && row.content === message.content
+        && (row.providerTimestamp?.getTime() ?? null) === timestamp
+        && (row.provider || 'unknown') === (message.provider || 'unknown'));
+      if (index < 0) continue;
+      const [row] = legacy.splice(index, 1);
+      await tx.insert(messageSyncKeys).values({ sessionId: session.id, externalId: message.external_id, messageId: row.id });
+      known.add(message.external_id); adopted += 1;
+    }
+    const plan = planMessageMerge(known, incoming);
     const [max] = await tx.select({ max: sql<number>`max(${messages.ordinal})` }).from(messages).where(eq(messages.sessionId, session.id));
     let ordinal = (max?.max ? Number(max.max) : 0) + 1;
     const firstOrdinal = ordinal;
@@ -188,11 +206,11 @@ export async function mergeSessionMessages(sessionId: string, incoming: MergeMes
       });
       ordinal += 1;
     }
-    if (plan.append.length) {
-      await tx.update(sessions).set({ lastMessageAt: now }).where(eq(sessions.id, session.id));
-      await tx.insert(events).values({ id: createId('evt'), sessionId: session.id, topicId: session.topicId, action: 'messages.merged', actor, detailsJson: { device, appended: plan.append.length, duplicates: plan.duplicates, first_ordinal: firstOrdinal }, createdAt: now });
+    if (plan.append.length || adopted) {
+      if (plan.append.length) await tx.update(sessions).set({ lastMessageAt: now }).where(eq(sessions.id, session.id));
+      await tx.insert(events).values({ id: createId('evt'), sessionId: session.id, topicId: session.topicId, action: 'messages.merged', actor, detailsJson: { device, adopted, appended: plan.append.length, duplicates: plan.duplicates, first_ordinal: firstOrdinal }, createdAt: now });
     }
-    return { ok: true as const, appended: plan.append.length, duplicates: plan.duplicates, first_ordinal: plan.append.length ? firstOrdinal : null };
+    return { ok: true as const, adopted, appended: plan.append.length, duplicates: plan.duplicates, first_ordinal: plan.append.length ? firstOrdinal : null };
   });
 }
 

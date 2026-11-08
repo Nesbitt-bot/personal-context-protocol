@@ -219,3 +219,11 @@ Verified owner DMs and explicitly selected groups can use OpenClaw execution
 through PCP grants. Manage access in the agent dashboard `/adapters`. Groups
 start empty. Image/GIF turns reach the model and appear in authorized PCP history.
 See [release details](docs/versions/v0.4.0.md) for storage, limits and deployment.
+
+### Voice and isolated group actions (0.4.1)
+
+AstrBot transcribes voice through the local Whisper container and PCP stores
+the normalized voice attachment alongside its transcript. `/adapters` creates
+restricted agents for explicitly allowed groups; `pcp_execute` runs commands
+in a networkless, non-root container with a per-chat workspace. Group access
+starts empty. See `docs/versions/v0.4.1.md` for limits and deployment.

@@ -27,9 +27,11 @@ from astrbot.api.star import Context, Star
 from astrbot.core.provider.register import provider_cls_map, register_provider_adapter
 
 try:
+    from .pcp_audio import collect_audio
     from .pcp_media import collect_images
     from .pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, attributed_text, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
 except ImportError:  # loaded as a top-level module (tests)
+    from pcp_audio import collect_audio
     from pcp_media import collect_images
     from pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, attributed_text, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
 
@@ -184,6 +186,13 @@ class PcpRelayPlugin(Star):
         stamp = stamp_from_event(event)
         segments = event.get_messages() if hasattr(event, "get_messages") else []
         media, notes = await asyncio.to_thread(collect_images, segments)
+        used = sum(len(item['data']) * 3 // 4 for item in media)
+        audio, audio_notes = await asyncio.to_thread(collect_audio, event, segments, used)
+        media = (media + audio)[:4]
+        notes.extend(audio_notes)
+        if audio:
+            # Native AstrBot preprocessing appends Whisper's text to message_str.
+            text = text or "[voice attachment; transcription unavailable]"
         if notes:
             text += "\n" + "\n".join(notes)
         _remember(PendingTurn(umo=str(event.unified_msg_origin), stamp=stamp, text=attributed_text(stamp, text), event=event, media=media))

@@ -260,7 +260,7 @@ export async function prepareBrokerTurn(
     sessionKey: openclawBrokerSessionKey(agent, grantId),
     agent,
     model: `openclaw/${agent}`,
-    messages: [{ role: 'system', content: system }, { role: 'user', content: media.length ? [{ type: 'text', text: message.text }, ...media.map((m) => ({ type: 'image_url' as const, image_url: { url: m.dataUrl } }))] : message.text }],
+    messages: [{ role: 'system', content: system }, { role: 'user', content: media.length ? [{ type: 'text', text: message.text }, ...media.filter(m => m.mime.startsWith('image/')).map((m) => ({ type: 'image_url' as const, image_url: { url: m.dataUrl } }))] : message.text }],
     expiresAt: granted.expiresAt,
     homeSessionId: granted.homeSessionId,
   };

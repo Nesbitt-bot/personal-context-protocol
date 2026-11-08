@@ -243,3 +243,7 @@ Current version: `0.1.15`
 Additive `attachments` table with session/message foreign keys, replay identity
 and blob metadata. Both schema bootstrap paths register `015_attachments`.
 No existing message or identity is rewritten. Blobs are backed up separately.
+
+## 016 — legacy message sync identities
+
+`message_sync_keys` aliases external IDs to existing messages. The first ID-based replay does not update messages or change their ordinals. Both bootstrap paths register the additive table.

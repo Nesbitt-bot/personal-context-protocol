@@ -382,6 +382,12 @@ export const SCHEMA_STATEMENTS = [
   ...SERVICE_SCHEMA_STATEMENTS,
   ...PROJECT_SCHEMA_STATEMENTS,
   ...BROKER_SCHEMA_STATEMENTS,
+    `CREATE TABLE IF NOT EXISTS message_sync_keys (
+    session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    external_id text NOT NULL,
+    message_id text NOT NULL UNIQUE REFERENCES messages(id) ON DELETE CASCADE,
+    PRIMARY KEY (session_id, external_id)
+)`,
     `CREATE TABLE IF NOT EXISTS attachments (
   id text PRIMARY KEY,
   session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -512,7 +518,7 @@ async function applySchema() {
 
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
-    VALUES ('015_attachments', 'session_scoped_sanitized_media_v1'), ('014_broker', 'credential_kinds_broker_grants_replay_ledger')
+    VALUES ('016_message_sync_keys', 'legacy_identity_ledger_v1'), ('015_attachments', 'session_scoped_sanitized_media_v1'), ('014_broker', 'credential_kinds_broker_grants_replay_ledger')
     ON CONFLICT (version) DO NOTHING
   `);
 }

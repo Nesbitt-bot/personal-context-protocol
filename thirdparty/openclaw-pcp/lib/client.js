@@ -49,6 +49,13 @@ export function createPcpClient({ baseUrl, token, fetchImpl = globalThis.fetch }
   }
   return {
     attachment: (body, timeoutMs) => call("/api/v1/service/attachments/content", body, timeoutMs),
+    execute: async (body, timeoutMs) => {
+      const response = await fetchImpl("http://127.0.0.1:3103/v1/execute", { method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
+      const value = await response.json();
+      if (!response.ok) throw new PcpError(value.error || "Isolated execution failed: PCP/runner — request rejected", { status: response.status });
+      return value;
+    },
     execution: (body, timeoutMs) => call("/api/v1/service/execution", body, timeoutMs),
     grant: (body, timeoutMs) => call("/api/v1/service/grants", body, timeoutMs),
     sync: (body, timeoutMs) => call("/api/v1/service/sync", body, timeoutMs),

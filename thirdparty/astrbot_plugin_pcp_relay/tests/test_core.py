@@ -153,3 +153,15 @@ class MediaTests(unittest.TestCase):
         images, warnings = collect_images([Image()])
         self.assertEqual(images[0]['data'], 'aGVsbG8=')
         self.assertEqual(warnings, [])
+
+class VoiceAttachmentTests(unittest.TestCase):
+    def test_stt_replaced_record_keeps_its_event_owned_wav(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        from pcp_audio import collect_audio
+        event = SimpleNamespace(_temporary_local_files=['/AstrBot/data/temp/voice.wav'])
+        with patch('pcp_audio.read_image', return_value=b'input'), patch('pcp_audio.normalize_voice', return_value=b'normalized-wav'):
+            attachments, notes = collect_audio(event, [])
+        self.assertEqual(notes, [])
+        self.assertEqual(attachments[0]['kind'], 'audio')
+        self.assertEqual(attachments[0]['name'], 'voice.wav')

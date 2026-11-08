@@ -47,7 +47,7 @@ const DEFAULTS = {
   ownerPrincipals: [],
 };
 const CLAIM_TTL_MS = 15 * 60 * 1000;
-const TOOL_NAMES = ["pcp_context", "pcp_search", "pcp_attachment"];
+const TOOL_NAMES = ["pcp_context", "pcp_search", "pcp_attachment", "pcp_execute"];
 
 function withTimeout(promise, ms) {
   let timer;
@@ -314,6 +314,17 @@ export function createPlugin(api, deps = {}) {
     const format = (rows, titles) => rows.map((m) => `[${titles.get(m.session_id) || m.session_id}] #${m.ordinal} ${m.role}: ${String(m.content).slice(0, 500)}${(m.attachments || []).map(a => ` [image ${a.id}]`).join("")}`).join("\n");
     let recalledImages = 0;
     return [
+      {
+        name: "pcp_execute", label: "Isolated execution",
+        description: "Run a shell command in this chat's isolated container workspace. No network, host files or credentials. Maximum 30 seconds, 256 MiB memory. Files in /workspace persist for this chat.",
+        parameters: { type: "object", additionalProperties: false, required: ["command"], properties: { command: { type: "string", minLength: 1, maxLength: 8000 } } },
+        async execute(_id, params) {
+          return run(async () => {
+            const result = await client.execute({ session_key: sessionKey, command: params.command }, 50000);
+            return { content: [{ type: "text", text: JSON.stringify(result) }], details: { exitCode: result.exit_code } };
+          });
+        },
+      },
       {
         name: "pcp_attachment", label: "PCP image",
         description: "Read a sanitized image ID from PCP context/search within this conversation's authorized sessions. At most four image reads per tool instance.",

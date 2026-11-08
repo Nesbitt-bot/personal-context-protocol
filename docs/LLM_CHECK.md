@@ -412,3 +412,19 @@ Append what this round actually did below:
   runtime settings, docs, source sizes, whitespace and staged paths.
 - GitHub credentials unavailable in this session; no remote push or webhook
   deployment is claimed. Local rollout verification will be recorded separately.
+
+## 2026-11-08 — voice and isolated group execution
+
+- Added normalized voice attachments with authenticated audio playback. Existing
+  AstrBot preprocessing supplies searchable transcript text; audio is never sent
+  as an image. A local faster-whisper container replaces exhausted cloud STT.
+- Added a grant-checked container executor and pcp_execute tool. Staging proved
+  uid 1000, read-only root, no socket/private-state mounts, separate chat
+  workspaces, and denial before execution when PCP rejects a grant.
+- Migration 016 records legacy message identity aliases without editing any
+  existing message; first ID-based replay preserves repeated identical turns.
+- 351 database-backed Vitest tests passed on disposable PostgreSQL, along with
+  TypeScript and production image build. The previous remote/deployed main is
+  retained; release checks and final deployment evidence follow below.
+- User dropped separate Unix-user/forge-administration setup; container isolation
+  is the accepted execution boundary. No selected groups were enabled.

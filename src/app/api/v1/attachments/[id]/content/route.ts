@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     if (denied) return authErrorResponse(denied);
     const headers: Record<string, string> = { 'Content-Type': attachment.mimeType, 'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox",
-      'Content-Disposition': 'inline; filename="image.webp"' };
+      'Content-Disposition': attachment.mimeType.startsWith('audio/') ? 'inline; filename="voice.wav"' : 'inline; filename="image.webp"' };
     // nginx may serve bytes after this request has passed normal authorization.
     if (process.env.PCP_MEDIA_ACCEL === '1') {
       headers['X-Accel-Redirect'] = `/_pcp_blobs/${attachment.blobSha256.slice(0, 2)}/${attachment.blobSha256}`;

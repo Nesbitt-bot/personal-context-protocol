@@ -611,3 +611,5 @@ LIMIT 50;
 `attachments` links immutable sanitized blobs to messages and sessions. Unique
 `(session_id, external_key)` identifies retries; upload and blob SHA-256 values
 distinguish source identity from normalized storage. No blob hash grants access.
+
+`message_sync_keys` has `(session_id, external_id)` as primary key and a unique `message_id` reference. This ledger preserves legacy message identity without mutating append-only message rows.

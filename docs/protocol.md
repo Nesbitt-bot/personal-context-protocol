@@ -960,3 +960,5 @@ or malformed images are rejected. The server stores only sanitized derivatives.
 - `POST /api/v1/service/attachments/content`: channel credential and live grant,
   `{session_key, attachment_id}`; returns sanitized image data only within the
   grant readable set. The `pcp_attachment` tool uses this route.
+
+Voice media entries use `kind: "audio"` with mono 16 kHz 16-bit PCM WAV. Image entries omit kind or use `image`. `/service/execution` also authorizes `pcp_execute` and returns a server-derived workspace key to the trusted runner.

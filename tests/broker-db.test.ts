@@ -269,6 +269,16 @@ describe.skipIf(!enabled)('PCP broker: AstrBot identity, policy, grants and reco
       expect((await check(allowed.body.session_key)).status).toBe(200);
       expect((await check(allowed.body.session_key, tok.other)).status).toBe(403);
       expect((await check(allowed.body.session_key.replace('astrbot-exec:', 'main:'))).status).toBe(403);
+      fs.writeFileSync(file, JSON.stringify({ owner: { agent: 'astrbot-exec', tools: ['exec'] }, groups: [
+        { platform: 'qq', group_id: '888888', senders: [STRANGER_QQ], agent: 'astrbot-exec-testgroup', tools: ['pcp_execute'] },
+      ] }));
+      const selected = await prepare(body(stamp({ sender_id: STRANGER_QQ, chat: 'group', group_id: '888888' }), 'execute in isolation'));
+      expect(selected.body.agent).toBe('astrbot-exec-testgroup');
+      const groupExec = await execute(req({ authorization: `Bearer ${tok.openclaw}` }, JSON.stringify({ session_key: selected.body.session_key, tool_name: 'pcp_execute' })));
+      expect(groupExec.status).toBe(200);
+      expect((await check(selected.body.session_key)).status).toBe(403);
+      const forbidden = await tool('search', tok.openclaw, { session_key: selected.body.session_key, query: 'BLUE HERON' });
+      expect(forbidden.body.results).toEqual([]);
       const group = await prepare(body(stamp({ chat: 'group', group_id: GROUP }), 'run a task'));
       expect(group.body.agent).toBe('relay');
       expect((await check(group.body.session_key)).status).toBe(403);

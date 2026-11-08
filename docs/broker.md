@@ -188,3 +188,5 @@ Signed `message.media` carries bounded image bytes. PCP strips metadata and
 persists sanitized content before returning vision parts for OpenClaw. The
 broker still verifies policy upstream and holds the gateway credential; there
 is no direct AstrBot gateway access. See `versions/v0.4.0.md`.
+
+In 0.4.1 selected groups use a minimal agent and grant-checked `pcp_execute`, which delegates only to the isolated container runner. The dashboard creates the corresponding group agent. Voice WAV bytes are stored while AstrBot STT text is supplied to OpenClaw.
