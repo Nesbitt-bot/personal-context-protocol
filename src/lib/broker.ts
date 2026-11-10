@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { outboundMediaSchema, normalizeOutbound, DeliveryMedia } from './outbound-media';
 import { mediaInputSchema, normalizeMedia, MEDIA_BODY_LIMIT } from './media';
 import { attachMedia } from './attachments';
 import { executionRule } from './execution-policy';
@@ -68,6 +69,7 @@ export const completeTurnSchema = z.object({
   status: z.enum(['ok', 'error']),
   reply: z.string().max(MAX_REPLY_CHARS * 2).optional(),
   error_code: z.string().max(64).optional(),
+  media: z.array(outboundMediaSchema).max(4).optional(),
 }).strict();
 
 /** `v1=<hex HMAC-SHA256(signing key, raw body)>`; the key is hex. */
@@ -260,7 +262,7 @@ export async function prepareBrokerTurn(
     sessionKey: openclawBrokerSessionKey(agent, grantId),
     agent,
     model: `openclaw/${agent}`,
-    messages: [{ role: 'system', content: system }, { role: 'user', content: media.length ? [{ type: 'text', text: message.text }, ...media.map((m) => ({ type: 'image_url' as const, image_url: { url: m.dataUrl } }))] : message.text }],
+    messages: [{ role: 'system', content: system }, { role: 'user', content: media.length ? [{ type: 'text', text: message.text }, ...media.filter(m => m.mime.startsWith('image/')).map((m) => ({ type: 'image_url' as const, image_url: { url: m.dataUrl } }))] : message.text }],
     expiresAt: granted.expiresAt,
     homeSessionId: granted.homeSessionId,
   };
@@ -270,7 +272,7 @@ export async function completeBrokerTurn(
   broker: ResolvedServiceCredential,
   input: z.infer<typeof completeTurnSchema>,
   now = new Date(),
-): Promise<{ ok: true; recorded: boolean } | BrokerFailure> {
+): Promise<{ ok: true; recorded: boolean; media: DeliveryMedia[] } | BrokerFailure> {
   if (broker.kind !== 'broker') return unauthorized('NOT_A_BROKER');
   const [row] = await db.select().from(turnGrants).where(and(
     eq(turnGrants.id, input.turn_id),
@@ -283,10 +285,13 @@ export async function completeBrokerTurn(
   const grant = await findActiveGrant(row.credentialId, brokerSessionKey(row.id), now);
   if (!grant) return { ok: false, status: 404, code: 'TURN_NOT_FOUND', error: 'Unable to complete AstrBot turn: broker / turn lookup - grant expired' };
 
+  const outgoing = await normalizeOutbound(input.media || []);
   let recorded = false;
   const reply = (input.reply || '').trim();
-  if (input.status === 'ok' && reply) {
-    await appendTurn(grant, `${row.externalKey}:out`, [{ role: 'assistant', content: reply.slice(0, MAX_REPLY_CHARS), provider: 'openclaw', base_model: `openclaw/${row.agent}` }], `broker:${broker.id}`, now);
+  if (input.status === 'ok' && (reply || outgoing.stored.length)) {
+    const saved = await appendTurn(grant, `${row.externalKey}:out`, [{ role: 'assistant', content: (reply || '[media attachment]').slice(0, MAX_REPLY_CHARS), provider: 'openclaw', base_model: `openclaw/${row.agent}` }], `broker:${broker.id}`, now);
+    if (!saved.ok) return saved;
+    await attachMedia(grant.homeSessionId, saved.firstOrdinal, `${row.externalKey}:out`, outgoing.stored);
     recorded = true;
   }
   await revokeGrantById(row.id, now);
@@ -295,10 +300,10 @@ export async function completeBrokerTurn(
     sessionId: row.homeSessionId,
     action: input.status === 'ok' ? 'broker.turn.completed' : 'broker.turn.failed',
     actor: `broker:${broker.id}`,
-    detailsJson: { grant_id: row.id, agent: row.agent, recorded, ...(input.error_code ? { error_code: input.error_code } : {}) },
+    detailsJson: { grant_id: row.id, agent: row.agent, recorded, attachment_count: outgoing.stored.length, delivery_status: outgoing.stored.length ? 'prepared' : undefined, ...(input.error_code ? { error_code: input.error_code } : {}) },
     createdAt: now,
   });
-  return { ok: true, recorded };
+  return { ok: true, recorded, media: outgoing.delivery };
 }
 
 /** Exposed for tests. */

@@ -182,7 +182,7 @@ test("HTTP backstop refuses every tool except pcp_* and works without PCP creden
 
 test("pcp_* tools use the service credential and ctx.sessionKey only", async () => {
   const { pcp, tools } = setup({ linked: true });
-  assert.deepEqual(tools[0].opts, { optional: true, names: ["pcp_context", "pcp_search", "pcp_attachment"] });
+  assert.deepEqual(tools[0].opts, { optional: true, names: ["pcp_context", "pcp_search", "pcp_attachment", "pcp_execute"] });
   const list = tools[0].factory({ agentId: "main", sessionKey: "agent:main:direct:owner", messageChannel: "telegram", requesterSenderId: "100000001" });
   const search = list.find((t) => t.name === "pcp_search");
   assert.equal(search.parameters.additionalProperties, false);

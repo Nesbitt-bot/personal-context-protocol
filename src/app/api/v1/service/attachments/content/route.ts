@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
     if ('response' in ctx) return ctx.response;
     const [attachment] = await db.select().from(attachments).where(eq(attachments.id, ctx.body.attachment_id)).limit(1);
     if (!attachment || !ctx.grant!.readableSessionIds.includes(attachment.sessionId)) return NextResponse.json({ error: 'Image unavailable: media/grant authorization - attachment is outside this turn scope', code: 'FORBIDDEN' }, { status: 403 });
+    if (!attachment.mimeType.startsWith('image/')) return NextResponse.json({ error: 'Image recall unavailable: media/type - voice is retained in PCP; use its recorded transcript for reasoning', code: 'MEDIA_TYPE' }, { status: 415 });
     const data = await fs.readFile(blobPath(attachment.blobSha256));
     return NextResponse.json({ data: data.toString('base64'), mime_type: attachment.mimeType }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return serviceInternalError('Unable to recall image', 'media/grant read', 'attachment storage is unavailable', error); }

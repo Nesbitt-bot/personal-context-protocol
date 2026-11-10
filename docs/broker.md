@@ -188,3 +188,15 @@ Signed `message.media` carries bounded image bytes. PCP strips metadata and
 persists sanitized content before returning vision parts for OpenClaw. The
 broker still verifies policy upstream and holds the gateway credential; there
 is no direct AstrBot gateway access. See `versions/v0.4.0.md`.
+
+In 0.4.1 selected groups use a minimal agent and grant-checked `pcp_execute`, which delegates only to the isolated container runner. The dashboard creates the corresponding group agent. Voice WAV bytes are stored while AstrBot STT text is supplied to OpenClaw.
+
+## Outbound multimedia (0.4.2)
+
+OpenClaw MEDIA directives and structured attachments now pass through the
+PCP broker as recorded bytes, then become real AstrBot Image/Record/Video
+components. PCP saves the assistant attachments before delivery and records
+signed adapter-accepted/failed receipts. Media-only replies work; missing files
+or rejected storage report failure. Limit: four files, six MiB total.
+Local files must be inside the responding agent's workspace. This path needs
+the inline-media OpenClaw gateway patch and AstrBot relay plugin 0.3.0.

@@ -1,0 +1,25 @@
+services:
+  speech:
+    image: pcp-speech:1.0.0
+    container_name: pcp-speech
+    build:
+      context: ../speech
+    env_file: ${PCP_SPEECH_ENV_FILE:-/home/motuariki/Documents/DockerVolumes/pcp/speech/secrets.env}
+    environment:
+      WHISPER_MODEL: base
+    volumes:
+      - type: bind
+        source: ${PCP_SPEECH_MODELS_DIR:-/home/motuariki/Documents/DockerVolumes/pcp/speech/models}
+        target: /models
+        bind:
+          create_host_path: false
+    ports:
+      - "127.0.0.1:3102:3102"
+    mem_limit: 2g
+    cpus: 4
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3102/healthz',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

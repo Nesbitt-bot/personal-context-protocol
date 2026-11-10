@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const rule = executionRule({ platform, sender_id, chat: home.sessionClass === 'group' ? 'group' : 'private',
       group_id: home.sessionClass === 'group' ? home.principal?.split(':').at(-1) : undefined }, user?.isAdmin === true);
     if (!rule || rule.agent !== grant.agent || !(rule.tools as string[]).includes(body.tool_name)) return denied();
-    return NextResponse.json({ allowed: true, agent: grant.agent, expires_at: grant.expiresAt.toISOString() }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ allowed: true, agent: grant.agent, workspace_key: grant.homeSessionId, expires_at: grant.expiresAt.toISOString() }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return serviceInternalError('Unable to authorize execution', 'broker/tool authorization', 'policy or identity lookup failed', error);
   }

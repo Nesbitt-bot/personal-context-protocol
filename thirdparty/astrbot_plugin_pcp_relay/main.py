@@ -27,9 +27,11 @@ from astrbot.api.star import Context, Star
 from astrbot.core.provider.register import provider_cls_map, register_provider_adapter
 
 try:
+    from .pcp_audio import collect_audio
     from .pcp_media import collect_images
     from .pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, attributed_text, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
 except ImportError:  # loaded as a top-level module (tests)
+    from pcp_audio import collect_audio
     from pcp_media import collect_images
     from pcp_relay_core import DEFAULT_BROKER_URL, DEFAULT_TIMEOUT_S, attributed_text, broker_url_ok, build_stamp, encode_body, load_credentials, outcome, post_turn
 
@@ -134,6 +136,19 @@ class PcpRelayProvider(Provider):
         body = encode_body(turn.stamp, turn.text, turn.media)
         result = await asyncio.to_thread(post_turn, self.broker_url, creds, body, self.timeout_s)
         verdict = outcome(result)
+        if verdict == "reply" and result.media:
+            try:
+                try:
+                    from .pcp_outbound import reply_chain, track_delivery
+                except ImportError:
+                    from pcp_outbound import reply_chain, track_delivery
+                chain = reply_chain(result.reply, result.media)
+                track_delivery(turn.event, self.broker_url, creds, result.turn_id)
+                return LLMResponse(role="assistant", result_chain=chain)
+            except (ValueError, KeyError, TypeError):
+                reason = "Attachment not sent: PCP relay/media response — invalid media payload; inspect the broker delivery record."
+                logger.warning(reason)
+                return LLMResponse(role="err", completion_text=reason)
         if verdict == "reply":
             return LLMResponse(role="assistant", completion_text=result.reply)
         if verdict == "error":
@@ -184,6 +199,13 @@ class PcpRelayPlugin(Star):
         stamp = stamp_from_event(event)
         segments = event.get_messages() if hasattr(event, "get_messages") else []
         media, notes = await asyncio.to_thread(collect_images, segments)
+        used = sum(len(item['data']) * 3 // 4 for item in media)
+        audio, audio_notes = await asyncio.to_thread(collect_audio, event, segments, used)
+        media = (media + audio)[:4]
+        notes.extend(audio_notes)
+        if audio:
+            # Native AstrBot preprocessing appends Whisper's text to message_str.
+            text = text or "[voice attachment; transcription unavailable]"
         if notes:
             text += "\n" + "\n".join(notes)
         _remember(PendingTurn(umo=str(event.unified_msg_origin), stamp=stamp, text=attributed_text(stamp, text), event=event, media=media))

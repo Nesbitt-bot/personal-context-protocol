@@ -408,3 +408,10 @@ export const attachments = pgTable('attachments', {
   filename: text('filename').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Identity ledger for legacy rows; AI never updates existing messages.
+export const messageSyncKeys = pgTable('message_sync_keys', {
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  externalId: text('external_id').notNull(),
+  messageId: text('message_id').notNull().unique().references(() => messages.id, { onDelete: 'cascade' }),
+}, table => ({ pk: primaryKey({ columns: [table.sessionId, table.externalId] }) }));
