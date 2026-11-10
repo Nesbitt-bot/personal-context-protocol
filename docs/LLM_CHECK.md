@@ -428,3 +428,18 @@ Append what this round actually did below:
   retained; release checks and final deployment evidence follow below.
 - User dropped separate Unix-user/forge-administration setup; container isolation
   is the accepted execution boundary. No selected groups were enabled.
+
+## 2026-11-09 — Outbound AstrBot multimedia
+
+- Confirmed both deployed losses: OpenClaw HTTP collapsed payloads to text,
+  then the PCP provider created text-only LLMResponse objects. The new opt-in
+  gateway export, recorded broker bytes and AstrBot MessageChain preserve media.
+- 356 Vitest tests passed against disposable PostgreSQL, including media-only
+  recording, exact byte hashes and signed/idempotent receipt authorization.
+  TypeScript, 27 Python plugin tests and production build passed.
+- The actual installed AstrBot OneBot serializer produced text+image segments
+  with base64 file bytes from the new chain. This check sent nothing to QQ.
+- Only the responding agent workspace is readable for local exports. Native
+  SSRF guards cover remote URLs; PCP validates media types and limits.
+- Database/runtime backups were retained under DockerVolumes. Actual adapter
+  send success is tracked separately from preparation and recipient display.

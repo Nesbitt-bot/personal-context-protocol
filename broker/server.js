@@ -80,7 +80,18 @@ function readBody(req) {
 async function postJson(fetchImpl, url, headers, body, timeoutMs) {
   const response = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body, signal: AbortSignal.timeout(timeoutMs) });
   let json = null;
-  try { json = await response.json(); } catch { json = null; }
+  try {
+    if (response.body?.getReader) {
+      const reader = response.body.getReader(), chunks = []; let length = 0;
+      while (true) {
+        const { done, value } = await reader.read(); if (done) break;
+        length += value.length;
+        if (length > MAX_BODY_BYTES) { await reader.cancel(); throw new Error('upstream body limit'); }
+        chunks.push(value);
+      }
+      json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } else json = await response.json();
+  } catch { json = null; }
   return { status: response.status, ok: response.ok, json };
 }
 
@@ -135,20 +146,26 @@ function createBroker(cfg = loadConfig(), deps = {}) {
         authorization: `Bearer ${gateway}`,
         'x-openclaw-session-key': t.session_key,
         'x-openclaw-agent-id': t.agent,
+        'x-openclaw-media': 'inline',
       }, JSON.stringify({ model: t.model, messages: t.messages, stream: false }), cfg.openclawTimeoutMs);
     } catch {
       completion = { ok: false, status: 0, json: null };
     }
     const reply = completion.ok ? replyText(completion.json).trim() : '';
-    if (!reply) {
+    const media = completion.ok && Array.isArray(completion.json?.choices?.[0]?.message?.attachments) ? completion.json.choices[0].message.attachments : [];
+    if (!reply && !media.length) {
       await complete({ status: 'error', error_code: completion.ok ? 'EMPTY_REPLY' : `OPENCLAW_${completion.status || 'UNREACHABLE'}` });
       log('WARN', `AstrBot turn failed: PCP broker / OpenClaw — ${completion.ok ? 'empty reply' : `HTTP ${completion.status || 'unreachable'}`} for ${t.turn_id} (${t.agent}).`);
       return send(res, 502, { error: 'OpenClaw did not reply', code: 'OPENCLAW_ERROR' });
     }
-    const recorded = await complete({ status: 'ok', reply });
+    const recorded = await complete({ status: 'ok', reply, ...(media.length ? { media } : {}) });
+    if (media.length && (!recorded.ok || !recorded.json?.media?.length)) {
+      log('WARN', `Attachment delivery refused: PCP broker/recording — media could not be saved for ${t.turn_id}.`);
+      return send(res, 502, { error: 'Attachment not sent: PCP broker/recording — media storage failed', code: 'MEDIA_RECORDING_FAILED' });
+    }
     if (!recorded.ok) log('WARN', `AstrBot turn not recorded: PCP broker / complete — PCP answered ${recorded.status}; reply still returned for ${t.turn_id}.`);
     log('INFO', `AstrBot turn done: PCP broker — ${t.turn_id} via ${t.agent}.`);
-    return send(res, 200, { reply, turn_id: t.turn_id, agent: t.agent });
+    return send(res, 200, { reply, turn_id: t.turn_id, agent: t.agent, ...(media.length ? { media: recorded.json.media } : {}) });
   }
 
   return http.createServer((req, res) => {
@@ -156,6 +173,13 @@ function createBroker(cfg = loadConfig(), deps = {}) {
     if (req.method === 'GET' && path === '/healthz') {
       const { broker, gateway } = secrets();
       return send(res, 200, { status: 'ok', configured: Boolean(broker && gateway) });
+    }
+    if (req.method === 'POST' && path === '/v1/delivery') {
+      readBody(req).then(raw => postJson(fetchImpl, `${cfg.pcpUrl}/api/v1/service/broker/delivery`, {
+        authorization: String(req.headers.authorization || ''), 'x-pcp-signature': String(req.headers['x-pcp-signature'] || ''),
+      }, raw, cfg.pcpTimeoutMs)).then(result => send(res, result.status, result.json || { code: 'INVALID_REPLY' }))
+        .catch(() => send(res, 503, { code: 'PCP_UNAVAILABLE' }));
+      return undefined;
     }
     if (req.method === 'POST' && path === '/v1/turn') {
       turn(req, res).catch(() => send(res, 500, { error: 'internal error', code: 'INTERNAL_ERROR' }));

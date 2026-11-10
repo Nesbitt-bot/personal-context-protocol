@@ -20,7 +20,7 @@ export function MessageMedia({ items }: { items: Attachment[] }) {
     })).then(result => { if (active) setImages(result); }).catch(e => { if (active) setError(e.message); });
     return () => { active = false; controller.abort(); urls.forEach(url => URL.revokeObjectURL(url)); };
   }, [items]);
-  return <div className="mt-2 flex flex-wrap gap-2">{images.map(({ item, url }) => item.mimeType.startsWith('audio/') ? <div key={item.id}><p className="text-xs">Voice message</p><audio controls preload="metadata" src={url} aria-label={item.filename} className="max-w-full" /></div> : <a key={item.id} href={url} target="_blank" rel="noreferrer" title={item.filename}>
+  return <div className="mt-2 flex flex-wrap gap-2">{images.map(({ item, url }) => item.mimeType.startsWith('audio/') ? <div key={item.id}><p className="text-xs">Voice message</p><audio controls preload="metadata" src={url} aria-label={item.filename} className="max-w-full" /></div> : item.mimeType.startsWith('video/') ? <video key={item.id} controls preload="metadata" src={url} aria-label={item.filename} className="max-h-64 max-w-full rounded-lg" /> : <a key={item.id} href={url} target="_blank" rel="noreferrer" title={item.filename}>
     <img src={url} alt={item.filename} loading="lazy" className="max-h-64 max-w-full rounded-lg" />
   </a>)}{error && <p role="alert">{error}</p>}</div>;
 }

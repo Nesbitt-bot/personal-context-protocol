@@ -148,6 +148,8 @@ class BrokerResult:
     status: int  # 0 = unreachable
     reply: str
     code: str
+    media: tuple = ()
+    turn_id: str = ""
 
 
 def post_turn(broker_url: str, creds: Credentials, body: bytes, timeout_s: float = DEFAULT_TIMEOUT_S, opener=urllib.request.urlopen) -> BrokerResult:
@@ -164,8 +166,11 @@ def post_turn(broker_url: str, creds: Credentials, body: bytes, timeout_s: float
     )
     try:
         with opener(request, timeout=timeout_s) as response:
-            payload = json.loads(response.read().decode("utf-8") or "{}")
-            return BrokerResult(response.status, str(payload.get("reply") or ""), "")
+            raw = response.read(12 * 1024 * 1024 + 1)
+            if len(raw) > 12 * 1024 * 1024:
+                return BrokerResult(502, "", "REPLY_TOO_LARGE")
+            payload = json.loads(raw.decode("utf-8") or "{}")
+            return BrokerResult(response.status, str(payload.get("reply") or ""), "", tuple(payload.get("media") or ()), str(payload.get("turn_id") or ""))
     except urllib.error.HTTPError as error:
         try:
             code = str(json.loads(error.read().decode("utf-8") or "{}").get("code") or "")
@@ -178,7 +183,7 @@ def post_turn(broker_url: str, creds: Credentials, body: bytes, timeout_s: float
 
 def outcome(result: BrokerResult) -> str:
     """'reply' | 'error' (AstrBot shows its failure message) | 'silent' (fail closed)."""
-    if result.status == 200 and result.reply.strip():
+    if result.status == 200 and (result.reply.strip() or result.media):
         return "reply"
     if result.status == 502:
         return "error"  # OpenClaw failed behind a verified, recorded turn

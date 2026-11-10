@@ -177,3 +177,13 @@ the normalized voice attachment alongside its transcript. `/adapters` creates
 restricted agents for explicitly allowed groups; `pcp_execute` runs commands
 in a networkless, non-root container with a per-chat workspace. Group access
 starts empty. See `versions/v0.4.1.md` for limits and deployment.
+
+## Outbound multimedia (0.4.2)
+
+OpenClaw MEDIA directives and structured attachments now pass through the
+PCP broker as recorded bytes, then become real AstrBot Image/Record/Video
+components. PCP saves the assistant attachments before delivery and records
+signed adapter-accepted/failed receipts. Media-only replies work; missing files
+or rejected storage report failure. Limit: four files, six MiB total.
+Local files must be inside the responding agent's workspace. This path needs
+the inline-media OpenClaw gateway patch and AstrBot relay plugin 0.3.0.

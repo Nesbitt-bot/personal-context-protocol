@@ -6,13 +6,13 @@ const { createBroker, upstreamOk, replyText } = require('../broker/server.js');
 
 type Call = { url: string; headers: Record<string, string>; body: string };
 
-function harness(behaviour: { prepare?: (c: Call) => Response | Promise<Response>; openclaw?: (c: Call) => Response | Promise<Response>; secrets?: { broker: string; gateway: string } }) {
+function harness(behaviour: { prepare?: (c: Call) => Response | Promise<Response>; openclaw?: (c: Call) => Response | Promise<Response>; complete?: (c: Call) => Response | Promise<Response>; secrets?: { broker: string; gateway: string } }) {
   const calls: Call[] = [];
   const fetchImpl = async (url: string, init: { headers: Record<string, string>; body: string }) => {
     const call = { url, headers: init.headers, body: init.body };
     calls.push(call);
     if (url.endsWith('/api/v1/service/broker/turns')) return behaviour.prepare ? behaviour.prepare(call) : json(200, PREPARED);
-    if (url.endsWith('/api/v1/service/broker/turns/complete')) return json(200, { success: true, recorded: true });
+    if (url.endsWith('/api/v1/service/broker/turns/complete')) return behaviour.complete ? behaviour.complete(call) : json(200, { success: true, recorded: true });
     if (url.endsWith('/v1/chat/completions')) return behaviour.openclaw ? behaviour.openclaw(call) : json(200, { choices: [{ message: { content: 'hello from relay-owner' } }] });
     throw new Error('unexpected');
   };
@@ -69,6 +69,19 @@ describe('PCP broker process', () => {
     // The gateway token never goes to PCP; the broker credential never goes to OpenClaw.
     expect(JSON.stringify([prepare, complete])).not.toContain('gw_secret');
     expect(JSON.stringify(openclaw)).not.toContain('pcps_broker');
+  });
+
+  it('media-only replies are recorded before returning bytes, and recording failures never claim delivery', async () => {
+    const media = [{ name: 'avatar.jpg', mime_type: 'image/jpeg', data: 'aW1hZ2U=' }];
+    const h = await start(harness({ openclaw: () => json(200, { choices: [{ message: { content: '', attachments: media } }] }),
+      complete: () => json(200, { success: true, media: media.map(m => ({ ...m, sha256: 'digest' })) }) }));
+    const response = await turn();
+    expect(response.status).toBe(200); expect((await response.json()).media[0].sha256).toBe('digest');
+    expect(h.calls[1].headers['x-openclaw-media']).toBe('inline');
+    expect(JSON.parse(h.calls[2].body).media).toEqual(media);
+    await close();
+    await start(harness({ openclaw: () => json(200, { choices: [{ message: { content: '', attachments: media } }] }), complete: () => json(503, {}) }));
+    expect((await turn()).status).toBe(502);
   });
 
   it('fails closed when PCP is down: 503 and OpenClaw is never called', async () => {

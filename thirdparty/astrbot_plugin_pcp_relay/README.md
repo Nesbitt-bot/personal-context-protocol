@@ -62,3 +62,13 @@ in authorized PCP history. Native images use the durable sync queue; AstrBot
 collects only platform image segments. No source URLs or credentials enter
 public streams. The PCP plugin also provides `pcp_attachment` for authorized
 image recall.
+
+## Outbound multimedia (0.4.2)
+
+OpenClaw MEDIA directives and structured attachments now pass through the
+PCP broker as recorded bytes, then become real AstrBot Image/Record/Video
+components. PCP saves the assistant attachments before delivery and records
+signed adapter-accepted/failed receipts. Media-only replies work; missing files
+or rejected storage report failure. Limit: four files, six MiB total.
+Local files must be inside the responding agent's workspace. This path needs
+the inline-media OpenClaw gateway patch and AstrBot relay plugin 0.3.0.

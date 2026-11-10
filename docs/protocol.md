@@ -962,3 +962,15 @@ or malformed images are rejected. The server stores only sanitized derivatives.
   grant readable set. The `pcp_attachment` tool uses this route.
 
 Voice media entries use `kind: "audio"` with mono 16 kHz 16-bit PCM WAV. Image entries omit kind or use `image`. `/service/execution` also authorizes `pcp_execute` and returns a server-derived workspace key to the trusted runner.
+
+## Outbound media and delivery evidence (0.4.2)
+
+`POST /api/v1/service/broker/turns/complete` accepts optional `media` entries
+with `{name,mime_type,data}`. PCP validates types/size, records sanitized image
+bytes or recognized audio/video against the assistant message, and returns the
+exact delivery bytes plus SHA-256. A media-only reply is valid.
+
+`POST /api/v1/service/broker/delivery` accepts signed ingress receipts
+`{turn_id,event_id,status,attachment_count}`. Status is `adapter_accepted` or
+`failed`; the same ingress credential must own the completed turn. Repeated
+event IDs insert once. Adapter acceptance is not recipient-display confirmation.

@@ -136,6 +136,19 @@ class PcpRelayProvider(Provider):
         body = encode_body(turn.stamp, turn.text, turn.media)
         result = await asyncio.to_thread(post_turn, self.broker_url, creds, body, self.timeout_s)
         verdict = outcome(result)
+        if verdict == "reply" and result.media:
+            try:
+                try:
+                    from .pcp_outbound import reply_chain, track_delivery
+                except ImportError:
+                    from pcp_outbound import reply_chain, track_delivery
+                chain = reply_chain(result.reply, result.media)
+                track_delivery(turn.event, self.broker_url, creds, result.turn_id)
+                return LLMResponse(role="assistant", result_chain=chain)
+            except (ValueError, KeyError, TypeError):
+                reason = "Attachment not sent: PCP relay/media response — invalid media payload; inspect the broker delivery record."
+                logger.warning(reason)
+                return LLMResponse(role="err", completion_text=reason)
         if verdict == "reply":
             return LLMResponse(role="assistant", completion_text=result.reply)
         if verdict == "error":

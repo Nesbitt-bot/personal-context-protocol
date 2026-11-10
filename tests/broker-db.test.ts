@@ -316,4 +316,29 @@ describe.skipIf(!enabled)('PCP broker: AstrBot identity, policy, grants and reco
     } finally { delete process.env.PCP_BLOB_DIR; fs.rmSync(dir, { recursive: true, force: true }); }
   });
 
+  it('records media-only assistant replies and accepts signed send evidence only for the issuing ingress', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pcp-outgoing-'));
+    process.env.PCP_BLOB_DIR = dir;
+    try {
+      const turn = await prepare(body(stamp(), 'send an image'));
+      const bytes = await sharp({ create: { width: 16, height: 10, channels: 3, background: '#aa33ee' } }).jpeg().toBuffer();
+      const response = await call('complete', { authorization: `Bearer ${tok.broker}` }, JSON.stringify({ turn_id: turn.body.turn_id, status: 'ok', reply: '', media: [{ name: 'avatar.jpg', mime_type: 'image/jpeg', data: bytes.toString('base64') }] }));
+      expect(response.status).toBe(200);
+      expect(response.body.media[0].mime_type).toBe('image/jpeg');
+      const stored = await lib.db.execute(lib.sql`SELECT a.blob_sha256, m.role FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.role='assistant'`) as unknown as Array<{ blob_sha256: string; role: string }>;
+      expect(stored).toHaveLength(1); expect(stored[0].blob_sha256).toBe(response.body.media[0].sha256);
+      expect(crypto.createHash('sha256').update(Buffer.from(response.body.media[0].data, 'base64')).digest('hex')).toBe(stored[0].blob_sha256);
+      const { POST } = await import('../src/app/api/v1/service/broker/delivery/route');
+      const evidence = JSON.stringify({ turn_id: turn.body.turn_id, event_id: 'a'.repeat(32), status: 'adapter_accepted', attachment_count: 1 });
+      const send = (token: string, signature: string) => POST(req({ authorization: `Bearer ${token}`, 'x-pcp-signature': signature }, evidence));
+      expect((await send(tok.ingress, 'v1=' + 'b'.repeat(64))).status).toBe(401);
+      const signature = lib.signIngressBody(tok.signingKey, evidence);
+      expect((await send(tok.other, signature)).status).toBe(401);
+      expect((await send(tok.ingress, signature)).status).toBe(200);
+      expect((await send(tok.ingress, signature)).status).toBe(200);
+      const receipts = await lib.db.execute(lib.sql`SELECT action FROM events WHERE id=${'evt_delivery_' + 'a'.repeat(32)}`) as unknown as Array<{ action: string }>;
+      expect(receipts).toEqual([{ action: 'broker.media.adapter_accepted' }]);
+    } finally { delete process.env.PCP_BLOB_DIR; fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
 });
