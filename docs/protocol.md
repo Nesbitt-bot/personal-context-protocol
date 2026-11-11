@@ -974,3 +974,12 @@ exact delivery bytes plus SHA-256. A media-only reply is valid.
 `{turn_id,event_id,status,attachment_count}`. Status is `adapter_accepted` or
 `failed`; the same ingress credential must own the completed turn. Repeated
 event IDs insert once. Adapter acceptance is not recipient-display confirmation.
+
+## Delegated coding work
+
+`POST /api/v1/service/work` registers an OpenCode child with a live delegated
+parent grant and accepts sequenced progress/terminal updates for 24 hours.
+The child, parent, credential and signed delivery route stay bound.
+`POST /api/v1/service/broker/work` accepts signed ingress polls with
+`{after,id,nonce,ts}` and returns only that ingress credential's work updates.
+Destinations originate from the signed platform stamp, never from model output.

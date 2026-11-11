@@ -200,3 +200,18 @@ signed adapter-accepted/failed receipts. Media-only replies work; missing files
 or rejected storage report failure. Limit: four files, six MiB total.
 Local files must be inside the responding agent's workspace. This path needs
 the inline-media OpenClaw gateway patch and AstrBot relay plugin 0.3.0.
+
+## Delegated coding progress (0.4.3)
+
+After a broker agent spawns an OpenCode ACP run, openclaw-pcp registers a
+durable observer before the initial turn closes. The observer sleeps between
+checks, reports progress about once per minute and persists completed/blocked
+results to PCP. AstrBot polls signed work updates and sends them to the original
+platform destination; the cursor survives restart. Destinations are derived
+from the verified stamp, never from model text. Terminal text is saved to the
+conversation. This continuation does not widen tool or PCP history permissions.
+
+Owner policy may allow sessions_yield together with sessions_spawn. The parent
+may yield while monitoring continues; a queued acknowledgement is not completion.
+The active model/permission failure is reported as a blocker. Jobs have a six-hour
+monitoring limit and updates are accepted for registered work for 24 hours.

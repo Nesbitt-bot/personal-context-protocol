@@ -341,4 +341,24 @@ describe.skipIf(!enabled)('PCP broker: AstrBot identity, policy, grants and reco
     } finally { delete process.env.PCP_BLOB_DIR; fs.rmSync(dir, { recursive: true, force: true }); }
   });
 
+  it('delegated task updates remain scoped after the parent finishes and poll only to its signed ingress', async () => {
+    const work = (await import('../src/app/api/v1/service/work/route')).POST;
+    const poll = (await import('../src/app/api/v1/service/broker/work/route')).POST;
+    const turn = await prepare(body(stamp(), 'delegate work'));
+    const run = crypto.randomUUID();
+    const payload = { session_key: turn.body.session_key, run_id: run, child_session_key: `agent:opencode:acp:${crypto.randomUUID()}`, sequence: 0, state: 'started', text: 'Coding started' };
+    const update = (input: object, token = tok.openclaw) => work(req({ authorization: `Bearer ${token}` }, JSON.stringify(input)));
+    expect((await update(payload, tok.other)).status).toBe(403);
+    expect((await update(payload)).status).toBe(200);
+    await complete(turn.body.turn_id, 'delegated');
+    expect((await update({ ...payload, sequence: 1, state: 'blocked', text: 'Provider quota exhausted' })).status).toBe(200);
+    expect((await update({ ...payload, run_id: crypto.randomUUID(), sequence: 1 })).status).toBe(403);
+    const rawPoll = JSON.stringify({ after: new Date(Date.now() - 60000).toISOString(), id: '', nonce: crypto.randomBytes(16).toString('hex'), ts: Math.floor(Date.now() / 1000) });
+    const result = await poll(req({ authorization: `Bearer ${tok.ingress}`, 'x-pcp-signature': lib.signIngressBody(tok.signingKey, rawPoll) }, rawPoll));
+    expect(result.status).toBe(200);
+    const rows = (await result.json()).updates.filter((row: { run_id: string }) => row.run_id === run);
+    expect(rows.map((row: { state: string }) => row.state)).toEqual(['started', 'blocked']);
+    expect(rows[0].delivery_route).toEqual({ platform_id: 'bot-test', chat: 'private', recipient: OWNER_QQ });
+  });
+
 });

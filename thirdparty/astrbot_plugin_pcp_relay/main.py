@@ -192,6 +192,18 @@ class PcpRelayPlugin(Star):
     def __init__(self, context: Context, config=None) -> None:
         super().__init__(context)
 
+    async def initialize(self):
+        try:
+            from .pcp_work import WorkUpdates
+        except ImportError:
+            from pcp_work import WorkUpdates
+        self.work_updates = asyncio.create_task(WorkUpdates(self.context,
+            "/AstrBot/data/plugin_data/astrbot_plugin_pcp_relay/work-cursor.json", DEFAULT_CREDENTIALS_FILE).run())
+
+    async def terminate(self):
+        task = getattr(self, "work_updates", None)
+        if task: task.cancel()
+
     @filter.on_llm_request()
     async def stamp_request(self, event: AstrMessageEvent, req: ProviderRequest) -> None:
         """Attach the platform identity to this LLM request (pcp_relay reads it)."""
