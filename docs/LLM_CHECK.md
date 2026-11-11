@@ -443,3 +443,24 @@ Append what this round actually did below:
   SSRF guards cover remote URLs; PCP validates media types and limits.
 - Database/runtime backups were retained under DockerVolumes. Actual adapter
   send success is tracked separately from preparation and recipient display.
+
+## 2026-11-11 — Outbound media rollout verified
+
+- The locally deployed app/broker are PCP 0.4.2 at bf9e34b; the gateway runs
+  the source-built inline-media patch. Runtime database/auth identity and health
+  checks passed, and the installed AstrBot relay matches the committed source.
+- A signed owner request returned the existing avatar as recorded JPEG bytes.
+  PCP stored the assistant attachment and its SHA-256 before handing it onward.
+- With explicit owner authorization, exactly one labeled private QQ test image
+  was sent using the upgraded chain and the live OneBot adapter. The platform
+  returned a message ID; get_msg readback contained both text and image segments.
+  PCP holds the signed broker.media.adapter_accepted receipt. This proves bridge
+  acceptance/readback, not a claim about the recipient's screen. Audio/video
+  component support is implemented; this live delivery check covered JPEG only.
+- Removed the temporary one-shot verification plugin and restarted AstrBot.
+  The no-resend marker, response and readback evidence were archived outside
+  the workspace under DockerVolumes/ai-infra/releases; temporary files went
+  to desktop Trash. No further message was sent.
+- Canonical Nesbitt-bot main contains merged PR 7 (fe6a4b4). The Trance-0 fork
+  still points at 8d4fddf; owner synchronization remains necessary for its
+  Jenkins job to rebuild this release. No webhook deployment is claimed here.
