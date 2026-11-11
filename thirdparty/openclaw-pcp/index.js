@@ -23,6 +23,7 @@ import { readFileSync } from "node:fs";
 import { promises as fsp } from "node:fs";
 import path from "node:path";
 import { createPcpClient, PcpError } from "./lib/client.js";
+import { WorkMonitor } from "./lib/work-monitor.js";
 import { DiskQueue } from "./lib/queue.js";
 import { redactSecrets } from "./lib/redact.js";
 import { applyOwnerBinding, checkOwnerPrincipals, compilePatterns, DEFAULT_HTTP_SESSION_PATTERNS, isBrokerSessionKey, isHttpSessionKey, resolveTarget } from "./lib/session.js";
@@ -107,6 +108,7 @@ export function createPlugin(api, deps = {}) {
     return { block: true, blockReason: "Execution refused: openclaw-pcp/tool authorization — no live PCP grant permits this tool." };
   };
 
+  const workMonitor = new WorkMonitor({ file: path.join(cfg.stateDir, "delegated-work.json"), streamRoot: path.join(cfg.stateDir, "..", "agents", "opencode", "sessions"), send: body => client.work(body, cfg.syncTimeoutMs), logger });
   // ---- Owner-bound channels: pinned principals only, checked once at start.
   const ownerBoundChannels = Array.isArray(cfg.ownerBoundChannels) ? cfg.ownerBoundChannels.filter((c) => typeof c === "string" && c) : [];
   const owners = checkOwnerPrincipals({ ownerBoundChannels, ownerPrincipals: Array.isArray(cfg.ownerPrincipals) ? cfg.ownerPrincipals : [], allowedPrefixes: cfg.allowedPrefixes });
@@ -412,7 +414,14 @@ export function createPlugin(api, deps = {}) {
     })().catch(() => logger.warn("PCP sync skipped: openclaw-pcp/after_compaction — compaction summary unreadable; agent unaffected."));
   });
 
-  api.on("after_tool_call", (event, ctx) => {
+  api.on("after_tool_call", async (event, ctx) => {
+    if (event.toolName === "sessions_spawn" && isBrokerSessionKey(ctx?.sessionKey)) {
+      let result = event.result?.details;
+      if (!result) try { result = JSON.parse(event.result?.content?.find(p => p.type === "text")?.text || "{}"); } catch { return; }
+      try { await workMonitor.register(ctx.sessionKey, result); }
+      catch { logger.warn("Coding monitoring deferred: openclaw-pcp/delegation — registration retained for retry."); }
+
+    }
     try {
       if (!TOOL_NAMES.includes(event?.toolName) || !ctx?.sessionKey) return;
       const target = lastTargets.get(ctx.sessionKey);
@@ -429,7 +438,7 @@ export function createPlugin(api, deps = {}) {
   });
 
   if (deps.startTimer !== false) {
-    const timer = setInterval(() => { void flush().catch(() => undefined); }, cfg.flushIntervalMs);
+    const timer = setInterval(() => { void flush().catch(() => undefined); void workMonitor.poll(); }, cfg.flushIntervalMs);
     timer.unref?.();
   }
   logger.info?.(`openclaw-pcp ready: ${queue.size} queued item(s).`);

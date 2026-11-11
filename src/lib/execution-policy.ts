@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { z } from 'zod';
 
 const agent = z.string().regex(/^astrbot-exec(?:-[a-z0-9_-]{1,40})?$/);
-const tools = z.array(z.enum(['exec', 'process', 'read', 'write', 'edit', 'apply_patch', 'sessions_spawn', 'pcp_execute'])).max(7);
+const tools = z.array(z.enum(['exec', 'process', 'read', 'write', 'edit', 'apply_patch', 'sessions_spawn', 'sessions_yield', 'pcp_execute'])).max(9);
 const rule = z.object({ agent, tools }).strict();
 export const executionPolicySchema = z.object({
   owner: rule.optional(),

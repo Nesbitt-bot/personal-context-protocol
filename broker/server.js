@@ -174,8 +174,8 @@ function createBroker(cfg = loadConfig(), deps = {}) {
       const { broker, gateway } = secrets();
       return send(res, 200, { status: 'ok', configured: Boolean(broker && gateway) });
     }
-    if (req.method === 'POST' && path === '/v1/delivery') {
-      readBody(req).then(raw => postJson(fetchImpl, `${cfg.pcpUrl}/api/v1/service/broker/delivery`, {
+    if (req.method === 'POST' && (path === '/v1/delivery' || path === '/v1/work/poll')) {
+      readBody(req).then(raw => postJson(fetchImpl, `${cfg.pcpUrl}/api/v1/service/broker/${path === '/v1/delivery' ? 'delivery' : 'work'}`, {
         authorization: String(req.headers.authorization || ''), 'x-pcp-signature': String(req.headers['x-pcp-signature'] || ''),
       }, raw, cfg.pcpTimeoutMs)).then(result => send(res, result.status, result.json || { code: 'INVALID_REPLY' }))
         .catch(() => send(res, 503, { code: 'PCP_UNAVAILABLE' }));

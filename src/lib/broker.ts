@@ -250,7 +250,7 @@ export async function prepareBrokerTurn(
     sessionId: granted.homeSessionId,
     action: 'broker.turn.prepared',
     actor: `broker:${broker.id}`,
-    detailsJson: { grant_id: grantId, principal, chat: stamp.chat, agent, linked: Boolean(linkedUser), message_id: stamp.message_id, context_parts: parts.length },
+    detailsJson: { delivery_route: { platform_id: stamp.platform_id, chat: stamp.chat, recipient: stamp.chat === 'group' ? stamp.group_id : stamp.sender_id }, grant_id: grantId, principal, chat: stamp.chat, agent, linked: Boolean(linkedUser), message_id: stamp.message_id, context_parts: parts.length },
     createdAt: now,
   });
 

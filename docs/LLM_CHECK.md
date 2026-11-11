@@ -464,3 +464,24 @@ Append what this round actually did below:
 - Canonical Nesbitt-bot main contains merged PR 7 (fe6a4b4). The Trance-0 fork
   still points at 8d4fddf; owner synchronization remains necessary for its
   Jenkins job to rebuild this release. No webhook deployment is claimed here.
+
+## 2026-11-11 — Bilibili delegation RCA and durable progress
+
+- Actual Bilibili parent run accepted ACP work, then sessions_yield was rejected
+  by the PCP tool policy. The child failed with exhausted OpenAI credit about
+  80 seconds later; events went only to the ephemeral HTTP parent, not QQ.
+- The later attachment investigation hit external-directory approval while
+  using container paths in the host coding server; it remained blocked until
+  the six-hour stream timeout. No automatic approval was granted.
+- Added durable per-run stream observation and signed PCP progress polling;
+  original platform/sender routing stays tied to the authenticated parent.
+  Completion/blockers survive the HTTP reply and plugin restart.
+- Added sessions_yield to the allowed owner policy vocabulary; group policies
+  remain unchanged. Registration requires a live delegate grant; later updates
+  require the same registered parent/child/run and credential.
+
+- Validation: all 359 Vitest tests passed with disposable PostgreSQL, including
+  registered-task scope after parent completion and signed route polling.
+  All 36 OpenClaw plugin tests and 27 AstrBot tests passed; TypeScript and
+  production image build passed. The CPA OpenCode route completed both a text
+  readiness check and a real bash/Python tool call.

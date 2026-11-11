@@ -57,6 +57,7 @@ export function createPcpClient({ baseUrl, token, fetchImpl = globalThis.fetch }
       return value;
     },
     execution: (body, timeoutMs) => call("/api/v1/service/execution", body, timeoutMs),
+    work: (body, timeoutMs) => call("/api/v1/service/work", body, timeoutMs),
     grant: (body, timeoutMs) => call("/api/v1/service/grants", body, timeoutMs),
     sync: (body, timeoutMs) => call("/api/v1/service/sync", body, timeoutMs),
     recall: (body, timeoutMs) => call("/api/v1/service/recall", body, timeoutMs),

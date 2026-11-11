@@ -1,6 +1,6 @@
 {
   "name": "openclaw-pcp",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "description": "OpenClaw plugin: PCP turn grants, cross-channel context, pcp_* tools, async sync, HTTP tool backstop and claim links.",
