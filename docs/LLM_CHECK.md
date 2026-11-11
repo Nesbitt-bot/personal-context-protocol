@@ -485,3 +485,26 @@ Append what this round actually did below:
   All 36 OpenClaw plugin tests and 27 AstrBot tests passed; TypeScript and
   production image build passed. The CPA OpenCode route completed both a text
   readiness check and a real bash/Python tool call.
+
+
+### Live rollout verification
+
+- PCP app/broker 0.4.3 deployed with the existing database and credentials;
+  OpenClaw PCP 0.3.2 and AstrBot relay 0.3.1 installed and healthy.
+- Canonical PR 9 merged. The Trance-0 fork remains owner-synchronized; its
+  Jenkins source was not changed.
+- Owner `sessions_yield` is enabled; group allowlists remain empty.
+- A separate expiring ingress with no real platform adapter exercised the
+  actual broker, owner execution policy, ACP spawn hook, OpenCode Python tool,
+  persistent work monitor, work API, and signed poll API.
+- The parent called `sessions_yield` successfully and its grant closed before
+  the child finished. PCP recorded `LOCAL_DELEGATION_VERIFIED 12345` once and
+  returned it through the isolated poll. A longer run also returned a `running`
+  update after the parent closed. AstrBot's real ingress is actively polling.
+- Dashboard 0.4.2 Jenkins builds 31 and 32 succeeded from GitHub webhooks.
+  Live task enable/disable/Undo passed using a temporary future task that was
+  removed afterward; all seven original configurations were preserved.
+- No QQ progress messages were sent. Real platform delivery remains unverified
+  until the owner authorizes that test; the earlier image-test authorization
+  does not cover these status messages. The original Bilibili task was not
+  claimed complete by these infrastructure checks.
