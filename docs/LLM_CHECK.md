@@ -504,7 +504,10 @@ Append what this round actually did below:
 - Dashboard 0.4.2 Jenkins builds 31 and 32 succeeded from GitHub webhooks.
   Live task enable/disable/Undo passed using a temporary future task that was
   removed afterward; all seven original configurations were preserved.
-- No QQ progress messages were sent. Real platform delivery remains unverified
-  until the owner authorizes that test; the earlier image-test authorization
-  does not cover these status messages. The original Bilibili task was not
-  claimed complete by these infrastructure checks.
+- After explicit owner approval, one QQ private-chat test delivered started,
+  running, and completed updates. All three appeared in QQ history and passed
+  `get_msg` readback by message ID. The final result was
+  `QQ_STATUS_DELIVERY_VERIFIED 12345`; progress and completion arrived after
+  the parent grant closed. The temporary read-only observer was removed and
+  private evidence retained. No Bilibili project files were changed; the
+  original conversion is not claimed complete by this infrastructure check.
