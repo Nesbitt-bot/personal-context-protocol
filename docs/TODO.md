@@ -2,6 +2,21 @@
 
 Owner-visible future work for Personal Context Protocol. Keep this list focused on versioned product work, not per-round scratch notes.
 
+## Sprint board (shipped)
+
+The Asana-like task list on `/projects` is implemented (migrations 017–019):
+
+- **Categories** are folders/topics; a **project** stays a pure repo tag (many-to-many, one primary). Tasks nest as subtasks, link sessions, and bind resources (docs/remotes/local paths).
+- **Board** `/projects`: editable board name, add task/category, List / group-by-category / group-by-project, sort (category/project/name/priority/progress/updated/created), 30-per-page pagination (list view only), collapsible categories with an Archived (completed) section, per-row status/title/project/due/last-updated inline edits, project tag-input (comma-separated autocomplete + create-with-repo/device/dir), and drag-and-drop reorder/move/subtask.
+- **Task detail** `/tasks/:id`: editable properties + progress, project picker, sessions table (health/hosted machine/agent/resume code/temp link), bound resources.
+- **Invariants**: every session has exactly one task (auto-created and linked on session creation); a session move carries its task and sibling sessions (`POST /sessions/:id/move`, with a confirm modal for multi-session tasks).
+- **Temporary access links** (`/l/<code>`): 1h idle / 24h absolute expiry, refreshed on agent read/upload; the instruction page teaches direct-push vs fallback export.
+
+Remaining follow-ups (not blockers):
+- Session history popup lists sibling sessions + events; device/project/agent columns are best-effort from plugin metadata (`agent_name`/`device_id`).
+- "Never warn again" for the multi-session move is per-browser (localStorage); promote to server settings if needed.
+
+
 ## v0.3.0 Broker — follow-ups
 
 - [x] Broker process, AstrBot ingress credential + HMAC stamp + replay window, loopback only
@@ -712,3 +727,51 @@ transcript is now the canonical, human-readable wire format in both directions.
 - [ ] Provision isolated group executors before adding groups in `/adapters`; initial allowlist stays empty.
 - [ ] Documents/audio/video, resumable media upload, historical media mapping, OCR/captions and media retention/GC.
 - [ ] Independent watchdog/LKG, build/deploy isolation and OpenClaw state relocation from the checkout.
+
+
+## Next Steps
+
+Fix the bug, temporary link is not recorded and timer is not on (note for each session, there should only be on active temporary link, auto destroy the old when new one is created).
+
+Note that current remote session-task links are broken. I've created a few category (topic) to cover the sessions and the tasks. You should update existing sessions; then with local data from opencode plugin (collected sessions across the devices to create remote sessions) update them to pcp; then fill the plugin bindings for those sessions on remote, on this device. for all 3 coding agents (opencode, claude, codex). upgrade existing plugin to use the binded token for the session (no expire), and test web 1h temporary mcp link. (currently these are the only two ways to access and sync the sessions, when agent use the no expire session token to sync the session, it should create a new temporary link for sync; the permanent session token should only be used to create active connection to avoid multithreading writes.) 
+
+Each leaf task name should start with a verb followed with a noun, and purpose ({Action}{Target} for/to {Goal,topic}), subdivide the task if more than 3 sessions are created for the same task, which is the target of the action, add projects for each task as well (use parent folder name or remote repo name, abbreviate if needed).
+
+e.g. For this session, the task name should be 
+
+Upgrade pcp for sprint board view
+
+for this task, use repo name pcp (abb for personal-context-protocol)
+
+
+Agentic System
+; This includes all the effort that maximize the harness of AI agent. including QQ bot debugging. 
+
+Example session and task:
+
+category: Agentic System
+task: Openclaw cross platform integration/pcp sycn ui upgrade/Upgrade pcp for sprint board view
+
+Note and logs
+; This includes all the effort that debugging and designing personal notes and knowledge base, projects include notenextra, codebook on code.trance-0.com and other blogs debugging.
+
+General Life
+; This includes all the daily task or short conversations that irrelevant to coding and techs. this might contains task/session created from astrbot, telegram or streaming conversations.
+
+eg. response cedar for work anxiety. etc.
+
+Notechondria
+; This is for mega future project Notechondria, which includes all the effort that debugging and designing personal notes and knowledge base especially the Notechondria project.
+
+OpenSearch
+; This will be the tech project related to openSearch, eg. integrate opensearch with pcp project
+
+Cashflow
+; This will be session/task related to cashflow project
+
+Dive Deep
+; Includes other tech project that involves complex reasoning. eg. create a simulation for xx topic
+
+Leave all others in uncategorized, and rescan if you can create a new category for certain groups/threads (more than 5 task/subtasks)
+
+note that it is allowed to create descriptive task with no sessions for grouping/merging purpose. but all the leaf tasks should have at least one session. (expected no task with depth higher than 4)

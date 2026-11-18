@@ -2,9 +2,9 @@ import { NextResponse, NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { verifyScopedToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
-import { topics } from '@/lib/schema';
+import { sessions, topics, tasks } from '@/lib/schema';
 import { logError } from '@/lib/logging';
-import { createSessionRecord, findSessionByExternalKey, mintSessionTokenRecord } from '@/lib/manager-store';
+import { createSessionRecord, findSessionByExternalKey, mintSessionTokenRecord, stampSessionIdentity } from '@/lib/manager-store';
 import { buildRecordingUrl, resolveAppBaseUrl } from '@/lib/recording-url';
 import { normalizeExternalKey } from '@/lib/external-key';
 
@@ -34,6 +34,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim() : undefined;
     const mode: 'wild' | 'exact' = body.mode === 'exact' ? 'exact' : 'wild';
+    const agentName = typeof body.agent_name === 'string' && body.agent_name.trim() ? body.agent_name.trim() : null;
+    const deviceId = typeof body.device_id === 'string' && body.device_id.trim() ? body.device_id.trim() : null;
+    let taskId: string | null = null;
+    if (typeof body.task_id === 'string' && body.task_id.trim()) {
+      const requestedTaskId = body.task_id.trim();
+      const [task] = await db.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, requestedTaskId)).limit(1);
+      if (!task) {
+        return NextResponse.json({ error: 'Unable to create session: scoped token manager / task lookup - task_id does not exist', code: 'NOT_FOUND' }, { status: 404 });
+      }
+      taskId = requestedTaskId;
+    }
     let externalKey: string | null;
     try {
       externalKey = normalizeExternalKey(body.external_key);
@@ -54,6 +65,10 @@ export async function POST(request: NextRequest) {
       if (existing) {
         if (tok.scope === 'folder' && existing.topicId !== tok.folderId) {
           return NextResponse.json({ error: 'Unable to create session: scoped token permissions / folder scope check - existing session is outside this folder', code: 'FORBIDDEN' }, { status: 403 });
+        }
+        if (agentName || deviceId || taskId) {
+          await stampSessionIdentity(existing.id, { agentName: agentName ?? undefined, deviceId: deviceId ?? undefined });
+          if (taskId) await db.update(sessions).set({ taskId, updatedAt: new Date() }).where(eq(sessions.id, existing.id));
         }
         let accessToken: string | null = null;
         if (tok.permissions.mint_tokens) {
@@ -102,6 +117,9 @@ export async function POST(request: NextRequest) {
       title,
       mode,
       externalKey: externalKey ?? undefined,
+      agentName,
+      deviceId,
+      taskId,
     });
 
     let accessToken: string | null = null;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Folder, FolderPlus, Inbox, MessageSquare, Plus, RefreshCw, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Archive, ChevronRight, Folder, FolderPlus, Inbox, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { Session, Topic } from './types';
 import { ContextMenu, ContextMenuItem } from './context-menu';
 
@@ -23,7 +23,7 @@ interface NavSidebarProps {
   onCreateSession: (topicId: string | null) => void;
   onCreateTopic: () => void;
   onRefresh: () => void;
-  onRenameTopic: (topicId: string) => void;
+  onRenameTopic: (topicId: string, title: string) => void;
   onRemoveTopic: (topicId: string) => void;
   onRestoreTopic: (topicId: string) => void;
   onDeleteTopic: (topicId: string) => void;
@@ -45,12 +45,15 @@ export function NavSidebar({
 }: NavSidebarProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   // Key of the group currently under the drag cursor (for the drop highlight).
   const [dropKey, setDropKey] = useState<string | null>(null);
   // One-shot "expand on hover" timer, plus a live mirror of `expanded` so the
   // deferred callback never toggles a group that opened in the meantime.
   const expandTimer = useRef<{ key: string; handle: ReturnType<typeof setTimeout> } | null>(null);
   const expandedRef = useRef(expanded);
+  const trashRef = useRef<HTMLDivElement>(null);
   expandedRef.current = expanded;
 
   function cancelExpand() {
@@ -123,6 +126,18 @@ export function NavSidebar({
     return [{ label: 'Move to trash', danger: true, onClick: () => onRemoveSession(s.id) }];
   }
 
+  function startEdit(topicId: string, title: string) {
+    setEditingTopicId(topicId);
+    setEditingTitle(title);
+  }
+
+  function commitRename() {
+    if (!editingTopicId) return;
+    const title = editingTitle.trim();
+    setEditingTopicId(null);
+    if (title) onRenameTopic(editingTopicId, title);
+  }
+
   function topicItems(t: Topic): ContextMenuItem[] {
     if (t.archived) {
       return [
@@ -131,7 +146,7 @@ export function NavSidebar({
       ];
     }
     return [
-      { label: 'Rename', onClick: () => onRenameTopic(t.id) },
+      { label: 'Rename', onClick: () => startEdit(t.id, t.title) },
       { label: 'New session here', onClick: () => onCreateSession(t.id) },
       { label: 'Move to trash', danger: true, onClick: () => onRemoveTopic(t.id) },
     ];
@@ -190,7 +205,7 @@ export function NavSidebar({
     );
   }
 
-  function renderGroup(key: string, label: string, icon: React.ReactNode, groupSessions: Session[], menuItems?: ContextMenuItem[], isDropTarget = true) {
+  function renderGroup(key: string, label: string, icon: React.ReactNode, groupSessions: Session[], menuItems?: ContextMenuItem[], isDropTarget = true, editable = false) {
     const isOpen = expanded.has(key);
     const targetTopicId = key === UNCATEGORIZED || key === TRASH_GROUP ? null : key;
     const dropProps = isDropTarget ? dropTarget(key, targetTopicId) : {};
@@ -209,7 +224,34 @@ export function NavSidebar({
         >
           <ChevronRight size={15} className={`shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
           {icon}
-          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {editable && editingTopicId === key ? (
+            <input
+              autoFocus
+              value={editingTitle}
+              onChange={(e) => setEditingTitle(e.target.value)}
+              onBlur={commitRename}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitRename();
+                else if (e.key === 'Escape') setEditingTopicId(null);
+              }}
+              className="min-w-0 flex-1 rounded-md border border-sky-400 bg-white px-1 py-0.5 text-sm font-medium outline-none dark:bg-slate-950"
+              aria-label="Rename category"
+            />
+          ) : editable ? (
+            <span
+              className="group/rename inline-flex min-w-0 flex-1 cursor-text items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                startEdit(key, label);
+              }}
+            >
+              <span className="min-w-0 truncate">{label}</span>
+              <Pencil size={11} className="shrink-0 text-slate-400 opacity-0 transition-opacity group-hover/rename:opacity-100" />
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+          )}
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 group-hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400">{groupSessions.length}</span>
         </button>
         {isOpen && (
@@ -229,6 +271,9 @@ export function NavSidebar({
         <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300" onClick={() => onCreateSession(null)} type="button"><Plus size={16} /> New session</button>
         <button className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" onClick={onCreateTopic} title="New topic" type="button"><FolderPlus size={17} /></button>
         <button className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" onClick={onRefresh} title="Refresh" type="button"><RefreshCw size={16} /></button>
+        {hasTrash && (
+          <button className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" onClick={() => trashRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })} title="Archived" type="button"><Archive size={16} /></button>
+        )}
       </div>
 
       <div className="mb-2 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-900">
@@ -242,7 +287,7 @@ export function NavSidebar({
         ) : (
           <>
             {renderGroup(UNCATEGORIZED, 'Uncategorized', <Inbox size={15} className="shrink-0 opacity-70" />, uncategorizedActive)}
-            {activeTopics.map((t) => renderGroup(t.id, t.title, <Folder size={15} className="shrink-0 opacity-70" />, byTopicActive.get(t.id) || [], topicItems(t)))}
+            {activeTopics.map((t) => renderGroup(t.id, t.title, <Folder size={15} className="shrink-0 opacity-70" />, byTopicActive.get(t.id) || [], topicItems(t), true, true))}
             {activeTopics.length === 0 && uncategorizedActive.length === 0 && activeSessions.length === 0 && (
               <div className="rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">Start a new session or topic.</div>
             )}
@@ -252,7 +297,7 @@ export function NavSidebar({
 
       {/* Trash section */}
       {hasTrash && (
-        <div className="mt-2 border-t border-slate-200 pt-2 dark:border-slate-800">
+        <div ref={trashRef} className="mt-2 border-t border-slate-200 pt-2 dark:border-slate-800">
           {renderGroup(TRASH_GROUP, 'Trash', <Trash2 size={15} className="shrink-0 opacity-70" />, archivedSessions, [
             archivedTopics.length > 0 && { label: `Empty trash (${archivedSessions.length} sessions, ${archivedTopics.length} topics)`, danger: true, onClick: onEmptyTrash },
           ].filter(Boolean) as ContextMenuItem[], false)}

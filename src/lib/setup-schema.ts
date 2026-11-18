@@ -228,6 +228,132 @@ export const BROKER_SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS broker_replay_seen_at_idx ON broker_replay(seen_at)',
 ];
 
+/**
+ * Migration 017 (tasks): the Asana-like sprint board. Tasks are units of work
+ * inside a category (folder/topic); projects stay pure repo tags and link
+ * many-to-many with one primary. Sessions attach to a single task. Additive and
+ * idempotent; kept as its own list so tests can check `scripts/deploy-init.js`
+ * and `drizzle/0017_tasks.sql` carry the same statements.
+ */
+export const TASK_SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS task_boards (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS tasks (
+    id text PRIMARY KEY,
+    parent_id text REFERENCES tasks(id) ON DELETE CASCADE,
+    topic_id text REFERENCES topics(id) ON DELETE SET NULL,
+    title text NOT NULL,
+    description text,
+    completed boolean NOT NULL DEFAULT false,
+    completed_at timestamptz,
+    priority integer NOT NULL DEFAULT 0,
+    expected_turns integer,
+    due_at timestamptz,
+    position double precision NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  'CREATE INDEX IF NOT EXISTS tasks_topic_id_idx ON tasks(topic_id)',
+  'CREATE INDEX IF NOT EXISTS tasks_parent_id_idx ON tasks(parent_id)',
+  `CREATE TABLE IF NOT EXISTS task_projects (
+    task_id text NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    project_id text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    is_primary boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (task_id, project_id)
+  )`,
+  'CREATE INDEX IF NOT EXISTS task_projects_project_id_idx ON task_projects(project_id)',
+  `CREATE TABLE IF NOT EXISTS task_resources (
+    id text PRIMARY KEY,
+    task_id text NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    title text NOT NULL,
+    url text NOT NULL,
+    kind text NOT NULL DEFAULT 'doc' CHECK (kind IN ('doc', 'remote', 'local')),
+    source text NOT NULL DEFAULT 'human' CHECK (source IN ('agent', 'human')),
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  'CREATE INDEX IF NOT EXISTS task_resources_task_id_idx ON task_resources(task_id)',
+  'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS task_id text REFERENCES tasks(id) ON DELETE SET NULL',
+  'CREATE INDEX IF NOT EXISTS sessions_task_id_idx ON sessions(task_id)',
+];
+
+/**
+ * Migration 018 (task attributes): let sync plugins set which agent ran on
+ * which machine, and give tasks a stable external key. Additive and idempotent.
+ */
+export const TASK_ATTR_SCHEMA_STATEMENTS = [
+  'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS agent_name text',
+  'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device_id text',
+  'CREATE INDEX IF NOT EXISTS sessions_device_id_idx ON sessions(device_id)',
+  'ALTER TABLE tasks ADD COLUMN IF NOT EXISTS external_key text',
+  'CREATE UNIQUE INDEX IF NOT EXISTS tasks_external_key_idx ON tasks(external_key)',
+];
+
+/**
+ * Migration 019 (access codes): temporary bind/sync links. Additive and
+ * idempotent; kept as its own list so tests can check `scripts/deploy-init.js`
+ * and `drizzle/019_access_codes.sql` carry the same statements.
+ */
+export const ACCESS_CODE_SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS access_codes (
+    id text PRIMARY KEY,
+    code_hash text NOT NULL,
+    salt text NOT NULL,
+    code_prefix text NOT NULL,
+    session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    created_by text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    last_used_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    revoked boolean NOT NULL DEFAULT false
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS access_codes_code_hash_idx ON access_codes(code_hash)',
+  'CREATE INDEX IF NOT EXISTS access_codes_prefix_idx ON access_codes(code_prefix)',
+  'CREATE INDEX IF NOT EXISTS access_codes_session_id_idx ON access_codes(session_id)',
+];
+
+/**
+ * Migration 020 (invariant): a session's category always follows its parent
+ * task's category, and vice versa. Triggers (not plain CREATE TABLE/INDEX), so
+ * they are kept out of the additive drift check.
+ */
+export const SESSION_TASK_TOPIC_INVARIANT_STATEMENTS = [
+  `CREATE OR REPLACE FUNCTION sync_session_topic_from_task() RETURNS trigger AS $$
+  BEGIN
+    UPDATE sessions SET topic_id = NEW.topic_id, updated_at = now()
+    WHERE task_id = NEW.id AND topic_id IS DISTINCT FROM NEW.topic_id;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql`,
+  'DROP TRIGGER IF EXISTS task_topic_sync_sessions ON tasks',
+  'CREATE TRIGGER task_topic_sync_sessions AFTER UPDATE OF topic_id ON tasks FOR EACH ROW EXECUTE FUNCTION sync_session_topic_from_task()',
+  `CREATE OR REPLACE FUNCTION sync_task_topic_from_session() RETURNS trigger AS $$
+  BEGIN
+    IF NEW.task_id IS NOT NULL THEN
+      UPDATE tasks SET topic_id = NEW.topic_id, updated_at = now()
+      WHERE id = NEW.task_id AND topic_id IS DISTINCT FROM NEW.topic_id;
+    END IF;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql`,
+  'DROP TRIGGER IF EXISTS session_topic_sync_task ON sessions',
+  'CREATE TRIGGER session_topic_sync_task AFTER UPDATE OF topic_id ON sessions FOR EACH ROW EXECUTE FUNCTION sync_task_topic_from_session()',
+];
+
+/**
+ * Migration 021 (priority optional): priority is nullable (empty = unset).
+ * The one-time `UPDATE tasks SET priority = 3` is applied by the migration
+ * itself, not here, so re-running the bootstrap never clobbers user changes.
+ */
+export const PRIORITY_OPTIONAL_SCHEMA_STATEMENTS = [
+  'ALTER TABLE tasks ALTER COLUMN priority DROP NOT NULL',
+  'ALTER TABLE tasks ALTER COLUMN priority SET DEFAULT NULL',
+];
+
 export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS app_instance (
     id text PRIMARY KEY DEFAULT 'instance_1',
@@ -382,6 +508,11 @@ export const SCHEMA_STATEMENTS = [
   ...SERVICE_SCHEMA_STATEMENTS,
   ...PROJECT_SCHEMA_STATEMENTS,
   ...BROKER_SCHEMA_STATEMENTS,
+  ...TASK_SCHEMA_STATEMENTS,
+  ...TASK_ATTR_SCHEMA_STATEMENTS,
+  ...ACCESS_CODE_SCHEMA_STATEMENTS,
+  ...SESSION_TASK_TOPIC_INVARIANT_STATEMENTS,
+  ...PRIORITY_OPTIONAL_SCHEMA_STATEMENTS,
     `CREATE TABLE IF NOT EXISTS message_sync_keys (
     session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     external_id text NOT NULL,
@@ -519,6 +650,36 @@ async function applySchema() {
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
     VALUES ('016_message_sync_keys', 'legacy_identity_ledger_v1'), ('015_attachments', 'session_scoped_sanitized_media_v1'), ('014_broker', 'credential_kinds_broker_grants_replay_ledger')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('017_tasks', 'sprint_board_tasks_projects_resources_session_task')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('018_task_attributes', 'session_agent_device_task_external_key')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('019_access_codes', 'temporary_bind_sync_access_links')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('020_session_task_topic_invariant', 'session_task_topic_sync_triggers')
+    ON CONFLICT (version) DO NOTHING
+  `);
+
+  await db.execute(sql`
+    INSERT INTO schema_migrations (version, checksum)
+    VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset')
     ON CONFLICT (version) DO NOTHING
   `);
 }

@@ -398,6 +398,100 @@ function schemaStatements(version) {
 )`,
     `CREATE INDEX IF NOT EXISTS attachments_message_idx ON attachments(message_id)`,
     `CREATE INDEX IF NOT EXISTS attachments_blob_idx ON attachments(blob_sha256)`,
+    // Migration 017 (tasks). Must match TASK_SCHEMA_STATEMENTS in
+    // src/lib/setup-schema.ts and drizzle/0017_tasks.sql.
+    `CREATE TABLE IF NOT EXISTS task_boards (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+    `CREATE TABLE IF NOT EXISTS tasks (
+    id text PRIMARY KEY,
+    parent_id text REFERENCES tasks(id) ON DELETE CASCADE,
+    topic_id text REFERENCES topics(id) ON DELETE SET NULL,
+    title text NOT NULL,
+    description text,
+    completed boolean NOT NULL DEFAULT false,
+    completed_at timestamptz,
+    priority integer NOT NULL DEFAULT 0,
+    expected_turns integer,
+    due_at timestamptz,
+    position double precision NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+    'CREATE INDEX IF NOT EXISTS tasks_topic_id_idx ON tasks(topic_id)',
+    'CREATE INDEX IF NOT EXISTS tasks_parent_id_idx ON tasks(parent_id)',
+    `CREATE TABLE IF NOT EXISTS task_projects (
+    task_id text NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    project_id text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    is_primary boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (task_id, project_id)
+  )`,
+    'CREATE INDEX IF NOT EXISTS task_projects_project_id_idx ON task_projects(project_id)',
+    `CREATE TABLE IF NOT EXISTS task_resources (
+    id text PRIMARY KEY,
+    task_id text NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    title text NOT NULL,
+    url text NOT NULL,
+    kind text NOT NULL DEFAULT 'doc' CHECK (kind IN ('doc', 'remote', 'local')),
+    source text NOT NULL DEFAULT 'human' CHECK (source IN ('agent', 'human')),
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+    'CREATE INDEX IF NOT EXISTS task_resources_task_id_idx ON task_resources(task_id)',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS task_id text REFERENCES tasks(id) ON DELETE SET NULL',
+    'CREATE INDEX IF NOT EXISTS sessions_task_id_idx ON sessions(task_id)',
+    // Migration 018 (task attributes). Must match TASK_ATTR_SCHEMA_STATEMENTS
+    // in src/lib/setup-schema.ts and drizzle/0018_task_attributes.sql.
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS agent_name text',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device_id text',
+    'CREATE INDEX IF NOT EXISTS sessions_device_id_idx ON sessions(device_id)',
+    'ALTER TABLE tasks ADD COLUMN IF NOT EXISTS external_key text',
+    'CREATE UNIQUE INDEX IF NOT EXISTS tasks_external_key_idx ON tasks(external_key)',
+    // Migration 019 (access codes). Must match ACCESS_CODE_SCHEMA_STATEMENTS
+    // in src/lib/setup-schema.ts and drizzle/019_access_codes.sql.
+    `CREATE TABLE IF NOT EXISTS access_codes (
+    id text PRIMARY KEY,
+    code_hash text NOT NULL,
+    salt text NOT NULL,
+    code_prefix text NOT NULL,
+    session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    created_by text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    last_used_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    revoked boolean NOT NULL DEFAULT false
+  )`,
+    'CREATE UNIQUE INDEX IF NOT EXISTS access_codes_code_hash_idx ON access_codes(code_hash)',
+    'CREATE INDEX IF NOT EXISTS access_codes_prefix_idx ON access_codes(code_prefix)',
+    'CREATE INDEX IF NOT EXISTS access_codes_session_id_idx ON access_codes(session_id)',
+    // Migration 020: enforce session -> task -> category topic consistency.
+    `CREATE OR REPLACE FUNCTION sync_session_topic_from_task() RETURNS trigger AS $$
+  BEGIN
+    UPDATE sessions SET topic_id = NEW.topic_id, updated_at = now()
+    WHERE task_id = NEW.id AND topic_id IS DISTINCT FROM NEW.topic_id;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql`,
+    'DROP TRIGGER IF EXISTS task_topic_sync_sessions ON tasks',
+    'CREATE TRIGGER task_topic_sync_sessions AFTER UPDATE OF topic_id ON tasks FOR EACH ROW EXECUTE FUNCTION sync_session_topic_from_task()',
+    `CREATE OR REPLACE FUNCTION sync_task_topic_from_session() RETURNS trigger AS $$
+  BEGIN
+    IF NEW.task_id IS NOT NULL THEN
+      UPDATE tasks SET topic_id = NEW.topic_id, updated_at = now()
+      WHERE id = NEW.task_id AND topic_id IS DISTINCT FROM NEW.topic_id;
+    END IF;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql`,
+    'DROP TRIGGER IF EXISTS session_topic_sync_task ON sessions',
+    'CREATE TRIGGER session_topic_sync_task AFTER UPDATE OF topic_id ON sessions FOR EACH ROW EXECUTE FUNCTION sync_task_topic_from_session()',
+    // Migration 021: priority is optional (empty = unset). The one-time
+    // UPDATE tasks SET priority = 3 is NOT here — it must run only once.
+    'ALTER TABLE tasks ALTER COLUMN priority DROP NOT NULL',
+    'ALTER TABLE tasks ALTER COLUMN priority SET DEFAULT NULL',
 
   ];
 }
@@ -463,6 +557,36 @@ async function main() {
     await sql`
       INSERT INTO schema_migrations (version, checksum)
       VALUES ('016_message_sync_keys', 'legacy_identity_ledger_v1'), ('015_attachments', 'session_scoped_sanitized_media_v1'), ('014_broker', 'credential_kinds_broker_grants_replay_ledger')
+      ON CONFLICT (version) DO NOTHING
+    `;
+
+    await sql`
+      INSERT INTO schema_migrations (version, checksum)
+      VALUES ('017_tasks', 'sprint_board_tasks_projects_resources_session_task')
+      ON CONFLICT (version) DO NOTHING
+    `;
+
+    await sql`
+      INSERT INTO schema_migrations (version, checksum)
+      VALUES ('018_task_attributes', 'session_agent_device_task_external_key')
+      ON CONFLICT (version) DO NOTHING
+    `;
+
+    await sql`
+      INSERT INTO schema_migrations (version, checksum)
+      VALUES ('019_access_codes', 'temporary_bind_sync_access_links')
+      ON CONFLICT (version) DO NOTHING
+    `;
+
+    await sql`
+      INSERT INTO schema_migrations (version, checksum)
+      VALUES ('020_session_task_topic_invariant', 'session_task_topic_sync_triggers')
+      ON CONFLICT (version) DO NOTHING
+    `;
+
+    await sql`
+      INSERT INTO schema_migrations (version, checksum)
+      VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset')
       ON CONFLICT (version) DO NOTHING
     `;
 

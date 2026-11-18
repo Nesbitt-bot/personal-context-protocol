@@ -101,7 +101,36 @@ export async function verifySessionToken(request: NextRequest, sessionId: string
 
   const token = authHeader.substring(7);
   const tokenPrefix = token.substring(0, 16); // First 16 chars of token for lookup
-  
+
+  // Temporary access codes (migration 019) grant the same append/read access as
+  // a session token. Try them first; they share the bearer header shape.
+  try {
+    const { resolveAccessCode, touchAccessCode } = await import('@/lib/access-code');
+    const resolved = await resolveAccessCode(token);
+    if (resolved.status === 'ok') {
+      if (resolved.row.sessionId !== sessionId) {
+        return {
+          error: `Unable to access: access code validation / session scope check - code is bound to session ${resolved.row.sessionId}, not ${sessionId}`,
+          code: 'SESSION_MISMATCH',
+          status: 403,
+        } as const;
+      }
+      await touchAccessCode(resolved.row.id);
+      return { success: true, sessionId: resolved.row.sessionId, canRenameSession: true, tokenId: resolved.row.id } as const;
+    }
+    if (resolved.status !== 'unknown') {
+      const label = resolved.status.replace(/_/g, ' ');
+      const code = resolved.status === 'revoked' ? 'ACCESS_CODE_REVOKED' : resolved.status === 'idle_expired' ? 'ACCESS_CODE_IDLE_EXPIRED' : 'ACCESS_CODE_EXPIRED';
+      return {
+        error: `Unable to authenticate: access code validation / expiration check - the temporary access code is ${label}`,
+        code,
+        status: 401,
+      } as const;
+    }
+  } catch {
+    // Not a resolvable access code; fall through to session-token verification.
+  }
+
   const { db } = await import('@/lib/db');
   const { sessionTokens } = await import('@/lib/schema');
   const { verifyToken } = await import('@/lib/auth');

@@ -164,6 +164,20 @@ export default function SettingsPage() {
         {/* What this deployment is and what it has been doing. Answering
             either question previously meant probing the API by hand. */}
         <DiagnosticsPanel enabled={isAdmin} />
+
+        <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="mb-2 text-lg font-semibold text-slate-950 dark:text-white">Preferences</h2>
+          <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
+            Dismissed warnings are remembered in this browser. Re-enable them here if you change your mind.
+          </p>
+          <button
+            type="button"
+            onClick={() => { localStorage.removeItem('pcp_move_task_warn_off'); setStatus('Move-task warning re-enabled.'); }}
+            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Re-enable move-task warning
+          </button>
+        </section>
       </section>
     </main>
   );

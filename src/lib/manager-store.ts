@@ -4,6 +4,7 @@ import { sessions, sessionTokens, topics, events } from './schema';
 import { createId, generateToken, generateSalt, hashToken } from './auth';
 import { uniqueSessionTitle, uniqueTokenName } from './session-store';
 import { resolveExpiresAt, type ExpirationChoice } from './token-expiration';
+import { ensureTaskForSession } from './task-store';
 
 /**
  * Reusable write helpers for the scoped-token manager layer. They mirror the
@@ -16,6 +17,9 @@ export async function createSessionRecord(opts: {
   title?: string;
   mode?: 'wild' | 'exact';
   externalKey?: string;
+  agentName?: string | null;
+  deviceId?: string | null;
+  taskId?: string | null;
 }): Promise<{ sessionId: string; title: string }> {
   if (opts.topicId) {
     const [topic] = await db
@@ -38,10 +42,19 @@ export async function createSessionRecord(opts: {
     title,
     mode: opts.mode ?? 'wild',
     archived: false,
+    agentName: opts.agentName ?? null,
+    deviceId: opts.deviceId ?? null,
+    taskId: opts.taskId ?? null,
     createdAt: now,
     updatedAt: now,
     lastMessageAt: null,
   });
+
+  // Invariant: every session has exactly one task. When the plugin did not
+  // name one, create a task titled after the session and link it.
+  if (!opts.taskId) {
+    await ensureTaskForSession(sessionId, title, opts.topicId, opts.externalKey ?? null, 'manager', now);
+  }
 
   await db.insert(events).values({
     id: createId('evt'),
@@ -49,11 +62,21 @@ export async function createSessionRecord(opts: {
     topicId: opts.topicId,
     action: 'session.created',
     actor: 'manager',
-    detailsJson: { title, session_id: sessionId, topic_id: opts.topicId },
+    detailsJson: { title, session_id: sessionId, topic_id: opts.topicId, agent_name: opts.agentName ?? null, device_id: opts.deviceId ?? null, task_id: opts.taskId ?? null },
     createdAt: now,
   });
 
   return { sessionId, title };
+}
+
+/** Last-writer-wins identity stamp: which agent on which machine hosted a session. */
+export async function stampSessionIdentity(sessionId: string, fields: { agentName?: string | null; deviceId?: string | null }, now = new Date()) {
+  const set: Partial<typeof sessions.$inferInsert> = {};
+  if (fields.agentName !== undefined) set.agentName = fields.agentName;
+  if (fields.deviceId !== undefined) set.deviceId = fields.deviceId;
+  if (!Object.keys(set).length) return;
+  set.updatedAt = now;
+  await db.update(sessions).set(set).where(eq(sessions.id, sessionId));
 }
 
 /** Find an existing manager-created session by its stable source identity. */

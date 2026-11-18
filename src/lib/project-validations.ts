@@ -52,16 +52,35 @@ export const updateProjectSchema = z.object({
 
 const fieldBases = z.record(z.enum(['project_id', 'context_title', 'context_summary', 'display_name', 'description']), pluginTime);
 
+/** Task attributes a sync plugin may set when it uploads a session (migration 018). */
+export const taskAttributesSchema = z.object({
+  external_key: z.string().min(1).max(200).optional(),
+  title: z.string().max(200).optional(),
+  category_id: z.string().min(1).max(100).nullable().optional(),
+  project_id: z.string().min(1).max(100).nullable().optional(),
+  priority: z.number().int().min(0).max(3).nullable().optional(),
+  expected_turns: z.number().int().min(0).max(100000).nullable().optional(),
+  due_at: z.string().datetime().nullable().optional(),
+});
+
+export const managerTaskSchema = taskAttributesSchema.extend({
+  session_id: z.string().min(1).optional(),
+});
+
 export const sessionContextSchema = z.object({
   project_id: z.string().min(1).max(100).nullable().optional(),
   context_title: z.string().max(300).nullable().optional(),
   context_summary: z.string().max(20000).nullable().optional(),
+  // Migration 018: which agent hosted this session on which machine, and the
+  // task it belongs to.
+  agent_name: z.string().max(100).nullable().optional(),
+  task_id: z.string().min(1).max(100).nullable().optional(),
   /** The plugin's own modification time for these fields. */
   updated_at: pluginTime,
   device_id: deviceId,
   /** Per field: the clock value the writer last saw (enables fast-forward without a conflict). */
   base_updated_at: fieldBases.optional(),
-}).refine((v) => v.project_id !== undefined || v.context_title !== undefined || v.context_summary !== undefined, 'give project_id, context_title or context_summary');
+}).refine((v) => v.project_id !== undefined || v.context_title !== undefined || v.context_summary !== undefined || v.agent_name !== undefined || v.task_id !== undefined, 'give project_id, context_title, context_summary, agent_name or task_id');
 
 export const uiSessionContextSchema = z.object({
   project_id: z.string().min(1).max(100).nullable().optional(),
@@ -71,6 +90,7 @@ export const uiSessionContextSchema = z.object({
 
 export const mergeMessagesSchema = z.object({
   device_id: deviceId,
+  agent_name: z.string().max(100).optional(),
   messages: z.array(z.object({
     external_id: z.string().min(1).max(200).refine((v) => !/[\u0000-\u001f\u007f]/.test(v), 'external_id must not contain control characters'),
     role: z.enum(['user', 'assistant', 'system', 'tool', 'correction']),

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, integer, jsonb, uniqueIndex, primaryKey, index, doublePrecision, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { APP_VERSION } from './version';
 
@@ -148,6 +148,65 @@ export const projectWorkspaces = pgTable('project_workspaces', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Sprint board name (single row; the "board" the task list lives on).
+export const taskBoards = pgTable('task_boards', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Tasks (migration 017): units of work. `topicId` is the category (folder);
+// null = unassigned. `parentId` nests a subtask. `completed` doubles as the
+// "archived" state shown under each category. `expectedTurns` is the only
+// progress input the user edits; current turns are derived from linked sessions.
+export const tasks = pgTable('tasks', {
+  id: text('id').primaryKey(),
+  parentId: text('parent_id').references((): AnyPgColumn => tasks.id, { onDelete: 'cascade' }),
+  topicId: text('topic_id').references(() => topics.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  // Stable plugin key so a sync tool can find-or-create this task (migration 018).
+  externalKey: text('external_key'),
+  description: text('description'),
+  completed: boolean('completed').notNull().default(false),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  priority: integer('priority'),
+  expectedTurns: integer('expected_turns'),
+  dueAt: timestamp('due_at', { withTimezone: true }),
+  position: doublePrecision('position').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  topicIdIdx: index('tasks_topic_id_idx').on(table.topicId),
+  parentIdIdx: index('tasks_parent_id_idx').on(table.parentId),
+  externalKeyIdx: uniqueIndex('tasks_external_key_idx').on(table.externalKey),
+}));
+
+// Task ↔ project (repo tag) links. A task may hold several projects; at most
+// one is primary.
+export const taskProjects = pgTable('task_projects', {
+  taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  isPrimary: boolean('is_primary').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.taskId, table.projectId] }),
+  projectIdIdx: index('task_projects_project_id_idx').on(table.projectId),
+}));
+
+// Resources bound to a task: key docs, remote sources, or local dir paths.
+export const taskResources = pgTable('task_resources', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  url: text('url').notNull(),
+  kind: text('kind', { enum: ['doc', 'remote', 'local'] }).notNull().default('doc'),
+  source: text('source', { enum: ['agent', 'human'] }).notNull().default('human'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  taskIdIdx: index('task_resources_task_id_idx').on(table.taskId),
+}));
+
 // Sessions. `topicId` is nullable: a session may be uncategorized (no topic).
 // `public` exposes a read-only view without the admin UI token.
 export const sessions = pgTable('sessions', {
@@ -158,7 +217,7 @@ export const sessions = pgTable('sessions', {
   // Recording mode the agent is told to honor: 'wild' (default) lets the agent
   // redact secrets it judges unsafe; 'exact' asks for verbatim recording
   // (including credentials) for faithful task migration.
-  mode: text('mode', { enum: ['wild', 'exact'] }).notNull().default('wild'),
+  mode: text('mode', { enum: ['wild', 'exact', 'locked'] }).notNull().default('wild'),
   public: boolean('public').notNull().default(false),
   archived: boolean('archived').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -175,11 +234,18 @@ export const sessions = pgTable('sessions', {
   // Projects (migration 013): the project this session belongs to, and the
   // per-task context (what this session is about within the project).
   projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  // Migration 017: the task this session records work for (one task per session).
+  taskId: text('task_id').references(() => tasks.id, { onDelete: 'set null' }),
+  // Migration 018: which agent ran on which machine for this session.
+  agentName: text('agent_name'),
+  deviceId: text('device_id'),
   contextTitle: text('context_title'),
   contextSummary: text('context_summary'),
   syncClockJson: jsonb('sync_clock_json').notNull().default({}),
 }, (table) => ({
   externalKeyIdx: uniqueIndex('sessions_external_key_idx').on(table.externalKey),
+  taskIdIdx: index('sessions_task_id_idx').on(table.taskId),
+  deviceIdIdx: index('sessions_device_id_idx').on(table.deviceId),
 }));
 
 // Session tokens
@@ -229,6 +295,26 @@ export const sessionLinks = pgTable('session_links', {
   label: text('label'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Temporary bind/sync access codes (migration 019). A code in the URL grants
+// append/read access to one session for a sliding 1h idle window, hard-capped
+// at 24h from creation. Only the hash is stored.
+export const accessCodes = pgTable('access_codes', {
+  id: text('id').primaryKey(),
+  codeHash: text('code_hash').notNull(),
+  salt: text('salt').notNull(),
+  codePrefix: text('code_prefix').notNull(),
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  revoked: boolean('revoked').notNull().default(false),
+}, (table) => ({
+  codeHashIdx: uniqueIndex('access_codes_code_hash_idx').on(table.codeHash),
+  prefixIdx: index('access_codes_prefix_idx').on(table.codePrefix),
+  sessionIdIdx: index('access_codes_session_id_idx').on(table.sessionId),
+}));
 
 // Messages
 export const messages = pgTable('messages', {

@@ -56,11 +56,11 @@ function toTranscript(messages: Message[], title: string, mode: 'wild' | 'strict
  */
 export function ImportExportPanel({ sessionId, sessionTitle, mode, messages, onCopyMcpPrompt }: ImportExportPanelProps) {
   const [open, setOpen] = useState(false);
-  const [exportMode, setExportMode] = useState<'wild' | 'strict'>(displayMode(mode));
+  const [exportMode, setExportMode] = useState<'wild' | 'strict'>(mode === 'wild' ? 'wild' : 'strict');
   const [compactions, setCompactions] = useState<ExportCompaction[]>([]);
   const [copied, setCopied] = useState('');
 
-  useEffect(() => { setExportMode(displayMode(mode)); }, [mode, sessionId]);
+  useEffect(() => { setExportMode(mode === 'wild' ? 'wild' : 'strict'); }, [mode, sessionId]);
 
   useEffect(() => {
     if (!open) return;

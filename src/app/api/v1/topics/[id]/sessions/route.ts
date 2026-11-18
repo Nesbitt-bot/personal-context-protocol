@@ -6,6 +6,7 @@ import { createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
 import { createSessionSchema } from '@/lib/validations';
 import { uniqueSessionTitle } from '@/lib/session-store';
+import { ensureTaskForSession } from '@/lib/task-store';
 import { and, desc, eq } from 'drizzle-orm';
 import { visibleSessionsFilter } from '@/lib/session-access';
 
@@ -118,6 +119,9 @@ export async function POST(
       updatedAt: new Date(),
       lastMessageAt: null
     });
+
+    // Invariant: every session has a task. Auto-create one named after it.
+    await ensureTaskForSession(sessionId, title, params.id, null, 'human');
 
     await db.insert(events).values({
       id: createId('evt'),

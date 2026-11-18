@@ -35,7 +35,7 @@ export interface AppendInput {
   provider_timestamp?: string;
 }
 
-export type StoreFailureCode = 'NOT_FOUND' | 'SESSION_ARCHIVED' | 'FORBIDDEN';
+export type StoreFailureCode = 'NOT_FOUND' | 'SESSION_ARCHIVED' | 'SESSION_LOCKED' | 'FORBIDDEN';
 
 export interface AppendSuccess {
   ok: true;
@@ -102,12 +102,13 @@ export async function appendMessagesToSession(params: {
   const { sessionId, messages: newMessages, suggestedTitle, canRenameSession, actor } = params;
 
   const [session] = await db
-    .select({ archived: sessions.archived, topicId: sessions.topicId, title: sessions.title })
+    .select({ archived: sessions.archived, topicId: sessions.topicId, title: sessions.title, mode: sessions.mode })
     .from(sessions)
     .where(eq(sessions.id, sessionId));
 
   if (!session) return { ok: false, code: 'NOT_FOUND' };
   if (session.archived) return { ok: false, code: 'SESSION_ARCHIVED' };
+  if (session.mode === 'locked') return { ok: false, code: 'SESSION_LOCKED' };
   if (suggestedTitle && !canRenameSession) return { ok: false, code: 'FORBIDDEN' };
 
   const now = new Date();
@@ -217,12 +218,13 @@ export async function recordCompaction(params: {
   const { sessionId, compact, actor } = params;
 
   const [session] = await db
-    .select({ archived: sessions.archived, topicId: sessions.topicId })
+    .select({ archived: sessions.archived, topicId: sessions.topicId, mode: sessions.mode })
     .from(sessions)
     .where(eq(sessions.id, sessionId));
 
   if (!session) return { ok: false, code: 'NOT_FOUND' };
   if (session.archived) return { ok: false, code: 'SESSION_ARCHIVED' };
+  if (session.mode === 'locked') return { ok: false, code: 'SESSION_LOCKED' };
 
   const now = new Date();
   const compactionId = createId('cmp');
