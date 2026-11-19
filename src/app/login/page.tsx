@@ -9,6 +9,7 @@ import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { loginErrorMessage } from '@/lib/oidc-config';
 import { BREAK_GLASS_STORAGE_KEY, fetchSignedInUser } from '@/lib/client-auth';
+import { loginDestination } from '@/lib/login-entry';
 import { sanitizeReturnTo } from '@/lib/return-to';
 
 interface AuthConfig {
@@ -29,16 +30,26 @@ function LoginForm() {
   const [setupMessage, setSetupMessage] = useState('');
   const [generatedToken, setGeneratedToken] = useState('');
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const adminRequested = searchParams.get('method') === 'admin';
   const authError = searchParams.get('auth_error');
   const safeNext = sanitizeReturnTo(searchParams.get('next'));
 
   useEffect(() => {
     checkSetupStatus();
     loadAuthConfig();
-    // Already signed in (e.g. the Back button after the Casdoor callback):
-    // go where the user was headed instead of offering a second sign-in.
-    if (!authError) fetchSignedInUser().then((user) => { if (user) router.replace(safeNext); });
+    let active = true;
+    fetchSignedInUser().then(user => { if (active) setSignedIn(Boolean(user)); });
+    return () => { active = false; };
   }, []);
+
+  const destination = !checkingSetup && initialized && !generatedToken && !error && authConfig && signedIn !== null
+    ? loginDestination({ next: safeNext, signedIn, oidc: authConfig.oidc_enabled, authError,
+        manualAdmin: adminRequested && authConfig.break_glass_enabled })
+    : null;
+  useEffect(() => {
+    if (destination) window.location.replace(destination);
+  }, [destination]);
 
   async function loadAuthConfig() {
     try {
@@ -154,7 +165,7 @@ function LoginForm() {
       }
 
       localStorage.setItem(BREAK_GLASS_STORAGE_KEY, candidate);
-      router.push(safeNext);
+      router.replace(safeNext);
     } catch (err) {
       setError(diagnosticMessage({
         consequence: 'Unable to log in',
@@ -167,10 +178,10 @@ function LoginForm() {
     }
   }
 
-  if (checkingSetup || !authConfig) {
+  if (checkingSetup || !authConfig || signedIn === null || destination) {
     return (
       <div className="rounded-md border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-soft dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-        Checking setup status...
+        {destination ? 'Redirecting…' : 'Checking sign-in…'}
       </div>
     );
   }
@@ -285,7 +296,7 @@ function LoginForm() {
 
   return (
     <div className="w-full space-y-6">
-      {oidcCard}
+      {(authError || (authConfig.oidc_enabled && !adminRequested)) && oidcCard}
     <form className="rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900" onSubmit={submitToken}>
       <div className="mb-5 flex items-center gap-3">
         <div className="rounded-md bg-slate-950 p-3 text-white dark:bg-sky-400 dark:text-slate-950">
@@ -293,12 +304,12 @@ function LoginForm() {
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Break-glass admin login</p>
-          <h1 className="text-xl font-semibold text-slate-950 dark:text-white">Enter UI token</h1>
+          <h1 className="text-xl font-semibold text-slate-950 dark:text-white">Enter admin token</h1>
         </div>
       </div>
 
       <p className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
-        Emergency access only (enabled by <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_BREAK_GLASS_ADMIN_LOGIN=1</code>). Use the admin token. If you did not set <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_ADMIN_TOKEN</code>, it is the token PCP printed once in your deploy/build logs and a fresh one is generated on each deploy. To set your own stable token, define <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">PCP_ADMIN_TOKEN</code> (32+ chars) and redeploy, or change it in Settings after login.
+        Use your configured admin token, or paste the first-login token PCP printed in the server logs if you have not replaced it.
       </p>
 
       {error && (
@@ -318,7 +329,7 @@ function LoginForm() {
           className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-sky-950"
           value={token}
           onChange={(event) => setToken(event.target.value)}
-          placeholder="Paste UI token"
+          placeholder="Paste admin token"
           type="password"
         />
       </label>
