@@ -44,6 +44,10 @@ metadata. Jenkins deletes the workspace env in final cleanup.
 
 ## Build and deployment gates
 
+For a build-only webhook run, add the Git trailer `PCP-Test-Only: true` to the
+tip commit. Jenkins builds the images and runs the test gates, but skips backup,
+deployment and channel-plugin sync for that revision (including rebuilds).
+
 1. Fetch GitHub main and record its commit.
 2. Build the builder target with `npm run build`, then run TypeScript checks
    and all Vitest suites in bounded containers.

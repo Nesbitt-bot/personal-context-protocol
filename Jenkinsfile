@@ -25,6 +25,8 @@ pipeline {
         script {
           def revision = checkout scm
           env.GIT_COMMIT = revision.GIT_COMMIT
+          // The tip commit can request full CI without touching the running stack.
+          env.TEST_ONLY = sh(script: 'git show -s --format="%(trailers:key=PCP-Test-Only,valueonly)" HEAD', returnStdout: true).trim().equalsIgnoreCase('true') ? 'true' : 'false'
         }
       }
     }
@@ -44,12 +46,15 @@ pipeline {
       steps { sh 'timeout 5m bash deploy/jenkins/test_check_storage.sh' }
     }
     stage('Database backup') {
+      when { expression { env.TEST_ONLY == 'false' } }
       steps { sh 'timeout 5m bash deploy/jenkins/backup_database.sh "$BACKUP_DIR"' }
     }
     stage('Deploy full stack') {
+      when { expression { env.TEST_ONLY == 'false' } }
       steps { sh 'bash deploy/jenkins/deploy.sh "$WORKSPACE/$DEPLOY_ENV"' }
     }
     stage('Sync channel plugins') {
+      when { expression { env.TEST_ONLY == 'false' } }
       // Each step is a no-op unless the plugin changed; on change it backs up,
       // installs, restarts and verifies health and channels, else restores.
       steps {
@@ -63,7 +68,7 @@ pipeline {
       junit testResults: 'reports/*.xml', allowEmptyResults: true
       sh 'rm -f "$WORKSPACE/$DEPLOY_ENV"'
     }
-    success { echo 'Deployment verified: PCP.Jenkins/complete — remote source tests, database backup, version and database checks passed.' }
+    success { script { echo(env.TEST_ONLY == 'true' ? 'CI verified; backup, deployment and plugin sync skipped.' : 'Deployment verified: remote source tests and deployment checks passed.') } }
     failure { echo 'Deployment incomplete: PCP.Jenkins/pipeline — required stage failed; inspect the retained build log before retrying.' }
   }
 }
