@@ -1,0 +1,9 @@
+{
+  "name": "personal-context-protocol",
+  "interface": { "displayName": "Personal Context Protocol" },
+  "plugins": [{
+    "name": "pcp",
+    "source": { "source": "local", "path": "./thirdparty/codex-pcp" },
+    "category": "Productivity"
+  }]
+}
