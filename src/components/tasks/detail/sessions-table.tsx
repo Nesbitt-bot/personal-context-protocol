@@ -1,5 +1,7 @@
 'use client';
 
+import { useLights, PresenceLight } from '@/components/presence';
+
 import { useState } from 'react';
 import { Check, ExternalLink, Link2, Unlink } from 'lucide-react';
 import type { TaskSession } from '@/lib/task-types';
@@ -17,6 +19,7 @@ function SessionRow({ session, onUnlink, onGenerateLink, busy }: {
   onGenerateLink: (id: string) => void;
   busy: boolean;
 }) {
+  const lights = useLights();
   const [copied, setCopied] = useState(false);
 
   async function copyResume() {
@@ -32,11 +35,12 @@ function SessionRow({ session, onUnlink, onGenerateLink, busy }: {
   return (
     <tr
       className="cursor-pointer border-t border-slate-100 first:border-t-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+      data-presence={lights.sessions[session.id]}
       onClick={copyResume}
       title="Click to copy resume code"
     >
       <td className="whitespace-nowrap px-3 py-2">
-        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${HEALTH_STYLE[session.health]}`}>{session.health}</span>
+        <PresenceLight state={lights.sessions[session.id]} /><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${HEALTH_STYLE[session.health]}`}>{session.health}</span>
       </td>
       <td className="max-w-[12rem] truncate px-3 py-2 text-sm text-slate-700 dark:text-slate-200" title={session.hosted_machine ?? undefined}>{session.hosted_machine || '—'}</td>
       <td className="max-w-[12rem] truncate px-3 py-2 text-sm text-slate-700 dark:text-slate-200" title={session.agent_name ?? undefined}>{session.agent_name || '—'}</td>

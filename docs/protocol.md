@@ -1078,3 +1078,20 @@ The child, parent, credential and signed delivery route stay bound.
 `POST /api/v1/service/broker/work` accepts signed ingress polls with
 `{after,id,nonce,ts}` and returns only that ingress credential's work updates.
 Destinations originate from the signed platform stamp, never from model output.
+
+## Session sync presence
+
+`POST /api/v1/manager/sessions/by-key/:key/presence` records a plugin heartbeat
+for an existing session. Use a global or matching folder token with
+`create_sessions`. Send `reporter` (`codex` or `opencode`), a random UUID `run`,
+`start` (true for the first report of a new run), and `state` (`synced`,
+`unsynced`, or `closed`). The server timestamps arrival. Renew every 20 seconds;
+close only on a normal exit. Success is 204. A 409 means the lease ended or a
+new run replaced this one: stop that worker, do not reclaim the lease.
+
+`GET /api/v1/presence` is an authenticated, non-cacheable UI snapshot. It maps
+visible session IDs, and for admins task IDs, to `live`, `problem`, or (for tasks with both) `mixed`. After 65
+seconds without a heartbeat a live session becomes a problem. Out-of-sync
+reports are problems immediately. Clean closes and never-monitored history
+have no light. A mixed parent keeps its active light on a red background. A dashboard connection error clears old indicators rather than
+claiming a session failed. Polling does not refresh any lease.

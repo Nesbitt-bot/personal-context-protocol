@@ -47,7 +47,7 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
 
   async function call(route: string, method: string, opts: Parameters<typeof request>[1] & { query?: string } = {}, params: Record<string, string> = {}) {
     const res = await routes[route][method](request(`/x${opts.query || ''}`, { ...opts, method }), { params });
-    return { status: res.status, body: await res.json() };
+    return { status: res.status, body: res.status === 204 ? null : await res.json() };
   }
 
   async function mintScoped(id: string, scope: string, permissions: Record<string, boolean>, folderId: string | null = null) {
@@ -93,7 +93,7 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     await ensureDatabaseSchema();
 
     tokens.manager = await mintScoped('stk_manager', 'global', { read_all: true, manage_projects: true });
-    tokens.reader = await mintScoped('stk_reader', 'global', { read_all: true, manage_projects: false });
+    tokens.reader = await mintScoped('stk_reader', 'global', { read_all: true, manage_projects: false, create_sessions: false });
     tokens.folder = await mintScoped('stk_folder', 'folder', { read_all: true, manage_projects: true }, 'top_a');
     const { createWebSession } = await import('../src/lib/web-session');
     const a = await createWebSession('usr_admin');
@@ -105,6 +105,8 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
       mProjects: await import('../src/app/api/v1/manager/projects/route'),
       mResolve: await import('../src/app/api/v1/manager/projects/resolve/route'),
       mWorkspaces: await import('../src/app/api/v1/manager/projects/[id]/workspaces/route'),
+      presence: await import('../src/app/api/v1/presence/route'),
+      beat: await import('../src/app/api/v1/manager/sessions/by-key/[key]/presence/route'),
       mContext: await import('../src/app/api/v1/manager/sessions/by-key/[key]/context/route'),
       mMerge: await import('../src/app/api/v1/manager/sessions/by-key/[key]/merge-messages/route'),
       mTasks: await import('../src/app/api/v1/manager/merge-tasks/route'),
@@ -133,12 +135,33 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     expect((await call('byKey', 'GET', { bearer: tokens.legacy }, { key: encodeURIComponent('win-384de1b4:codex:019f') })).body).toMatchObject({ found: true, message_count: 2 });
   });
 
+  it('fences replaced workers, enforces visibility, expires missed beats and neutralizes a clean stop', async () => {
+    const key = 'win-384de1b4:codex:019f';
+    const run = '12345678-1234-4234-8234-123456789012';
+    const second = '12345678-1234-4234-8234-123456789013';
+    const beat = (bearer: string, start: boolean, state: string, id = run) => call('beat','POST',
+      {bearer,body:{reporter:'codex',run:id,start,state}},{key});
+    // This route returns 204 without a response body on success.
+    expect((await beat(tokens.reader,true,'synced')).status).toBe(403);
+    expect((await beat(tokens.legacy,true,'synced')).status).toBe(204);
+    expect((await call('presence','GET',{browser:adminBrowser})).body.sessions.ses_win_codex).toBe('live');
+    expect((await call('presence','GET',{browser:aliceBrowser})).body).toEqual({sessions:{},tasks:{}});
+    await raw`UPDATE session_presence SET seen_at=now()-interval '70 seconds' WHERE session_id='ses_win_codex'`;
+    expect((await call('presence','GET',{browser:adminBrowser})).body.sessions.ses_win_codex).toBe('problem');
+    expect((await beat(tokens.legacy,true,'unsynced',second)).status).toBe(204);
+    expect((await beat(tokens.legacy,false,'closed')).status).toBe(409);
+    expect((await beat(tokens.legacy,false,'synced',second)).status).toBe(204);
+    expect((await beat(tokens.legacy,false,'closed',second)).status).toBe(204);
+    expect((await beat(tokens.legacy,false,'synced',second)).status).toBe(409);
+    expect((await call('presence','GET',{browser:adminBrowser})).body.sessions.ses_win_codex).toBeUndefined();
+  });
+
   it('operator `sessions export` reads identities in a read-only transaction, without content', async () => {
     const cli = createRequire(import.meta.url)('../scripts/pcp-operator.js');
     const exported = await cli.exportSessions(raw);
     expect(exported.has_projects).toBe(true);
     // Latest applied migration (schema_migrations versions sort lexically).
-    expect(exported.schema_version).toBe('021_priority_optional');
+    expect(exported.schema_version).toBe('022_session_presence');
     expect(exported.sessions.find((x: { id: string }) => x.id === 'ses_win_codex')).toEqual({ id: 'ses_win_codex', external_key: 'win-384de1b4:codex:019f', title: 'opencode:win-384de1b4:circtime [codex] deploy page', project_id: null, archived: false });
     expect(JSON.stringify(exported)).not.toContain('deploy via actions');
     // The transaction really is read-only.

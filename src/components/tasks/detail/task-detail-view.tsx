@@ -1,5 +1,7 @@
 'use client';
 
+import { useLights, PresenceLight } from '@/components/presence';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -22,6 +24,7 @@ import { fromDateInputValue, toDateInputValue } from './format';
  * / `onDeleted` let the host decide how to leave or react to a deletion.
  */
 export function TaskDetailView({ id, onBack, onDeleted }: { id: string; onBack?: () => void; onDeleted?: () => void }) {
+  const lights = useLights();
   const router = useRouter();
 
   const [user, setUser] = useState<SignedInUser | null>(null);
@@ -209,7 +212,7 @@ export function TaskDetailView({ id, onBack, onDeleted }: { id: string; onBack?:
       {!task && !error && <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Loading task...</p>}
       {task && detail && (
         <>
-          <header className="space-y-4">
+          <header data-presence={lights.tasks[task.id]} className="space-y-4">
             <div className="flex flex-wrap items-start gap-3">
               <div className="min-w-0 flex-1">
                 {editingTitle ? (
@@ -225,7 +228,7 @@ export function TaskDetailView({ id, onBack, onDeleted }: { id: string; onBack?:
                     }}
                   />
                 ) : (
-                  <h1 className="cursor-text break-words text-2xl font-semibold" title="Click to rename" onClick={() => { setTitleDraft(task.title); setEditingTitle(true); }}>{task.title}</h1>
+                  <h1 className="cursor-text break-words text-2xl font-semibold" title="Click to rename" onClick={() => { setTitleDraft(task.title); setEditingTitle(true); }}><PresenceLight task state={lights.tasks[task.id]} />{task.title}</h1>
                 )}
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {task.topic_title ? <>In {task.topic_title} · </> : <>Unassigned · </>}

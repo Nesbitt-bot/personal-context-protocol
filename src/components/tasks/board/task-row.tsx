@@ -1,5 +1,7 @@
 'use client';
 
+import { useLights, PresenceLight } from '@/components/presence';
+
 import { useState } from 'react';
 import type { DragEvent, MouseEvent } from 'react';
 import { CalendarDays, CheckCircle2, ChevronRight, Circle, Clock, MessageSquare, Pencil } from 'lucide-react';
@@ -22,6 +24,7 @@ function stop(e: MouseEvent) {
 
 /** One task row with inline edit controls, selection highlight and native drag & drop. */
 export function TaskRow(props: TaskRowProps) {
+  const lights = useLights();
   const { task, depth, grouped, collapsed, selected, projects, draggedId } = props;
   const [editing, setEditing] = useState<'title' | 'due' | null>(null);
   const [editingPriority, setEditingPriority] = useState(false);
@@ -50,6 +53,7 @@ export function TaskRow(props: TaskRowProps) {
 
   return (
     <div
+      data-presence={lights.tasks[task.id]}
       draggable={!editing}
       onClick={() => props.onSelect(task)}
       onDragStart={(e) => {
@@ -118,7 +122,7 @@ export function TaskRow(props: TaskRowProps) {
       ) : (
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <button onClick={(e) => { stop(e); props.onOpen(task); }} className={`min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline ${titleClass}`} type="button">
-            {task.title}
+            <PresenceLight task state={lights.tasks[task.id]} />{task.title}
           </button>
           <button
             className="shrink-0 rounded p-0.5 text-slate-400 opacity-0 hover:text-slate-600 group-hover:opacity-100 dark:hover:text-slate-300"

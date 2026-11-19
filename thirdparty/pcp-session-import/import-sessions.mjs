@@ -19,6 +19,7 @@
  */
 
 import fs from 'node:fs';
+import { recordReceipt } from './presence-receipt.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -81,10 +82,7 @@ async function call(opts, token, method, route, body) {
   return parsed;
 }
 
-const remoteCount = async (opts, token, key) => {
-  const r = await call(opts, token, 'GET', `/manager/sessions/by-key/${encodeURIComponent(key)}`);
-  return r.found ? Number(r.message_count) : null;
-};
+const lookup = (opts, token, key) => call(opts, token, 'GET', `/manager/sessions/by-key/${encodeURIComponent(key)}`);
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
@@ -120,7 +118,9 @@ async function main() {
     if (!token) continue;
 
     try {
-      const plan = planUpload(messages.length, await remoteCount(opts, token, key));
+      const existing = await lookup(opts, token, key);
+      const plan = planUpload(messages.length, existing.found ? Number(existing.message_count) : null);
+      if (opts.upload && plan.action === 'up-to-date') await recordReceipt(opts.baseUrl, key, s, existing);
       bump(summary.remote, plan.action);
       if (!opts.upload || !['create', 'append'].includes(plan.action)) continue;
       // Only now ask the manager for the session (it mints a session token per call).
@@ -135,8 +135,10 @@ async function main() {
         });
         if (!res.ok) throw new Error(`append failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
       }
-      const after = await remoteCount(opts, token, key);
+      const confirmed = await lookup(opts, token, key);
+      const after = confirmed.message_count;
       if (after !== messages.length) throw new Error(`count mismatch after upload: remote ${after}, local ${messages.length}`);
+      await recordReceipt(opts.baseUrl, key, s, confirmed);
       bump(summary.remote, plan.action === 'create' ? 'uploaded_new' : 'uploaded_append');
       bump(summary.remote, 'messages_uploaded', messages.length - plan.from);
     } catch (error) {

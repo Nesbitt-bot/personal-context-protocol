@@ -248,6 +248,15 @@ export const sessions = pgTable('sessions', {
   deviceIdIdx: index('sessions_device_id_idx').on(table.deviceId),
 }));
 
+// Most recent lease per session and reporter; no historical backfill.
+export const sessionPresence = pgTable('session_presence', {
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  reporter: text('reporter').notNull(),
+  runId: text('run_id').notNull(),
+  state: text('state').notNull(),
+  seenAt: timestamp('seen_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ pk: primaryKey({ columns: [table.sessionId, table.reporter] }) }));
+
 // Session tokens
 export const sessionTokens = pgTable('session_tokens', {
   id: text('id').primaryKey(),

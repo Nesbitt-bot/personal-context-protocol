@@ -1,5 +1,7 @@
 'use client';
 
+import { useLights, PresenceLight } from '@/components/presence';
+
 import { useEffect, useRef, useState } from 'react';
 import { Archive, Check, ClipboardPaste, KeyRound, Lock, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
 import { Modal } from '@/components/modal';
@@ -101,6 +103,7 @@ export function SessionWorkspace({
   onCreateAccessLink,
   onImported,
 }: SessionWorkspaceProps) {
+  const lights = useLights();
   const [now, setNow] = useState(() => Date.now());
   const [compactionCount, setCompactionCount] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -203,8 +206,8 @@ export function SessionWorkspace({
             <>
               {/* Row 1: title (left), live last activity (right). */}
               <div className="flex items-baseline justify-between gap-4">
-                <h2 className="min-w-0 truncate text-xl font-semibold text-slate-950 dark:text-white" title={selectedSession.title}>
-                  {selectedSession.title}
+                <h2 data-presence={lights.sessions[selectedSession.id]} className="min-w-0 truncate text-xl font-semibold text-slate-950 dark:text-white" title={selectedSession.title}>
+                  <PresenceLight state={lights.sessions[selectedSession.id]} />{selectedSession.title}
                 </h2>
                 <button
                   className="shrink-0 text-sm text-slate-500 hover:text-sky-600 dark:text-slate-400 dark:hover:text-sky-300"

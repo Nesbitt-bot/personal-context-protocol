@@ -1,5 +1,7 @@
 'use client';
 
+import { useLights, PresenceLight } from '@/components/presence';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, ChevronRight, Folder, FolderPlus, Inbox, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { Session, Topic } from './types';
@@ -185,10 +187,12 @@ export function NavSidebar({
     };
   }
 
+  const lights = useLights();
   function renderSession(s: Session) {
     return (
       <button
         key={s.id}
+        data-presence={lights.sessions[s.id]}
         draggable={!s.archived}
         onDragStart={() => dragStart(s.id)}
         onDragEnd={dragEnd}
@@ -199,7 +203,7 @@ export function NavSidebar({
         type="button"
         {...pressHandlers(sessionItems(s))}
       >
-        <MessageSquare size={15} className="shrink-0 opacity-70" />
+        <PresenceLight state={lights.sessions[s.id]} /><MessageSquare size={15} className="shrink-0 opacity-70" />
         <span className="min-w-0 flex-1 truncate">{s.title}</span>
       </button>
     );

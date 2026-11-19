@@ -115,3 +115,26 @@ test('plans append-only, idempotent uploads', () => {
   assert.equal(planUpload(5, 7).action, 'remote-ahead');
   assert.equal(planUpload(0, null).action, 'skip-empty');
 });
+
+// A receipt is scoped to the deployment and source key and holds no transcript.
+test('writes a private presence receipt only for verified live DB revisions', async () => {
+  const { mkdtemp, readFile, readdir, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { recordReceipt } = await import('./presence-receipt.mjs');
+  const home = await mkdtemp(join(tmpdir(), 'pcp-presence-test-'));
+  const oldHome = process.env.HOME;
+  process.env.HOME = home;
+  try {
+    const source = {origin:'shared',updated:100,sessionID:'local'};
+    await recordReceipt('https://pcp.example','device:opencode:local',source,{session_id:'remote'});
+    const dir = join(home,'.local/state/pcp/import-receipts');
+    await assert.rejects(readdir(dir),{code:'ENOENT'});
+    await recordReceipt('https://pcp.example','device:opencode:local',{...source,origin:'local-db'},{session_id:'remote'});
+    const [name] = await readdir(dir);
+    assert.deepEqual(JSON.parse(await readFile(join(dir,name))),{remoteId:'remote',localId:'local',updated:100});
+  } finally {
+    if (oldHome === undefined) delete process.env.HOME; else process.env.HOME = oldHome;
+    await rm(home,{recursive:true,force:true});
+  }
+});

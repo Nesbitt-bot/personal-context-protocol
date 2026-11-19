@@ -513,6 +513,14 @@ export const SCHEMA_STATEMENTS = [
   ...ACCESS_CODE_SCHEMA_STATEMENTS,
   ...SESSION_TASK_TOPIC_INVARIANT_STATEMENTS,
   ...PRIORITY_OPTIONAL_SCHEMA_STATEMENTS,
+  `CREATE TABLE IF NOT EXISTS session_presence (
+  session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  reporter text NOT NULL,
+  run_id text NOT NULL,
+  state text NOT NULL,
+  seen_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (session_id, reporter)
+)`,
     `CREATE TABLE IF NOT EXISTS message_sync_keys (
     session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     external_id text NOT NULL,
@@ -679,7 +687,7 @@ async function applySchema() {
 
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
-    VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset')
+    VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset'), ('022_session_presence', 'session_reporter_leases')
     ON CONFLICT (version) DO NOTHING
   `);
 }

@@ -1,6 +1,6 @@
 {
   "name": "pcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Register a private PCP task and session when Codex starts or resumes. No transcript upload.",
   "hooks": "./hooks/hooks.json"
 }

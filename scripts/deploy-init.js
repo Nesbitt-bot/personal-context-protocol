@@ -492,6 +492,14 @@ function schemaStatements(version) {
     // UPDATE tasks SET priority = 3 is NOT here — it must run only once.
     'ALTER TABLE tasks ALTER COLUMN priority DROP NOT NULL',
     'ALTER TABLE tasks ALTER COLUMN priority SET DEFAULT NULL',
+  `CREATE TABLE IF NOT EXISTS session_presence (
+  session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  reporter text NOT NULL,
+  run_id text NOT NULL,
+  state text NOT NULL,
+  seen_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (session_id, reporter)
+)`,
 
   ];
 }
@@ -586,7 +594,7 @@ async function main() {
 
     await sql`
       INSERT INTO schema_migrations (version, checksum)
-      VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset')
+      VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset'), ('022_session_presence', 'session_reporter_leases')
       ON CONFLICT (version) DO NOTHING
     `;
 
