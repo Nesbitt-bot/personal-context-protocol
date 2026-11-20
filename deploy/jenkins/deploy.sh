@@ -2,11 +2,14 @@
 set -Eeuo pipefail
 ENV_FILE=${1:?Private prepared env path required}
 COMPOSE=(docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f deploy/jenkins/compose.override.yml)
+# Use the optional local GPU only when the operator has enabled it.
+if [[ ${PCP_SEARCH_GPU:-0} == 1 ]]; then COMPOSE+=(-f deploy/search-gpu.compose.yml); fi
 # The project name and the PostgreSQL bind mount are retained across versions.
 # Never let PostgreSQL initialize an empty cluster by accident.
 timeout 2m bash deploy/jenkins/check_storage.sh
 timeout 4m "${COMPOSE[@]}" up -d --no-build --wait --wait-timeout 180 db
 timeout 5m "${COMPOSE[@]}" up -d --no-build --wait --wait-timeout 180 app
+timeout 8m "${COMPOSE[@]}" up -d --no-build --wait --wait-timeout 300 search-indexer
 APP_ID=$("${COMPOSE[@]}" ps -q app)
 timeout 30s docker exec "$APP_ID" node deploy/jenkins/verify_runtime.js
 # The PCP broker runs when its private secrets directory exists (broker.token,

@@ -148,3 +148,5 @@ Expected response:
 PostgreSQL and a GitHub-main webhook pipeline. Neon is used only as a
 read-only snapshot source during migration; its runtime URLs are not copied
 into the local Jenkins environment.
+
+Session search uses the private Compose services described in [Docker deployment](deployment-docker-compose.md). A Vercel-only installation with no reachable search backend cannot serve search requests.

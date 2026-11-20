@@ -38,6 +38,7 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY deploy/jenkins/verify_runtime.js ./deploy/jenkins/verify_runtime.js
 # The loopback PCP broker (docker-compose.yml service "broker"), no dependencies.
+COPY search ./search
 COPY broker/server.js ./broker/server.js
 
 EXPOSE 3000

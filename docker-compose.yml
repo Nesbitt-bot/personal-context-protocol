@@ -12,6 +12,8 @@ services:
       db:
         condition: service_healthy
     environment:
+      PCP_SEARCH_URL: http://opensearch:9200
+      PCP_EMBED_URL: http://embedder:11434
       DATABASE_URL: ${DATABASE_URL:-postgresql://pcp:${POSTGRES_PASSWORD:-pcp_local_password}@db:5432/pcp?sslmode=disable}
       PCP_INSTANCE_SECRET: ${PCP_INSTANCE_SECRET:-local-compose-secret-change-me-32chars}
       PCP_APP_URL: ${PCP_APP_URL:-http://localhost:3000}
@@ -40,6 +42,7 @@ services:
         read_only: true
         bind:
           create_host_path: false
+    networks: [default, search]
     ports:
       # Loopback by default; put a TLS reverse proxy in front for remote use.
       - "${PCP_PORT:-127.0.0.1:3000}:3000"
@@ -52,6 +55,56 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  # Session transcripts and vectors never need a published host port.
+  opensearch:
+    image: opensearchproject/opensearch:3.6.0
+    mem_limit: 2g
+    environment:
+      discovery.type: single-node
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    networks: [search]
+    volumes:
+      - type: bind
+        source: ${PCP_SEARCH_DATA_DIR:-/home/motuariki/Documents/DockerVolumes/pcp/opensearch}
+        target: /usr/share/opensearch/data
+        bind: { create_host_path: false }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=3s' >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+  embedder:
+    image: ollama/ollama:0.40.16
+    networks: [search, model-download]
+    mem_limit: 4g
+    cpus: 4
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_CONTEXT_LENGTH: "4096"
+    volumes:
+      - type: bind
+        source: ${PCP_SEARCH_MODEL_DIR:-/home/motuariki/Documents/DockerVolumes/pcp/search-models}
+        target: /root/.ollama
+        bind: { create_host_path: false }
+    restart: unless-stopped
+  search-indexer:
+    image: personal-context-protocol:${PCP_VERSION:-0.4.3}
+    command: ["node", "search/indexer.js"]
+    networks: [default, search]
+    mem_limit: 512m
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://pcp:${POSTGRES_PASSWORD:-pcp_local_password}@db:5432/pcp?sslmode=disable}
+      PCP_SEARCH_URL: http://opensearch:9200
+      PCP_EMBED_URL: http://embedder:11434
+    depends_on:
+      db: { condition: service_healthy }
+      opensearch: { condition: service_healthy }
+      embedder: { condition: service_started }
+    restart: unless-stopped
 
   # PCP broker (AstrBot -> PCP -> OpenClaw). Same image, separate process.
   # Host networking because the OpenClaw gateway listens on host loopback;
@@ -121,3 +174,8 @@ services:
     labels:
       org.opencontainers.image.version: ${PCP_VERSION:-0.4.3}
     restart: unless-stopped
+
+networks:
+  search:
+    internal: true
+  model-download: {}

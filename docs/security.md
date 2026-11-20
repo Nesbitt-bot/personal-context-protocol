@@ -164,3 +164,10 @@ authorization on every content request; hashes are storage identifiers only.
 Only sanitized images are stored; no EXIF/GPS originals or user-supplied SVG.
 The optional nginx internal location cannot be requested directly. Native
 upload queues contain private image source bytes and must remain mode 600.
+
+Session search is a human UI endpoint, not an agent tool. The app applies current
+PostgreSQL session visibility before ranking, then checks it again before returning
+IDs and current titles. The local OpenSearch index contains private transcripts;
+protect its host directory and backups like the database. Never publish the search
+or embedding service ports. Only the profile image URL is passed to the browser,
+with no referrer, and only when supplied by a verified identity token.

@@ -1,0 +1,6 @@
+{
+  "index": "pcp-sessions-gemma2-v1",
+  "model": "embeddinggemma-2:270m",
+  "digest": "c21dd30c1e38444d3b4faa091407b6fa97221447b4965d74931d43d7f09bbbfd",
+  "dimension": 768
+}

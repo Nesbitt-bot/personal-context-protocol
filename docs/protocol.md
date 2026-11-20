@@ -1095,3 +1095,13 @@ seconds without a heartbeat a live session becomes a problem. Out-of-sync
 reports are problems immediately. Clean closes and never-monitored history
 have no light. A mixed parent keeps its active light on a red background. A dashboard connection error clears old indicators rather than
 claiming a session failed. Polling does not refresh any lease.
+
+### Search sessions (web UI only)
+
+`POST /api/v1/search` accepts `{"q":"words or a natural-language description"}`
+(1–500 characters). Use web UI authentication and CSRF headers, as for other
+UI POST routes. Returns up to 20 ranked `results` (session `id` and current
+`title`) and `semantic` indicating vector hits contributed. BM25 and passage
+vector rankings are combined by reciprocal rank. Both retrieval paths are
+scoped to visible sessions; PostgreSQL checks visibility again before responding.
+No indexed transcript, vector, or unauthorized result count is returned.

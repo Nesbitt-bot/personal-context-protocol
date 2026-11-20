@@ -1,0 +1,4 @@
+# Optional NVIDIA runtime for local embedding acceleration.
+services:
+  embedder:
+    gpus: all

@@ -106,3 +106,27 @@ discard the database.
 For remote-SCM builds and automatic local deployments, use the
 [Jenkins target](deployment-jenkins.md). Its stable bind-mounted data directory
 preserves data while image tags include both software version and Jenkins build.
+
+### Private session search
+
+Before `docker compose up -d --build`, create the two bind directories selected by
+`PCP_SEARCH_DATA_DIR` and `PCP_SEARCH_MODEL_DIR` (defaults next to the PCP blob
+store). Give the former to OpenSearch uid 1000 and restrict both to mode 0700.
+OpenSearch requires host `vm.max_map_count` of at least 262144. For NVIDIA hosts
+append `-f deploy/search-gpu.compose.yml` after `-f docker-compose.yml` (Jenkins:
+set `PCP_SEARCH_GPU=1` in the deploy shell). CPU inference is supported but slower.
+Neither service publishes a port. Do not attach untrusted containers to the search
+or model-download networks. Only model download needs outbound internet.
+
+`search-indexer` reconciles JSON documents by session ID from PostgreSQL about
+once a minute, including edits and deletions. It indexes title, context and
+ordered messages, not credential tables, attachments or raw import metadata.
+It embeds overlapping passages locally with the pinned EmbeddingGemma 2 270M
+model. Lexical search is available during vector backfill or model downtime.
+Check indexing with `docker compose logs --tail 30 search-indexer` and
+`docker compose exec opensearch curl -fsS 'localhost:9200/pcp-sessions-gemma2-v1/_count?q=ready:true'`.
+A missing index is rebuilt on worker startup. Model or mapping upgrades require a
+new index name and backfill; never mix two model revisions in the same index.
+
+To verify document identity, completed vector coverage, and positive/negative
+semantic scope checks: `docker compose exec search-indexer node search/verify.js`.
