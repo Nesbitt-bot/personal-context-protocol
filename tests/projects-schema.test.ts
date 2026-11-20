@@ -3,6 +3,7 @@ import path from 'path';
 import { describe, it, expect } from 'vitest';
 import { PROJECT_SCHEMA_STATEMENTS, SCHEMA_STATEMENTS } from '../src/lib/setup-schema';
 import { normalizePermissions } from '../src/lib/scoped-token';
+import { createScopedTokenSchema } from '../src/lib/validations';
 
 const squash = (value: string) => value.replace(/\s+/g, ' ').trim();
 
@@ -34,6 +35,36 @@ describe('migration 013 (projects)', () => {
 });
 
 describe('manage_projects scoped-token permission', () => {
+  it.each([true, false])('preserves the UI selection %s through request validation', (selected) => {
+    const request = createScopedTokenSchema.parse({
+      name: 'session-sync', scope: 'global',
+      permissions: { read_all: true, create_sessions: true, mint_tokens: true, manage_projects: selected },
+    });
+    expect(request.permissions).toHaveProperty('manage_projects', selected);
+    expect(normalizePermissions(request.permissions, request.scope).manage_projects).toBe(selected);
+  });
+
+  it.each(['folder', 'session'] as const)('cannot grant project management through a %s request', (scope) => {
+    const request = createScopedTokenSchema.parse({
+      name: 'restricted', scope, folder_id: 'top_a', session_id: 'ses_a',
+      permissions: { manage_projects: true },
+    });
+    expect(normalizePermissions(request.permissions, request.scope).manage_projects).toBe(false);
+  });
+
+  it('rejects non-boolean project permissions instead of silently discarding them', () => {
+    expect(createScopedTokenSchema.safeParse({
+      name: 'invalid', scope: 'global', permissions: { manage_projects: 'true' },
+    }).success).toBe(false);
+  });
+
+  it('keeps legacy request payloads without the new checkbox restricted', () => {
+    const request = createScopedTokenSchema.parse({
+      name: 'older-client', scope: 'global', permissions: { read_all: true },
+    });
+    expect(normalizePermissions(request.permissions, request.scope).manage_projects).toBe(false);
+  });
+
   it('is never granted implicitly to a token minted before it existed', () => {
     const legacy = { read_all: true, mint_tokens: true, create_sessions: true, create_folders: false, delete_folders: false, delete_sessions: false, rename_sessions: false };
     expect(normalizePermissions(legacy, 'global').manage_projects).toBe(false);

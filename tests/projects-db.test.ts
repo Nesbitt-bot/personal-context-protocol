@@ -102,6 +102,7 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     aliceBrowser = { session: b.sessionValue, csrf: b.csrfValue };
 
     routes = {
+      scopedTokens: await import('../src/app/api/v1/tokens/route'),
       mProjects: await import('../src/app/api/v1/manager/projects/route'),
       mResolve: await import('../src/app/api/v1/manager/projects/resolve/route'),
       mWorkspaces: await import('../src/app/api/v1/manager/projects/[id]/workspaces/route'),
@@ -184,6 +185,30 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
   });
 
   let projectId = '';
+
+  it('retains the UI project permission when creating, verifying and revoking a scoped token', async () => {
+    const created = await call('scopedTokens', 'POST', { browser: adminBrowser, body: {
+      name: 'UI session sync', scope: 'global', expires_in: '1h',
+      permissions: { read_all: true, create_sessions: true, mint_tokens: true, manage_projects: true },
+    } });
+    expect(created.status).toBe(200);
+    expect(created.body.permissions.manage_projects).toBe(true);
+    const token = created.body.access_token;
+    const [stored] = await raw`SELECT token_hash, salt, permissions_json FROM scoped_tokens WHERE id = ${created.body.id}`;
+    const { verifyToken } = await import('../src/lib/auth');
+    expect(stored.token_hash).not.toBe(token);
+    expect(await verifyToken(token, stored.token_hash, stored.salt)).toBe(true);
+    expect(stored.permissions_json.manage_projects).toBe(true);
+    const project = await call('mProjects', 'POST', { bearer: token, body: {
+      canonical_key: 'name:ui-token-regression', display_name: 'UI token regression',
+    } });
+    expect(project.status).toBe(201);
+    const revoked = await call('scopedTokens', 'PATCH', { browser: adminBrowser, body: {
+      token_id: created.body.id, revoke: true,
+    } });
+    expect(revoked.status).toBe(200);
+    expect((await call('mProjects', 'GET', { bearer: token })).status).toBe(401);
+  });
 
   it('creates one project per canonical identity, idempotently, and merges remotes and aliases', async () => {
     const created = await call('mProjects', 'POST', { bearer: tokens.manager, body: {
