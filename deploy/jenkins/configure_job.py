@@ -28,6 +28,7 @@ def request(path, data=None):
 
 crumb = json.loads(request('crumbIssuer/api/json'))
 headers[crumb['crumbRequestField']] = crumb['crumb']
+repository = 'https://github.com/Nesbitt-bot/personal-context-protocol.git'
 job = 'job/personal-context-protocol/'
 raw = request(job + 'config.xml')
 backup = Path('logs/jenkins-job-before-scm.xml')
@@ -41,7 +42,7 @@ definition = ET.SubElement(root, 'definition', {'class': 'org.jenkinsci.plugins.
 scm = ET.SubElement(definition, 'scm', {'class': 'hudson.plugins.git.GitSCM'})
 ET.SubElement(scm, 'configVersion').text = '2'
 remote = ET.SubElement(ET.SubElement(scm, 'userRemoteConfigs'), 'hudson.plugins.git.UserRemoteConfig')
-ET.SubElement(remote, 'url').text = 'https://github.com/Trance-0/personal-context-protocol.git'
+ET.SubElement(remote, 'url').text = repository
 branch = ET.SubElement(ET.SubElement(scm, 'branches'), 'hudson.plugins.git.BranchSpec')
 ET.SubElement(branch, 'name').text = '*/main'
 ET.SubElement(scm, 'doGenerateSubmoduleConfigurations').text = 'false'
@@ -64,4 +65,5 @@ root.find('description').text = 'GitHub main webhook → bounded build/tests →
 request(job + 'config.xml', ET.tostring(root))
 installed = ET.fromstring(request(job + 'config.xml'))
 assert installed.find('definition').get('class').endswith('CpsScmFlowDefinition')
+assert installed.findtext('./definition/scm/userRemoteConfigs/hudson.plugins.git.UserRemoteConfig/url') == repository
 print('Job configured: PCP.Jenkins/scm — remote GitHub main and Jenkinsfile; existing enabled/disabled state retained')

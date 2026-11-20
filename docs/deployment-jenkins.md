@@ -1,6 +1,6 @@
 # Local Jenkins deployment
 
-Jenkins deploys GitHub `Trance-0/personal-context-protocol` **main**, using
+Jenkins deploys GitHub `Nesbitt-bot/personal-context-protocol` **main**, using
 **Pipeline script from SCM**, script path `Jenkinsfile`, and the GitHub push
 webhook. Runtime is the local Next.js app plus local PostgreSQL; Neon is the
 read-only migration source, not the deployed runtime database.
@@ -8,29 +8,20 @@ read-only migration source, not the deployed runtime database.
 ## Controller, source and private env
 
 - Controller: http://127.0.0.1:8081/; job: `personal-context-protocol`.
-- Repository: `https://github.com/Trance-0/personal-context-protocol.git`.
+- Repository: `https://github.com/Nesbitt-bot/personal-context-protocol.git`.
 - Branch: `*/main`; script path: `Jenkinsfile`; lightweight checkout disabled.
 - Agent: `local-docker`; its workspace path is also mounted on the host.
 - Webhook receiver: `https://jenkins.trance-0.com/github-webhook/`.
 - Private agent env: `/var/lib/jenkins/secrets/pcp-deploy.env` inside
   `jenkins-local-docker`.
 
-The original checkout at `Documents/workspace/personal-context-protocol`
-tracks an older Nesbitt-bot fork. Jenkins uses Trance-0 main, which is the
-source of the previously running 0.1.24 app. Deployment work is isolated on
-`deploy/jenkins-neon-import` under `~/.local/state/pcp-jenkins/source` so that
-older checkout and its main branch remain intact. Never configure Jenkins
-with a snapshot of either local checkout.
+Push directly to `Nesbitt-bot/personal-context-protocol` on `main`. Its GitHub
+webhook triggers the local Jenkins deployment; no fork sync or Vercel build is
+required. Jenkins checks out the remote revision, not a local workspace.
 
-`local.env` is a private, mode-0600 reference in both checkouts. `prod.env`
-contains the supplied Neon source credentials and is also private. They are
-ignored by Git and excluded from Docker contexts. Update only the local
-runtime env on the agent:
-
-```bash
-docker cp local.env jenkins-local-docker:/var/lib/jenkins/secrets/pcp-deploy.env
-docker exec jenkins-local-docker chmod 600 /var/lib/jenkins/secrets/pcp-deploy.env
-```
+Keep runtime settings in the existing private, mode-0600 agent env file.
+Changing the SCM remote does not require replacing this file or migrating the
+database. Never copy Neon credentials into the runtime env.
 
 Required local values: `DATABASE_URL` targeting `db:5432/pcp`,
 `POSTGRES_PASSWORD` matching the existing cluster, `PCP_INSTANCE_SECRET`, and
