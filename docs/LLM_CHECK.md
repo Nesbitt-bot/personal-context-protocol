@@ -529,3 +529,11 @@ Append what this round actually did below:
 - No production build files, containers, runtime configuration, or database
   were modified for debugging. The requested push uses the normal GitHub
   webhook; Jenkins owns testing and deployment. No test-only trailer.
+
+## 2026-11-20 — Session files and paste recording (v0.4.5)
+
+- Moved fallback recording and agent prompt tools to the clipboard dialog.
+- Added session JSON download/upload controls in settings and authenticated
+  document routes with atomic merging. Type checking and six disposable-DB
+  integration checks passed. Browser verification covered modal focus and a
+  file download followed by duplicate-free reimport through the file picker.

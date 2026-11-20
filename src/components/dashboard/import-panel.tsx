@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, TerminalSquare, Upload } from 'lucide-react';
+import { Check, Upload } from 'lucide-react';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
 import { uiAuthHeaders } from '@/lib/client-auth';
 
@@ -60,13 +60,11 @@ export function ImportPanel({ sessionId, onImported }: ImportPanelProps) {
 
   return (
     <section className="mt-3 shrink-0 rounded-md border border-slate-200 bg-slate-950 p-4 text-slate-100 shadow-sm dark:border-slate-800">
-      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-        <TerminalSquare size={15} /> Paste fallback to record
-      </div>
       <p className="mb-3 text-xs leading-5 text-slate-400">
         If an agent could not upload from its sandbox, paste its fallback block here — a <code className="text-slate-300">{'{ messages }'}</code> object, the agent&apos;s JSON, a <code className="text-slate-300">&lt;PCP_COMPACT&gt;</code> block, or a plain transcript. Already-recorded messages are skipped automatically.
       </p>
       <textarea
+        aria-label="Fallback transcript"
         className="h-36 w-full resize-y rounded-md border border-slate-700 bg-black/40 p-3 font-mono text-xs text-slate-100 outline-none focus:border-sky-500"
         value={text}
         onChange={(event) => setText(event.target.value)}

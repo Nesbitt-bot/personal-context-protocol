@@ -211,3 +211,7 @@ Owner policy may allow sessions_yield together with sessions_spawn. The parent
 may yield while monitoring continues; a queued acknowledgement is not completion.
 The active model/permission failure is reported as a blocker. Jobs have a six-hour
 monitoring limit and updates are accepted for registered work for 24 hours.
+
+Session settings provide JSON file download/upload in the backend OpenSearch
+session-document format. The clipboard action opens a paste-recording dialog.
+See [session files](session-files.md) for the format and merge behavior.

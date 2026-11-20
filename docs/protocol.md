@@ -1112,3 +1112,24 @@ UI POST routes. Returns up to 20 ranked `results` (session `id` and current
 vector rankings are combined by reciprocal rank. Both retrieval paths are
 scoped to visible sessions; PostgreSQL checks visibility again before responding.
 No indexed transcript, vector, or unauthorized result count is returned.
+
+## Session JSON files (human UI)
+
+`GET /sessions/:id/document` downloads the complete session as a JSON attachment:
+`{ sid, title, summary, messages: [{ ordinal, role, content }] }`, the content
+fields of an OpenSearch session `_source`. It reads PostgreSQL so recent
+messages do not wait for indexing. No tokens or vectors are exported.
+
+`POST /sessions/:id/document` accepts that JSON or an OpenSearch hit with
+`_source`. Browser authentication, session ownership and CSRF are required.
+The URL selects the destination; the file's `sid` identifies source messages
+only. Appends and duplicate matching are serialized in one transaction. An
+empty destination adopts title/summary; existing context and task/category
+links are retained. Locked/archived sessions reject uploads. Index-derived
+fields are ignored and rebuilt by the indexer.
+
+Limits: 20 MiB JSON, 10,000 messages, 100,000 characters per message, 2,000,000
+summary characters. Invalid JSON returns 400, schema failures 422, oversized
+bodies 413, and read-only destinations 409. Success returns
+`{ success, session_id, imported, skipped, metadata_initialized }`. See
+[session files](session-files.md).

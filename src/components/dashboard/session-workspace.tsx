@@ -2,10 +2,11 @@
 
 import { useLights, PresenceLight } from '@/components/presence';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Archive, Check, ClipboardPaste, KeyRound, Lock, RotateCcw, Settings2, Shield, ShieldAlert } from 'lucide-react';
 import { Modal } from '@/components/modal';
 import { ImportPanel } from './import-panel';
+import { FallbackTools } from './fallback-tools';
 import { MessageList } from './message-list';
 import { CompactionList } from './compaction-list';
 import { ImportExportPanel } from './import-export-panel';
@@ -114,10 +115,12 @@ export function SessionWorkspace({
   const [linking, setLinking] = useState(false);
   const [historySessionId, setHistorySessionId] = useState<string | null>(null);
   const [historyEvents, setHistoryEvents] = useState<EventLog[] | null>(null);
-  const importRef = useRef<HTMLDivElement>(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
 
   useEffect(() => {
     setCompactionCount(0);
+    setPasteOpen(false);
+    setSettingsOpen(false);
     const link = selectedSession ? loadLink(selectedSession.id) : null;
     setAccessLink(link);
   }, [selectedSession?.id]);
@@ -181,9 +184,6 @@ export function SessionWorkspace({
   const recordingUrl = selectedSession ? `${window.location.origin}/r/${selectedSession.id}` : '';
   const linkSecondsLeft = accessLink ? Math.max(0, Math.floor((new Date(accessLink.expires_at).getTime() - now) / 1000)) : 0;
 
-  function scrollToImport() {
-    importRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
 
   return (
     <section className="min-h-0 min-w-0 bg-white dark:bg-slate-950">
@@ -243,7 +243,7 @@ export function SessionWorkspace({
                   {accessLink && linkSecondsLeft > 0 && (
                     <span className="text-xs font-medium tabular-nums text-emerald-600 dark:text-emerald-400" title="Temporary link time remaining">{formatCountdown(linkSecondsLeft)}</span>
                   )}
-                  <button className={ICON_BTN} onClick={scrollToImport} type="button" title="Paste from fallback block">
+                  <button className={ICON_BTN} onClick={() => setPasteOpen(true)} aria-label="Paste fallback to record" type="button" title="Paste from fallback block">
                     <ClipboardPaste size={16} />
                   </button>
                   <button className={ICON_BTN} onClick={() => setSettingsOpen(true)} type="button" title="Session settings">
@@ -285,15 +285,19 @@ export function SessionWorkspace({
               <div className="min-h-0 flex-1 overflow-y-auto pb-3">
                 <MessageList sessionId={selectedSession.id} messages={messages} onChanged={handleChanged} hasCompactions={compactionCount > 0} />
                 <CompactionList key={`${selectedSession.id}:${refreshKey}`} sessionId={selectedSession.id} onLoaded={setCompactionCount} />
-                <ImportExportPanel sessionId={selectedSession.id} sessionTitle={selectedSession.title} mode={(selectedSession.mode as 'wild' | 'exact' | 'locked') || 'wild'} messages={messages} onCopyMcpPrompt={() => onCopyMcpPrompt(selectedSession)} />
-              </div>
-              <div ref={importRef} className="shrink-0 border-t border-slate-200 pt-3 dark:border-slate-800">
-                <ImportPanel sessionId={selectedSession.id} onImported={handleChanged} />
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {pasteOpen && selectedSession && (
+        <Modal title="Paste fallback to record" onClose={() => setPasteOpen(false)} widthClass="max-w-2xl">
+          <div className="px-5 pb-5"><ImportPanel key={selectedSession.id} sessionId={selectedSession.id} onImported={handleChanged} />
+            <FallbackTools sessionId={selectedSession.id} sessionTitle={selectedSession.title} mode={mode} messages={messages} onCopyMcpPrompt={() => { setPasteOpen(false); onCopyMcpPrompt(selectedSession); }} />
+          </div>
+        </Modal>
+      )}
 
       {/* History popup: sibling sessions of this task + per-session operations log. */}
       {historyOpen && selectedSession && (
@@ -397,9 +401,7 @@ export function SessionWorkspace({
 
             <div className="rounded-md border border-slate-200 dark:border-slate-700">
               <p className="border-b border-slate-200 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">Import / Export</p>
-              <div className="p-3">
-                <p className="text-sm text-slate-600 dark:text-slate-300">Use the temporary access link (key icon) to sync context with an agent, or paste a fallback block in the message area (clipboard icon).</p>
-              </div>
+              <ImportExportPanel key={selectedSession.id} sessionId={selectedSession.id} readOnly={mode === 'locked' || selectedSession.archived} onImported={handleChanged} />
             </div>
 
             <div className="flex justify-end gap-2">
