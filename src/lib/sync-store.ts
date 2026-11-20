@@ -1,6 +1,7 @@
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { lastImportOrdinal, receiptIndex } from './import-receipts';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from './db';
-import { events, mergeTasks, messages, messageSyncKeys, projects, sessions, syncConflicts } from './schema';
+import { importReceipts, events, mergeTasks, messages, messageSyncKeys, projects, sessions, syncConflicts } from './schema';
 import { createId } from './auth';
 import { decideFieldWrite, planMessageMerge, readClock, type ClockMap, type ConflictRecord } from './sync-policy';
 
@@ -177,6 +178,8 @@ export async function mergeSessionMessages(sessionId: string, incoming: MergeMes
       : [];
     const aliases = await tx.select().from(messageSyncKeys).where(eq(messageSyncKeys.sessionId, session.id));
     const known = new Set([...existing.map((r) => r.id as string), ...aliases.map(row => row.externalId)]);
+    const replay = receiptIndex(await tx.select().from(importReceipts).where(eq(importReceipts.sessionId, session.id)));
+    for (const m of incoming) if (replay(m)) known.add(m.external_id);
     const claimed = new Set(aliases.map(row => row.messageId));
     // Upgrade earlier append-only imports to external IDs without changing
     // message IDs, ordinals, text, timestamps or attachment foreign keys.
@@ -194,8 +197,7 @@ export async function mergeSessionMessages(sessionId: string, incoming: MergeMes
       known.add(message.external_id); adopted += 1;
     }
     const plan = planMessageMerge(known, incoming);
-    const [max] = await tx.select({ max: sql<number>`max(${messages.ordinal})` }).from(messages).where(eq(messages.sessionId, session.id));
-    let ordinal = (max?.max ? Number(max.max) : 0) + 1;
+    let ordinal = (await lastImportOrdinal(tx, session.id)) + 1;
     const firstOrdinal = ordinal;
     for (const m of plan.append) {
       await tx.insert(messages).values({

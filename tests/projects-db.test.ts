@@ -161,7 +161,7 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     const exported = await cli.exportSessions(raw);
     expect(exported.has_projects).toBe(true);
     // Latest applied migration (schema_migrations versions sort lexically).
-    expect(exported.schema_version).toBe('022_session_presence');
+    expect(exported.schema_version).toBe('023_import_compaction_receipts');
     expect(exported.sessions.find((x: { id: string }) => x.id === 'ses_win_codex')).toEqual({ id: 'ses_win_codex', external_key: 'win-384de1b4:codex:019f', title: 'opencode:win-384de1b4:circtime [codex] deploy page', project_id: null, archived: false });
     expect(JSON.stringify(exported)).not.toContain('deploy via actions');
     // The transaction really is read-only.
@@ -378,6 +378,25 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
       { id: 'msg_legacy_1', ordinal: 1, external_message_id: null },
       { id: 'msg_legacy_2', ordinal: 2, external_message_id: null },
     ]);
+  });
+
+  it('keeps a compacted source resumable without recreating tasks or removed turns', async () => {
+    const { ensureTaskByExternalKey } = await import('../src/lib/task-store');
+    const { appendMessagesToSession } = await import('../src/lib/recording-store');
+    const { mergeSessionMessages } = await import('../src/lib/sync-store');
+    const sessionId = 'ses_import_mirror';
+    const externalKey = 'dev:dsh:mirror';
+    await raw`insert into tasks (id,title,external_key) values ('tsk_original','Canonical','dev:codex:original')`;
+    await raw`insert into sessions (id,title,external_key,task_id) values (${sessionId},'Mirror',${externalKey},'tsk_original')`;
+    const turn = { role: 'assistant' as const, content: 'original turn', provider_timestamp: '2026-04-01T01:00:00.000Z' };
+    await raw`insert into import_compaction_receipts values (${sessionId},1,'msg_retired','assistant',${turn.provider_timestamp},encode(sha256(convert_to(${turn.content},'UTF8')),'hex'),true)`;
+    const lookup = await ensureTaskByExternalKey({externalKey, title: 'Old mirror title'}, 'test');
+    expect(lookup).toMatchObject({created: false, task: {id: 'tsk_original', title: 'Canonical'}});
+    const append = (messages: Array<typeof turn>) => appendMessagesToSession({sessionId, messages, canRenameSession: false, actor: 'test'});
+    expect(await append([turn])).toMatchObject({duplicates: 1});
+    expect(await mergeSessionMessages(sessionId,[{...turn,external_id:'legacy'}],'dev','test')).toMatchObject({appended:0, duplicates:1});
+    expect(await append([{...turn,provider_timestamp:'2026-04-02T01:00:00.000Z'}])).toMatchObject({duplicates:0,messages:[{ordinal:2}]});
+    expect((await raw`select id from messages where session_id=${sessionId}`).length).toBe(1);
   });
 
 });

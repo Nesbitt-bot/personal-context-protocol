@@ -326,6 +326,11 @@ export async function ensureTaskByExternalKey(input: EnsureTaskByKeyInput, actor
       if (input.projectId) await setTaskProjects(existing.id, [input.projectId], input.projectId, actor, now);
       return { task: existing, created: false };
     }
+    // An imported session can be consolidated under another task. Its stable
+    // session key remains an alias, not permission to recreate or rename a task.
+    const [bound] = await db.select({ task: tasks }).from(sessions)
+      .innerJoin(tasks, eq(tasks.id, sessions.taskId)).where(eq(sessions.externalKey, input.externalKey)).limit(1);
+    if (bound) return { task: bound.task, created: false };
   }
   const created = await createTask({
     title: input.title,

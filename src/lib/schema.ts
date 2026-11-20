@@ -510,3 +510,14 @@ export const messageSyncKeys = pgTable('message_sync_keys', {
   externalId: text('external_id').notNull(),
   messageId: text('message_id').notNull().unique().references(() => messages.id, { onDelete: 'cascade' }),
 }, table => ({ pk: primaryKey({ columns: [table.sessionId, table.externalId] }) }));
+
+// Original sync positions, not a second copy of a compacted transcript.
+export const importReceipts = pgTable('import_compaction_receipts', {
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  ordinal: integer('ordinal').notNull(),
+  originalId: text('original_id').notNull(),
+  role: text('role').notNull(),
+  providerTimestamp: timestamp('provider_timestamp', { withTimezone: true }).notNull(),
+  contentSha256: text('content_sha256').notNull(),
+  removed: boolean('removed').notNull(),
+}, table => ({ pk: primaryKey({ columns: [table.sessionId, table.ordinal] }) }));

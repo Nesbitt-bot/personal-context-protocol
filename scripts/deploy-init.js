@@ -492,6 +492,16 @@ function schemaStatements(version) {
     // UPDATE tasks SET priority = 3 is NOT here — it must run only once.
     'ALTER TABLE tasks ALTER COLUMN priority DROP NOT NULL',
     'ALTER TABLE tasks ALTER COLUMN priority SET DEFAULT NULL',
+  `CREATE TABLE IF NOT EXISTS import_compaction_receipts (
+  session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  ordinal integer NOT NULL,
+  original_id text NOT NULL,
+  role text NOT NULL,
+  provider_timestamp timestamptz NOT NULL,
+  content_sha256 text NOT NULL,
+  removed boolean NOT NULL,
+  PRIMARY KEY (session_id, ordinal)
+)`,
   `CREATE TABLE IF NOT EXISTS session_presence (
   session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   reporter text NOT NULL,
@@ -594,7 +604,7 @@ async function main() {
 
     await sql`
       INSERT INTO schema_migrations (version, checksum)
-      VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset'), ('022_session_presence', 'session_reporter_leases')
+      VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset'), ('022_session_presence', 'session_reporter_leases'), ('023_import_compaction_receipts', 'mirror_replay_fingerprints')
       ON CONFLICT (version) DO NOTHING
     `;
 

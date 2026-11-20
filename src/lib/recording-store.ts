@@ -1,3 +1,4 @@
+import { lastImportOrdinal, receiptIndex } from './import-receipts';
 /**
  * Server-side write path for agent recording.
  *
@@ -17,9 +18,9 @@
  *   - topic ids are resolved internally and never surfaced to the agent.
  */
 
-import { and, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from './db';
-import { messages, sessions, events, compactions } from './schema';
+import { importReceipts, messages, sessions, events, compactions } from './schema';
 import { createId } from './auth';
 import { generateUniqueTitle, normalizeTitle } from './naming';
 import type { NormalizedCompact } from './ingest';
@@ -116,17 +117,19 @@ export async function appendMessagesToSession(params: {
   const { inserted, finalTitle, duplicates } = await db.transaction(async (tx) => {
     // Serialize appends per session: ordinals and the duplicate check below.
     await tx.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)).for('update');
-    const [maxOrdinal] = await tx
-      .select({ max: sql<number>`max(${messages.ordinal})` })
-      .from(messages)
-      .where(eq(messages.sessionId, sessionId));
-
-    let currentOrdinal = maxOrdinal?.max ? Number(maxOrdinal.max) : 0;
+    const replay = receiptIndex(await tx.select().from(importReceipts).where(eq(importReceipts.sessionId, sessionId)));
+    let currentOrdinal = await lastImportOrdinal(tx, sessionId);
     const insertedRows: Array<{ id: string; ordinal: number; duplicate?: boolean }> = [];
     let duplicateCount = 0;
     let firstNewOrdinal: number | null = null;
 
     for (const msg of newMessages) {
+      const receipt = replay(msg);
+      if (receipt) {
+        insertedRows.push({ id: receipt.originalId, ordinal: receipt.ordinal, duplicate: true });
+        duplicateCount += 1;
+        continue;
+      }
       if (msg.provider_timestamp) {
         const [existing] = await tx
           .select({ id: messages.id, ordinal: messages.ordinal })
