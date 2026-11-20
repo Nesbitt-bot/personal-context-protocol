@@ -19,6 +19,13 @@ Push directly to `Nesbitt-bot/personal-context-protocol` on `main`. Its GitHub
 webhook triggers the local Jenkins deployment; no fork sync or Vercel build is
 required. Jenkins checks out the remote revision, not a local workspace.
 
+When changing the repository on an existing job, run **Build Now** once after
+saving the new SCM URL. The GitHub webhook can reach Jenkins while Git polling
+still consults the previous build's checkout. Check that the bootstrap build
+reads `Jenkinsfile` from the new URL. On the next push, verify the build cause
+is **GitHub push**, its checked-out SHA matches the pushed `main` commit, and
+`/api/v1/health` reports that SHA with build target `jenkins`.
+
 Keep runtime settings in the existing private, mode-0600 agent env file.
 Changing the SCM remote does not require replacing this file or migrating the
 database. Never copy Neon credentials into the runtime env.

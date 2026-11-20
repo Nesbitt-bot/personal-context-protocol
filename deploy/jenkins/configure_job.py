@@ -66,4 +66,7 @@ request(job + 'config.xml', ET.tostring(root))
 installed = ET.fromstring(request(job + 'config.xml'))
 assert installed.find('definition').get('class').endswith('CpsScmFlowDefinition')
 assert installed.findtext('./definition/scm/userRemoteConfigs/hudson.plugins.git.UserRemoteConfig/url') == repository
+assert installed.findtext('./definition/scm/branches/hudson.plugins.git.BranchSpec/name') == '*/main'
+assert installed.findtext('./definition/scriptPath') == 'Jenkinsfile'
+assert installed.find('./properties/org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty/triggers/com.cloudbees.jenkins.GitHubPushTrigger') is not None
 print('Job configured: PCP.Jenkins/scm — remote GitHub main and Jenkinsfile; existing enabled/disabled state retained')
