@@ -4,7 +4,7 @@
  * Covers, at desktop (1280x800) and phone (390x844) widths in light and dark
  * themes:
  *   - the top navigation for signed-in admins and members (Sessions and
- *     Projects entries, admin-only Tokens/Settings, a working phone menu);
+ *     Projects entries, admin-only Tokens, a working phone menu);
  *   - every modal dialog (token manager, per-session tokens, token display):
  *     fully inside the viewport, labelled role="dialog", focus moves in and
  *     stays trapped, every control is hit-testable, Esc and the close button
@@ -222,7 +222,9 @@ async function memberRun(browser, viewportName, theme) {
   await closeMenu(page);
   record(`${prefix} nav: no Tokens entry (member)`, !(await navEntry(page, 'Tokens', 'button')));
   await closeMenu(page);
-  record(`${prefix} nav: no Settings entry (member)`, !(await navEntry(page, 'Settings')));
+  await page.getByRole('button', { name: /^Account:/ }).click();
+  record(`${prefix} account options`, (await page.locator('#account-options').innerText()).trim().split(/\s+/).join(',') === 'Profile,Settings,Logout');
+  await page.keyboard.press('Escape');
   await closeMenu(page);
   const listed = await page.request.get(`${BASE}/api/v1/sessions`);
   const ids = ((await listed.json().catch(() => ({}))).sessions || []).map((x) => x.id);

@@ -161,7 +161,7 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     const exported = await cli.exportSessions(raw);
     expect(exported.has_projects).toBe(true);
     // Latest applied migration (schema_migrations versions sort lexically).
-    expect(exported.schema_version).toBe('023_import_compaction_receipts');
+    expect(exported.schema_version).toBe('024_user_picture');
     expect(exported.sessions.find((x: { id: string }) => x.id === 'ses_win_codex')).toEqual({ id: 'ses_win_codex', external_key: 'win-384de1b4:codex:019f', title: 'opencode:win-384de1b4:circtime [codex] deploy page', project_id: null, archived: false });
     expect(JSON.stringify(exported)).not.toContain('deploy via actions');
     // The transaction really is read-only.
