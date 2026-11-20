@@ -1,4 +1,5 @@
-import { and, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
+import { lastImportOrdinal } from './import-receipts';
+import { and, desc, eq, ilike, inArray } from 'drizzle-orm';
 import { db } from './db';
 import { attachments, events, messages, sessions, syncedTurns } from './schema';
 import { createId } from './auth';
@@ -45,11 +46,7 @@ export async function appendTurn(
       return { ok: true as const, duplicate: true, sessionId: session.id, firstOrdinal: existing.firstOrdinal, messageCount: existing.messageCount };
     }
 
-    const [maxOrdinal] = await tx
-      .select({ max: sql<number>`max(${messages.ordinal})` })
-      .from(messages)
-      .where(eq(messages.sessionId, session.id));
-    const firstOrdinal = (maxOrdinal?.max ? Number(maxOrdinal.max) : 0) + 1;
+    const firstOrdinal = (await lastImportOrdinal(tx, session.id)) + 1;
 
     let ordinal = firstOrdinal;
     for (const message of turn) {

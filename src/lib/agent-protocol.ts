@@ -14,7 +14,7 @@ export const PROTOCOL_VERSION = '0.1';
 export const MAX_MESSAGES_PER_REQUEST = 50;
 export const MAX_CONTENT_CHARS = 100_000;
 
-export type RecordingMode = 'wild' | 'exact';
+export type RecordingMode = 'wild' | 'exact' | 'locked';
 export const DEFAULT_RECORDING_MODE: RecordingMode = 'wild';
 
 export const RECORDING_GUIDANCE: Record<RecordingMode, string> = {
@@ -22,6 +22,8 @@ export const RECORDING_GUIDANCE: Record<RecordingMode, string> = {
     'Recording mode is "wild". If recording a value verbatim could leak a secret, credential, API key, or other sensitive data, you may redact it with a placeholder like <REDACTED> or paraphrase it. Record the substance faithfully; prioritize safety over verbatim fidelity.',
   exact:
     'Recording mode is "exact". Record messages verbatim, including credentials and sensitive values, because this session is being captured for faithful future task migration. Do not redact or paraphrase.',
+  locked:
+    'This session is "locked" (read-only). It is no longer accepting new recordings; read the existing context if you need to continue, but do not attempt to append.',
 };
 
 /**
@@ -29,12 +31,14 @@ export const RECORDING_GUIDANCE: Record<RecordingMode, string> = {
  * for the stored `exact` mode (kept for backward compatibility).
  */
 export function normalizeRecordingMode(value: unknown): RecordingMode {
+  if (value === 'locked') return 'locked';
   return value === 'exact' || value === 'strict' ? 'exact' : 'wild';
 }
 
 /** Public/UI display name for a stored mode: `exact` is shown as `strict`. */
-export type DisplayMode = 'wild' | 'strict';
+export type DisplayMode = 'wild' | 'strict' | 'locked';
 export function displayMode(mode: RecordingMode): DisplayMode {
+  if (mode === 'locked') return 'locked';
   return mode === 'exact' ? 'strict' : 'wild';
 }
 

@@ -7,6 +7,7 @@ import { createId } from '@/lib/auth';
 import { logError } from '@/lib/logging';
 import { createSessionSchema } from '@/lib/validations';
 import { uniqueSessionTitle } from '@/lib/session-store';
+import { ensureTaskForSession } from '@/lib/task-store';
 import { desc, eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,10 @@ export async function GET(request: NextRequest) {
       .select({
         id: sessions.id,
         topic_id: sessions.topicId,
+        task_id: sessions.taskId,
+        project_id: sessions.projectId,
+        device_id: sessions.deviceId,
+        agent_name: sessions.agentName,
         title: sessions.title,
         public: sessions.public,
         mode: sessions.mode,
@@ -114,6 +119,9 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
       lastMessageAt: null,
     });
+
+    // Invariant: every session has a task. Auto-create one named after it.
+    await ensureTaskForSession(sessionId, title, topicId, null, 'human');
 
     await db.insert(events).values({
       id: createId('evt'),

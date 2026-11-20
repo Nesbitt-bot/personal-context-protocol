@@ -8,6 +8,7 @@ import { NavSidebar } from '@/components/dashboard/nav-sidebar';
 import { SessionWorkspace } from '@/components/dashboard/session-workspace';
 import { TokenModal } from '@/components/dashboard/token-modal';
 import { CreateModal, TopicCreateValues, SessionCreateValues } from '@/components/dashboard/create-modal';
+import { Modal } from '@/components/modal';
 import { EventLog, Message, Session, Topic } from '@/components/dashboard/types';
 import { readJsonResponse } from '@/lib/http';
 import { diagnosticMessage, errorCause } from '@/lib/logging';
@@ -45,15 +46,17 @@ function DashboardContent() {
   const [hasUiToken, setHasUiToken] = useState(false);
   const [uiTokenSource, setUiTokenSource] = useState<string | null>(null);
   const [tokenModalSession, setTokenModalSession] = useState<Session | null>(null);
-  const [eventsOpen, setEventsOpen] = useState(false);
   const [createModal, setCreateModal] = useState<{ kind: 'topic' } | { kind: 'session'; topicId: string | null } | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const sidebarWidthRef = useRef(320);
+  const [moveWarning, setMoveWarning] = useState<{ sessionId: string; topicId: string | null; sessions: Session[]; targetTitle: string } | null>(null);
+  const [neverWarnMove, setNeverWarnMove] = useState(false);
 
   // Restore the saved sidebar width on mount.
   useEffect(() => {
     const saved = Number(localStorage.getItem('pcp_sidebar_w'));
     if (saved >= 220 && saved <= 620) { setSidebarWidth(saved); sidebarWidthRef.current = saved; }
+    setNeverWarnMove(localStorage.getItem('pcp_move_task_warn_off') === '1');
   }, []);
 
   // Drag the border between the nav sidebar and the workspace.
@@ -208,10 +211,7 @@ function DashboardContent() {
     } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create session', moduleProcess: 'session administration / create session request', cause: `browser could not reach the sessions endpoint; ${errorCause(err)}` })); }
   }
 
-  async function renameTopic(topicId: string) {
-    const topic = topics.find((item) => item.id === topicId);
-    const title = window.prompt('Rename topic', topic?.title || '');
-    if (title === null) return;
+  async function renameTopic(topicId: string, title: string) {
     const trimmed = title.trim();
     if (!trimmed) return;
     try {
@@ -235,7 +235,7 @@ function DashboardContent() {
     } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to remove topic', moduleProcess: 'topic administration / remove topic request', cause: `browser could not reach the archive endpoint; ${errorCause(err)}` })); }
   }
 
-  async function updateSession(sessionId: string, fields: { title?: string; topic_id?: string | null; archived?: boolean; public?: boolean; mode?: 'wild' | 'exact' }) {
+  async function updateSession(sessionId: string, fields: { title?: string; topic_id?: string | null; archived?: boolean; public?: boolean; mode?: 'wild' | 'exact' | 'locked' }) {
     try {
       const res = await fetch(`/api/v1/sessions/${sessionId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(fields) });
       const data = await readJsonResponse(res, { consequence: 'Unable to update session', moduleProcess: 'session administration / update session request', fallbackCause: 'update session endpoint did not return JSON' });
@@ -302,18 +302,58 @@ function DashboardContent() {
     } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to empty trash', moduleProcess: 'trash administration / empty trash', cause: errorCause(err) })); }
   }
 
-  async function moveSession(sessionId: string, topicId: string | null) {
-    if (await updateSession(sessionId, { topic_id: topicId })) {
-      setExpanded((prev) => new Set(prev).add(topicId ?? '__none__'));
-      setStatus('Session moved.');
+  function moveSession(sessionId: string, topicId: string | null) {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    const taskId = session.task_id;
+    const siblings = taskId ? sessions.filter((s) => s.task_id === taskId && !s.archived) : [session];
+    if (taskId && siblings.length > 1 && !neverWarnMove) {
+      const target = topics.find((t) => t.id === topicId)?.title ?? 'Uncategorized';
+      setMoveWarning({ sessionId, topicId, sessions: siblings, targetTitle: target });
+      return;
     }
+    void doMove(sessionId, topicId);
+  }
+
+  async function doMove(sessionId: string, topicId: string | null) {
+    try {
+      const res = await fetch(`/api/v1/sessions/${encodeURIComponent(sessionId)}/move`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ topic_id: topicId }) });
+      const data = await readJsonResponse(res, { consequence: 'Unable to move session', moduleProcess: 'session administration / move session', fallbackCause: 'move endpoint did not return JSON' });
+      if (!res.ok || data.error) { setError(data.error || 'Unable to move session'); return; }
+      setExpanded((prev) => new Set(prev).add(topicId ?? '__none__'));
+      const moved = Array.isArray(data.moved_session_ids) ? data.moved_session_ids.length : 1;
+      setStatus(moved > 1 ? `Moved ${moved} sessions and their task.` : 'Session moved.');
+      await loadAll();
+    } catch (err) {
+      setError(diagnosticMessage({ consequence: 'Unable to move session', moduleProcess: 'session administration / move session', cause: errorCause(err) }));
+    }
+  }
+
+  function confirmMove() {
+    if (!moveWarning) return;
+    if (neverWarnMove) localStorage.setItem('pcp_move_task_warn_off', '1');
+    const { sessionId, topicId } = moveWarning;
+    setMoveWarning(null);
+    void doMove(sessionId, topicId);
   }
 
   function startEditSession() { if (!selectedSession) return; setEditTitle(selectedSession.title); setEditTopicId(selectedSession.topic_id || ''); setEditingSession(true); }
   async function saveSessionEdits() { const title = editTitle.trim(); if (!selectedSession || !title) return; if (await updateSession(selectedSession.id, { title, topic_id: editTopicId || null })) { setEditingSession(false); setStatus('Session updated'); } }
   async function archiveSelectedSession() { if (!selectedSession) return; if (await updateSession(selectedSession.id, { archived: true })) setStatus('Session archived'); }
-  async function togglePublic(session: Session, next: boolean) { if (await updateSession(session.id, { public: next })) setStatus(next ? 'Session is now public (read-only link).' : 'Session is now private.'); }
-  async function setMode(session: Session, mode: 'wild' | 'exact') { if (await updateSession(session.id, { mode })) setStatus(mode === 'exact' ? 'Recording mode: exact — agents are told to record verbatim.' : 'Recording mode: wild — agents may redact secrets.'); }
+  async function setMode(session: Session, mode: 'wild' | 'exact' | 'locked') {
+    if (await updateSession(session.id, { mode })) {
+      setStatus(mode === 'locked' ? 'Session locked — read-only.' : mode === 'exact' ? 'Recording mode: exact — agents are told to record verbatim.' : 'Recording mode: wild — agents may redact secrets.');
+    }
+  }
+
+  async function createAccessLink(session: Session): Promise<{ url: string; expires_at: string } | null> {
+    try {
+      const res = await fetch(`/api/v1/sessions/${encodeURIComponent(session.id)}/access-code`, { method: 'POST', headers: authHeaders() });
+      const data = await readJsonResponse(res, { consequence: 'Unable to create access link', moduleProcess: 'session administration / create access link', fallbackCause: 'access-code endpoint did not return JSON' });
+      if (!res.ok || data.error) { setError(data.error || 'Unable to create access link'); return null; }
+      return { url: data.url, expires_at: data.expires_at };
+    } catch (err) { setError(diagnosticMessage({ consequence: 'Unable to create access link', moduleProcess: 'session administration / create access link', cause: errorCause(err) })); return null; }
+  }
   async function restoreSelectedSession() { if (!selectedSession) return; if (await updateSession(selectedSession.id, { archived: false })) setStatus('Session restored'); }
 
   async function generateToken(session: Session) {
@@ -412,17 +452,14 @@ function DashboardContent() {
         <SessionWorkspace
           error={error} status={status} hasUiToken={hasUiToken} uiTokenInput={uiTokenInput}
           selectedTopic={selectedTopic} selectedSession={selectedSession}
-          topics={topics.filter(t => !t.archived)} messages={messages} events={events}
-          eventsOpen={eventsOpen} onToggleEvents={() => setEventsOpen(o => !o)}
+          topics={topics.filter(t => !t.archived)} sessions={sessions} messages={messages} events={events}
           editingSession={editingSession} editTitle={editTitle} editTopicId={editTopicId}
-          generatedToken={generatedToken} onClearGeneratedToken={() => setGeneratedToken('')}
           onUiTokenInputChange={setUiTokenInput} onSaveUiToken={saveUiToken}
           onStartEditSession={startEditSession} onEditTitleChange={setEditTitle}
           onEditTopicIdChange={setEditTopicId} onSaveSessionEdits={saveSessionEdits}
           onCancelSessionEdits={() => setEditingSession(false)}
           onArchiveSelectedSession={archiveSelectedSession} onRestoreSelectedSession={restoreSelectedSession}
-          onGenerateToken={generateToken} onCreateImportToken={createImportToken} onCreateExportToken={createExportToken} onManageTokens={setTokenModalSession}
-          onTogglePublic={togglePublic} onSetMode={setMode} onCopyMcpPrompt={copyMcpPrompt}
+          onSetMode={setMode} onCopyMcpPrompt={copyMcpPrompt} onCreateAccessLink={createAccessLink}
           onImported={() => selectedSession && loadSessionDetail(selectedSession.id)}
         />
       </div>
@@ -447,6 +484,33 @@ function DashboardContent() {
           onCancel={() => setCreateModal(null)}
           onCreateSession={submitCreateSession}
         />
+      )}
+      {moveWarning && (
+        <Modal title="Move session and its task?" onClose={() => setMoveWarning(null)} widthClass="max-w-xl">
+          <div className="space-y-4 px-5 py-4">
+            <p className="text-sm text-slate-700 dark:text-slate-200">
+              This session belongs to a task with <span className="font-medium">{moveWarning.sessions.length} sessions</span>. Moving it to{' '}
+              <span className="font-medium">{moveWarning.targetTitle}</span> will move the task and all of its sessions there too:
+            </p>
+            <ul className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-3 text-sm dark:border-slate-700">
+              {moveWarning.sessions.map((s) => (
+                <li key={s.id} className="truncate text-slate-700 dark:text-slate-200">{s.title}</li>
+              ))}
+            </ul>
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <input type="checkbox" className="accent-sky-600" checked={neverWarnMove} onChange={(e) => setNeverWarnMove(e.target.checked)} />
+              Don&apos;t warn me again when moving a multi-session task
+            </label>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setMoveWarning(null)} className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                Cancel
+              </button>
+              <button type="button" onClick={confirmMove} className="rounded-md bg-slate-950 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300">
+                Move all {moveWarning.sessions.length} sessions
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </main>
   );

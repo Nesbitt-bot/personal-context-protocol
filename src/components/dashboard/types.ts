@@ -10,9 +10,13 @@ export interface Topic {
 export interface Session {
   id: string;
   topic_id: string | null;
+  task_id: string | null;
+  project_id: string | null;
+  device_id: string | null;
+  agent_name: string | null;
   title: string;
   public?: boolean;
-  mode?: 'wild' | 'exact';
+  mode?: 'wild' | 'exact' | 'locked';
   archived: boolean;
   created_at: string;
   updated_at?: string;

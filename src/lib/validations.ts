@@ -46,7 +46,7 @@ export const renameTopicSchema = z.object({
 export const createSessionSchema = z.object({
   title: z.string().max(200).optional(),
   topic_id: z.string().min(1).optional(),
-  mode: z.enum(['wild', 'exact']).optional(),
+  mode: z.enum(['wild', 'exact', 'locked']).optional(),
 });
 
 export const renameSessionSchema = z.object({
@@ -59,7 +59,7 @@ export const updateSessionSchema = z.object({
   topic_id: z.string().min(1).nullable().optional(),
   archived: z.boolean().optional(),
   public: z.boolean().optional(),
-  mode: z.enum(['wild', 'exact']).optional(),
+  mode: z.enum(['wild', 'exact', 'locked']).optional(),
   // Admin only: platform principal (null clears) and attribution class.
   principal: z.string().min(1).max(300).nullable().optional(),
   class: z.enum(['trusted', 'unattributed', 'group']).optional(),

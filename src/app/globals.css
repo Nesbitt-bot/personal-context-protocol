@@ -52,3 +52,12 @@ textarea {
     transition-duration: 0.001ms !important;
   }
 }
+.pcp-light { display: inline-block; vertical-align: middle; flex: none; width: .65rem; height: .65rem; margin-inline-end: .35rem; border-radius: 50%; background: #059669; }
+.pcp-light.pcp-problem { background: #dc2626; border-radius: 2px; }
+:is([data-presence='problem'], [data-presence='mixed']) { background-color: #fee2e2 !important; color: #7f1d1d !important; }
+.dark :is([data-presence='problem'], [data-presence='mixed']) { background-color: #581c25 !important; color: #ffe4e6 !important; }
+@media (prefers-reduced-motion: no-preference) {
+  .pcp-session-live { animation: pcp-breathe 2.6s ease-in-out infinite; }
+  .pcp-task-live { animation: pcp-breathe 1.5s ease-in-out infinite; }
+  @keyframes pcp-breathe { 0%, 100% { opacity: .65; } 50% { opacity: 1; box-shadow: 0 0 0 3px #10b98144; } }
+}

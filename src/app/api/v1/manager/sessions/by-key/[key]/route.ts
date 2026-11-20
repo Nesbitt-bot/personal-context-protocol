@@ -1,8 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { count, eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { verifyScopedToken } from '@/lib/middleware';
 import { db } from '@/lib/db';
-import { messages, sessions } from '@/lib/schema';
+import { importReceipts, messages, sessions } from '@/lib/schema';
 import { logError } from '@/lib/logging';
 import { normalizeExternalKey } from '@/lib/external-key';
 
@@ -62,14 +62,14 @@ export async function GET(
       return NextResponse.json({ found: false, external_key: externalKey });
     }
 
-    const [cursor] = await db
-      .select({ messageCount: count(messages.id) })
-      .from(messages)
-      .where(eq(messages.sessionId, session.id));
-
-    // Ordinals are assigned monotonically from 1 per session, so the message
-    // count is also the highest ordinal recorded.
-    const messageCount = Number(cursor?.messageCount ?? 0);
+    // Legacy clients slice the source transcript at message_count. A physically
+    // removed mirror turn still consumes its original position in that stream.
+    const [cursor] = await db.select({
+      visible: sql<number>`count(*)::int`,
+      removed: sql<number>`(select count(*)::int from ${importReceipts} where session_id = ${session.id} and removed)`,
+      last: sql<number>`greatest(coalesce(max(${messages.ordinal}), 0), (select coalesce(max(ordinal), 0) from ${importReceipts} where session_id = ${session.id}))`,
+    }).from(messages).where(eq(messages.sessionId, session.id));
+    const messageCount = Number(cursor.visible) + Number(cursor.removed);
 
     return NextResponse.json({
       found: true,
@@ -78,7 +78,8 @@ export async function GET(
       title: session.title,
       mode: session.mode,
       message_count: messageCount,
-      last_ordinal: messageCount,
+      visible_message_count: Number(cursor.visible),
+      last_ordinal: Number(cursor.last),
     });
   } catch (error) {
     logError({

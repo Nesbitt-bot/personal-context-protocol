@@ -73,6 +73,12 @@ export const AGENT_ERRORS: Record<string, AgentErrorShape> = {
     message: 'Unable to record: agent session recording / session state check — the session is archived and is read-only.',
     next_steps: ['Ask the user to restore the session before recording more messages.'],
   },
+  SESSION_LOCKED: {
+    status: 403,
+    retryable: false,
+    message: 'Unable to record: agent session recording / session state check — the session is locked and read-only.',
+    next_steps: ['Read the existing context if you need to continue, but do not append. Ask the user to unlock the session to record more.'],
+  },
   UNPARSEABLE_PAYLOAD: {
     status: 422,
     retryable: true,

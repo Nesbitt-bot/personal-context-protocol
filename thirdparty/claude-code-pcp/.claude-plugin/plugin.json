@@ -1,0 +1,25 @@
+{
+  "name": "claude-code-pcp",
+  "description": "Auto-sync this Claude Code session with Personal Context Protocol. On session start it checks the remote status and warns when a previously-synced session is resumed while PCP is unreachable (to avoid conflicting with the remote copy).",
+  "version": "0.1.0",
+  "author": {
+    "name": "Personal Context Protocol"
+  },
+  "commands": [
+    "./commands/pcp-sync.md"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/session-start.mjs"],
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

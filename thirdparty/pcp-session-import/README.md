@@ -76,3 +76,6 @@ DIR`, the OpenClaw container checkouts (`/home/node/.openclaw/workspace/git/<rep
 Full runbook: `docs/projects.md`.
 
 Tests: `node --test` in this directory.
+
+On `--upload`, a verified live-DB cursor also writes a private, metadata-only
+revision receipt for the OpenCode presence light. Dry runs do not write receipts.

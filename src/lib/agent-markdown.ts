@@ -225,3 +225,108 @@ ${transcriptExampleText(mode)}
 <!-- machine-readable descriptor: GET ${url(`/r/${sessionId}`)}?format=json -->
 `;
 }
+
+/**
+ * The instruction document served from `GET /l/<code>` — a temporary bind/sync
+ * link. It tells the agent to bind a local session to a remote PCP session,
+ * push its context directly when it can, or emit a fallback export otherwise.
+ */
+export function buildLinkInstructionMarkdown(options: {
+  base: string | null;
+  sessionId: string;
+  code: string;
+  title: string | null;
+  mode: RecordingMode;
+  existingMessageCount: number;
+}): string {
+  const { sessionId, code, title, mode, existingMessageCount } = options;
+  const base = (options.base || '').replace(/\/+$/, '');
+  const url = (path: string) => (base ? `${base}${path}` : path);
+  const ingestUrl = url(`/api/v1/agent/sessions/${sessionId}/ingest`);
+  const compactUrl = url(`/api/v1/agent/sessions/${sessionId}/compact`);
+  const transcriptUrl = url(`/r/${sessionId}/transcript`);
+  const m = displayMode(mode);
+
+  return `# Personal Context Protocol — bind & sync instructions
+
+You were given a **temporary access link** by the person you are talking to. The
+code in this URL is your credential for **one session only**:
+
+    ${code}
+
+It is valid for **1 hour of inactivity**, refreshed each time you read or
+upload, and expires **24 hours** after it was created no matter what.
+
+## What you are being asked to do
+
+Bind your **current local session** to this remote PCP session
+\`${title || sessionId}\`, so the user can continue the same work elsewhere.
+
+## Step 0 — decide how you can sync
+
+- **Push directly** if you have an HTTP/web tool or a PCP plugin installed:
+  use the endpoints below with \`Authorization: Bearer <the code>\`.
+- **No web/upload capability?** That is fine. Emit a \`<PCP_TRANSCRIPT>\` block
+  (see step 3) for your user to paste into their dashboard themselves. Do not
+  claim the sync succeeded in that case.
+
+## Step 1 — read the current remote context
+
+${existingMessageCount > 0 ? `This session already holds **${existingMessageCount} message(s)**. Read them first so you append only what is new.` : 'This session is empty.'}
+
+\`\`\`bash
+curl -H "Authorization: Bearer ${code}" "${transcriptUrl}"
+\`\`\`
+
+The returned markdown is the context so far. If your user asked you to **resume
+context** on this device, load it and continue the work.
+
+## Step 2 — push your local session (primary method: markdown)
+
+POST your conversation as a raw markdown transcript — one \`### @role\` heading
+per message, in order, wrapped in a \`<PCP_TRANSCRIPT>\` tag with a \`title\`:
+
+\`\`\`bash
+curl -X POST "${ingestUrl}" \\
+  -H "Authorization: Bearer ${code}" \\
+  -H "Content-Type: text/markdown" \\
+  --data-binary @- <<'EOF'
+<PCP_TRANSCRIPT v=1 title="Short specific title">
+### @user
+
+first user message
+
+### @assistant
+
+first assistant reply
+</PCP_TRANSCRIPT>
+EOF
+\`\`\`
+
+- Include every message, including the one that asked you to sync and your replies.
+- Already-recorded messages are deduplicated, so overlapping with step 1 is safe.
+- On success the server replies \`{ "ok": true, "imported": { ... } }\` — only then
+  is the sync done.
+
+Compact summary (only when full messages cannot be reconstructed):
+\`POST ${compactUrl}\` with \`{ "summary": "...", "decisions": [] }\` and the same
+\`Authorization\` header.
+
+## Step 3 — fallback export (no direct push)
+
+Output a fenced block exactly like this for your user to paste:
+
+\`\`\`text
+${transcriptExampleText(mode)}
+\`\`\`
+
+## Boundaries
+
+- Use the code only for this session. Do not manage topics, rewrite messages,
+  or touch other sessions. On \`ACCESS_CODE_EXPIRED\` /
+  \`ACCESS_CODE_IDLE_EXPIRED\` / \`ACCESS_CODE_REVOKED\`, stop and tell your user
+  to generate a fresh link.
+- Everything you send is stored as raw, human-readable text the user reviews.
+- Recording mode: **${m}**. ${RECORDING_GUIDANCE[mode]}
+`;
+}

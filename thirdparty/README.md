@@ -4,6 +4,8 @@ Channel plugins and sync tools that connect other systems to PCP. They are
 built, tested and deployed separately from the PCP web app and are excluded
 from the Docker image (`.dockerignore`).
 
+- `codex-pcp/` and `opencode-pcp-presence/`: session registration and live sync
+  lights for Codex and OpenCode. See their READMEs for installation and receipt requirements.
 - `openclaw-pcp/`: OpenClaw plugin (design Phase 3, native Telegram and
   OpenClaw-WeChat). It provides turn grants and a bounded cross-session context
   summary, grant-checked `pcp_context` / `pcp_search` tools, async redacted

@@ -3,6 +3,7 @@ import { requireProjectToken, validationError } from '@/lib/project-access';
 import { mergeMessagesSchema } from '@/lib/project-validations';
 import { sessionByExternalKey } from '@/lib/manager-session-key';
 import { mergeSessionMessages } from '@/lib/sync-store';
+import { stampSessionIdentity } from '@/lib/manager-store';
 import { logError } from '@/lib/logging';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: { key: st
     if (!session) return NextResponse.json({ error: `${consequence}: session sync / session lookup - no session has this external key`, code: 'NOT_FOUND' }, { status: 404 });
     const outcome = await mergeSessionMessages(session.id, parsed.data.messages, parsed.data.device_id, gate.actor);
     if (!outcome.ok) return NextResponse.json({ error: outcome.error, code: outcome.code }, { status: outcome.status });
+    await stampSessionIdentity(session.id, { agentName: parsed.data.agent_name ?? undefined, deviceId: parsed.data.device_id });
     return NextResponse.json({ session_id: session.id, ...outcome });
   } catch (error) {
     logError({ consequence, moduleProcess: 'session sync / merge messages', cause: 'session lock or message insert failed', error });

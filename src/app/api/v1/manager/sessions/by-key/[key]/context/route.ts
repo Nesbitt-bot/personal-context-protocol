@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { eq } from 'drizzle-orm';
 import { requireProjectToken, validationError } from '@/lib/project-access';
 import { sessionContextSchema } from '@/lib/project-validations';
 import { sessionByExternalKey } from '@/lib/manager-session-key';
 import { applySessionContext } from '@/lib/sync-store';
+import { stampSessionIdentity } from '@/lib/manager-store';
+import { db } from '@/lib/db';
+import { sessions, tasks } from '@/lib/schema';
 import { logError } from '@/lib/logging';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +27,16 @@ export async function PATCH(request: NextRequest, { params }: { params: { key: s
     if (session && 'error' in session) return NextResponse.json({ error: `${consequence}: session sync / external key validation - ${session.error}`, code: 'VALIDATION_ERROR' }, { status: 400 });
     if (!session) return NextResponse.json({ error: `${consequence}: session sync / session lookup - no session has this external key`, code: 'NOT_FOUND' }, { status: 404 });
     const body = parsed.data;
+    // Identity and task link are plain last-writer-wins (not sync-conflict
+    // managed): whichever plugin last saw the session sets them.
+    if (body.task_id) {
+      const [task] = await db.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, body.task_id)).limit(1);
+      if (!task) return NextResponse.json({ error: `${consequence}: session sync / task lookup - task_id does not exist`, code: 'NOT_FOUND' }, { status: 404 });
+    }
+    await stampSessionIdentity(session.id, { agentName: body.agent_name ?? undefined, deviceId: body.device_id });
+    if (body.task_id !== undefined) {
+      await db.update(sessions).set({ taskId: body.task_id, updatedAt: new Date() }).where(eq(sessions.id, session.id));
+    }
     const base = Object.fromEntries(Object.entries(body.base_updated_at || {}).map(([k, v]) => [k, new Date(v as string)]));
     const outcome = await applySessionContext(session.id, {
       project_id: body.project_id, context_title: body.context_title, context_summary: body.context_summary,

@@ -398,6 +398,13 @@ Body:
 }
 ```
 
+### POST `/sessions/:id/move` (admin)
+
+Moves a session to another category and keeps its task consistent: the task's
+category follows, and every session bound to that task moves with it. Body:
+`{ "topic_id": "topic_123" | null }`. Response `{ success, moved_session_ids,
+moved_task_id }`.
+
 Admins may also set `principal` (e.g. `"telegram:123"`, `null` clears it) and
 `class` (`trusted` | `unattributed` | `group`); attaching a principal that is
 already linked to a user makes that user the owner of an unowned session.
@@ -511,6 +518,64 @@ versions and merge instructions, for an agent to resolve later through
 `/manager/merge-tasks`. PCP never calls a model. Idempotent per conflict
 (`created: false` returns the pending task).
 
+## Tasks (sprint board)
+
+The Asana-like sprint board (migration 017). A **task** is a unit of work inside
+a **category** (folder/topic); a **project** stays a pure repo tag (see
+[projects.md](projects.md)) linked to tasks many-to-many with at most one
+**primary** project. Sessions attach to one task. Admin-only: every route below
+requires a Casdoor admin session (or break-glass admin) and is CSRF-checked.
+
+### GET|POST `/tasks`
+
+`GET /tasks?sort=&dir=` returns the board: `{ board: { id, name }, categories:
+[{ id, title, open_count, completed_count }], projects: [{ id, display_name,
+canonical_key }], tasks: [{ id, parent_id, topic_id, topic_title, title,
+description, completed, completed_at, priority, expected_turns, due_at,
+position, created_at, updated_at, project, project_ids, subtask_count,
+session_count, current_turns, progress }] }`. `sort` is one of `category`,
+`project`, `name`, `priority`, `progress`, `updated`, `created`; `dir` is `asc`
+or `desc` (times default `desc`, the rest `asc`). `current_turns` is the sum of
+messages across the task and its subtasks' sessions; `progress` is
+`current_turns / expected_turns` when `expected_turns` is set.
+
+`POST /tasks` creates a task: `{ title?, description?, topic_id? (null allowed),
+parent_id? (subtask — inherits the parent's category), priority? (0–3),
+expected_turns? (int or null), due_at? (ISO or null), project_ids?,
+primary_project_id? }`. Omit both `topic_id` and `parent_id` for an unassigned
+task. Returns `{ success, id, title, topic_id, parent_id }`.
+
+### GET|PATCH `/tasks/board`
+
+`GET` returns `{ board: { id, name } }`. `PATCH` renames the board: `{ name }`.
+
+### GET|PATCH|DELETE `/tasks/:id`
+
+`GET` returns the detail: `{ task, categories, projects, sessions, resources }`.
+`sessions` rows are `{ id, title, context_title, external_key, health
+(healthy|stale|drift), run_count, hosted_machine, agent_name, last_updated,
+project_id, project_name, resume_code, session_url }`; `resources` rows are
+`{ id, title, url, kind (doc|remote|local), source (agent|human), created_at }`.
+
+`PATCH` edits fields: `{ title?, description?, topic_id?, parent_id?,
+completed?, priority?, expected_turns?, due_at?, position? }`. `DELETE` removes
+the task (`409` while it still has subtasks).
+
+### PATCH `/tasks/:id/projects`
+
+`{ project_ids, primary_project_id? (null allowed) }` replaces the task's
+repo-tag projects; the primary must be inside `project_ids`.
+
+### POST `/tasks/:id/resources`
+
+`{ title, url, kind? (doc|remote|local), source? (agent|human) }` adds a bound
+resource. `DELETE /tasks/:id/resources/:resourceId` removes one.
+
+### POST `/tasks/:id/sessions`
+
+`{ session_id }` links a session to the task (one task per session).
+`DELETE /tasks/:id/sessions/:sessionId` detaches it.
+
 ## Projects for agents and plugins (scoped manager)
 
 `Authorization: Bearer <scoped token>`, **global scope only** (folder and
@@ -557,6 +622,16 @@ directory must be absolute. Unique per (project, device, directory).
 `last_seen_at` only moves forward; `default_branch` and `device_label` are
 last-writer-wins by `seen_at`.
 
+### POST `/manager/tasks`
+
+Find-or-create a sprint-board task and set its attributes, from a sync plugin:
+`{ external_key?, title?, category_id? (folder/topic id), project_id?,
+priority? (0-3), expected_turns? (int or null), due_at? (ISO or null),
+session_id? }`. `external_key` makes it idempotent; when it matches an existing
+task the attributes are updated instead of forking a new one. `session_id`
+links that session to the task (one task per session). Response `{ task_id,
+created, session_id }` (`201` when created).
+
 ### PATCH `/manager/sessions/by-key/:key/context`
 
 Attach the session with this external key to a project and/or set its task
@@ -567,20 +642,25 @@ context:
   "project_id": "prj_...",
   "context_title": "Deploy the page with GitHub Actions",
   "context_summary": "...",
+  "agent_name": "opencode",
+  "task_id": "tsk_...",
   "updated_at": "2026-11-05T10:00:00Z",
   "device_id": "win-1a2b3c4d",
   "base_updated_at": { "context_summary": "2026-11-04T09:00:00Z" }
 }
 ```
 
-`updated_at` is the plugin's own modification time; `base_updated_at` (per
-field, optional) is the field clock the writer last saw. Response `{
-session_id, applied, kept, unchanged, conflicts, clock_skew }`.
+`agent_name` and `device_id` record which agent on which machine hosted the
+session; `task_id` links it to a sprint-board task (`null` unlinks). These are
+last-writer-wins. `updated_at` is the plugin's own modification time;
+`base_updated_at` (per field, optional) is the field clock the writer last saw.
+Response `{ session_id, applied, kept, unchanged, conflicts, clock_skew }`.
 
 ### POST `/manager/sessions/by-key/:key/merge-messages`
 
-`{ device_id, messages: [{ external_id, role, content, provider?, base_model?,
-provider_timestamp? }] }` (1-50): append-only merge by message id. Response `{
+`{ device_id, agent_name?, messages: [{ external_id, role, content, provider?,
+base_model?, provider_timestamp? }] }` (1-50): append-only merge by message id.
+`device_id`/`agent_name` are also stamped on the session. Response `{
 session_id, appended, duplicates, first_ordinal }`.
 
 ### GET `/manager/merge-tasks?status=pending`
@@ -684,6 +764,21 @@ Response (token shown only here):
   "status": "active"
 }
 ```
+
+### POST `/sessions/:sessionId/access-code` (admin)
+
+Generates a temporary bind/sync link. The raw code is returned once; the URL is
+what the user hands to their agent:
+
+```json
+{ "success": true, "id": "lnk_...", "code": "<raw code, shown once>",
+  "url": "https://<domain>/l/<code>", "expires_at": "...", "idle_timeout_seconds": 3600 }
+```
+
+`GET /l/<code>` serves the bind/sync instruction document (public). The code
+grants append/read access to the one bound session for a sliding **1h idle
+window** (refreshed on each agent read/upload) and a **24h absolute cap** from
+creation.
 
 ## Agent Recording (URL + token)
 
@@ -983,3 +1078,20 @@ The child, parent, credential and signed delivery route stay bound.
 `POST /api/v1/service/broker/work` accepts signed ingress polls with
 `{after,id,nonce,ts}` and returns only that ingress credential's work updates.
 Destinations originate from the signed platform stamp, never from model output.
+
+## Session sync presence
+
+`POST /api/v1/manager/sessions/by-key/:key/presence` records a plugin heartbeat
+for an existing session. Use a global or matching folder token with
+`create_sessions`. Send `reporter` (`codex` or `opencode`), a random UUID `run`,
+`start` (true for the first report of a new run), and `state` (`synced`,
+`unsynced`, or `closed`). The server timestamps arrival. Renew every 20 seconds;
+close only on a normal exit. Success is 204. A 409 means the lease ended or a
+new run replaced this one: stop that worker, do not reclaim the lease.
+
+`GET /api/v1/presence` is an authenticated, non-cacheable UI snapshot. It maps
+visible session IDs, and for admins task IDs, to `live`, `problem`, or (for tasks with both) `mixed`. After 65
+seconds without a heartbeat a live session becomes a problem. Out-of-sync
+reports are problems immediately. Clean closes and never-monitored history
+have no light. A mixed parent keeps its active light on a red background. A dashboard connection error clears old indicators rather than
+claiming a session failed. Polling does not refresh any lease.
