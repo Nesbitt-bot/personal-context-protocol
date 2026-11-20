@@ -87,6 +87,7 @@ export async function completeLogin(
   const profile = {
     displayName: identity.displayName,
     email: identity.email,
+    pictureUrl: identity.pictureUrl,
     groupsJson: groupsSnapshot,
     isAdmin: decision.isAdmin,
     lastLoginAt: now,

@@ -32,6 +32,7 @@ export interface WebSessionUser {
   sub: string;
   displayName: string;
   email: string | null;
+  pictureUrl: string | null;
   isAdmin: boolean;
   groups: string[];
 }
@@ -70,6 +71,7 @@ export async function lookupWebSession(sessionValue: string, now = new Date()): 
       userId: users.id,
       sub: users.oidcSub,
       displayName: users.displayName,
+      pictureUrl: users.pictureUrl,
       email: users.email,
       isAdmin: users.isAdmin,
       groups: users.groupsJson,
@@ -87,6 +89,7 @@ export async function lookupWebSession(sessionValue: string, now = new Date()): 
       userId: row.userId,
       sub: row.sub,
       displayName: row.displayName,
+      pictureUrl: row.pictureUrl,
       email: row.email,
       isAdmin: row.isAdmin,
       groups: Array.isArray(row.groups) ? (row.groups as string[]) : [],

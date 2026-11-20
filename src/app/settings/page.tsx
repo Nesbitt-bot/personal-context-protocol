@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { ArrowLeft, Check, KeyRound } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { SiteNav } from '@/components/site-nav';
 import { DiagnosticsPanel } from '@/components/diagnostics-panel';
 import { readJsonResponse } from '@/lib/http';
@@ -24,6 +25,7 @@ export default function SettingsPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   // Settings are admin-only; the panel loads once the admin check passed.
+  const [signedIn, setSignedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -32,11 +34,8 @@ export default function SettingsPage() {
         router.replace('/login?next=/settings');
         return;
       }
-      if (!user.is_admin) {
-        setError('Unable to open settings: web UI authorization / admin check - settings need membership in the PCP admin group');
-        return;
-      }
-      setIsAdmin(true);
+      setSignedIn(true);
+      setIsAdmin(user.is_admin);
     });
   }, [router]);
 
@@ -99,7 +98,7 @@ export default function SettingsPage() {
     <main className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
       <SiteNav />
       <section className="mx-auto max-w-3xl space-y-6 px-4 py-12 sm:px-6">
-        <form className="rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900" onSubmit={updateToken}>
+        {isAdmin && <form className="rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900" onSubmit={updateToken}>
           <div className="mb-5 flex items-center gap-3">
             <div className="rounded-md bg-slate-950 p-3 text-white dark:bg-sky-400 dark:text-slate-950">
               <KeyRound size={22} />
@@ -159,14 +158,15 @@ export default function SettingsPage() {
               <ArrowLeft size={16} /> Dashboard
             </Link>
           </div>
-        </form>
+        </form>}
 
         {/* What this deployment is and what it has been doing. Answering
             either question previously meant probing the API by hand. */}
         <DiagnosticsPanel enabled={isAdmin} />
 
-        <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+        {signedIn && <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900">
           <h2 className="mb-2 text-lg font-semibold text-slate-950 dark:text-white">Preferences</h2>
+          <div className="mb-4"><ThemeToggle /></div>
           <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
             Dismissed warnings are remembered in this browser. Re-enable them here if you change your mind.
           </p>
@@ -177,7 +177,8 @@ export default function SettingsPage() {
           >
             Re-enable move-task warning
           </button>
-        </section>
+          {!isAdmin && <p role="status">{status}</p>}
+        </section>}
       </section>
     </main>
   );

@@ -16,7 +16,7 @@ import { logError } from './logging';
  * never accepted here; they have their own routes and verifiers.
  */
 export type UiActor =
-  | { kind: 'user'; userId: string; displayName: string; isAdmin: boolean }
+  | { kind: 'user'; userId: string; displayName: string; pictureUrl?: string | null; isAdmin: boolean }
   | { kind: 'break_glass'; userId: 'admin'; displayName: 'Break-glass admin'; isAdmin: true };
 
 export type UiAuthError = { error: string; code: string; status: number };
@@ -74,6 +74,7 @@ export async function authenticateUi(request: NextRequest): Promise<UiAuthResult
       kind: 'user',
       userId: lookup.user.userId,
       displayName: lookup.user.displayName,
+      pictureUrl: lookup.user.pictureUrl,
       isAdmin: lookup.user.isAdmin,
     };
     return { success: true, actor, userId: actor.userId };

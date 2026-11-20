@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     user_id: auth.actor.userId,
     display_name: auth.actor.displayName,
+    picture_url: auth.actor.kind === 'user' ? auth.actor.pictureUrl : null,
     is_admin: auth.actor.isAdmin,
     method: auth.actor.kind === 'user' ? 'oidc' : 'break_glass',
   });

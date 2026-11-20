@@ -173,7 +173,17 @@ async function loadJwks(jwksUri: string, fetchImpl: FetchLike, force: boolean): 
   return value;
 }
 
+/** Only HTTPS image URLs from the verified identity token can become avatars. */
+export function profilePicture(value: string) {
+  if (value.length > 2048) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+
 export interface VerifiedIdentity {
+  pictureUrl: string | null;
   sub: string;
   displayName: string;
   email: string | null;
@@ -240,6 +250,7 @@ export async function verifyIdToken(
   return {
     sub: payload.sub,
     displayName: (claim('displayName') || claim('name') || claim('preferred_username') || payload.sub).slice(0, 200),
+    pictureUrl: profilePicture(claim('picture') || claim('avatar')),
     email: claim('email') || null,
     groups,
   };

@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Code2, Database, FolderGit2, KeyRound, Menu, MessageSquare, Settings, X } from 'lucide-react';
+import { Code2, Database, FolderGit2, KeyRound, Menu, MessageSquare, X } from 'lucide-react';
+import { SessionSearch } from './session-search';
+import { AccountMenu } from './account-menu';
 import { ThemeToggle } from './theme-toggle';
 import { ScopedTokenManager } from './dashboard/scoped-token-manager';
 import { fetchSignedInUser, signOut, SignedInUser } from '@/lib/client-auth';
@@ -12,15 +14,6 @@ const ENTRY = 'inline-flex items-center gap-2 rounded-md border border-slate-200
 const ACTIVE = 'border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100';
 const MENU_ITEM = 'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800';
 
-/**
- * Shared top navigation for public and authenticated app pages.
- *
- * Signed-in users get Sessions (the dashboard) and Projects; admins also get
- * Tokens and Settings. The server enforces every one of these regardless of
- * what is shown. On narrow screens the entries move into a menu so nothing is
- * unreachable on a phone. After sign-in "Login" becomes "Logout" so the user
- * always knows whether a session is active.
- */
 export function SiteNav() {
   const [user, setUser] = useState<SignedInUser | null>(null);
   const [showTokens, setShowTokens] = useState(false);
@@ -56,20 +49,20 @@ export function SiteNav() {
     ? [
         { href: '/dashboard', label: 'Sessions', icon: MessageSquare, active: pathname.startsWith('/dashboard') || pathname.startsWith('/sessions') },
         { href: '/projects', label: 'Projects', icon: FolderGit2, active: pathname.startsWith('/projects') },
-        ...(isAdmin ? [{ href: '/settings', label: 'Settings', icon: Settings, active: pathname.startsWith('/settings') }] : []),
       ]
     : [];
 
   return (
     <nav className="sticky top-0 z-20 border-b border-slate-200 bg-white/85 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <Link href="/" className="inline-flex min-w-0 items-center gap-3 text-slate-950 dark:text-slate-50">
+        <Link href="/" aria-label="PCP home" className="inline-flex min-w-0 items-center gap-3 text-slate-950 dark:text-slate-50">
           <span className="rounded-md bg-slate-950 p-2 text-white dark:bg-sky-400 dark:text-slate-950">
             <Database size={18} />
           </span>
-          <span className="truncate text-sm font-semibold">Personal Context Protocol</span>
+          <span className="hidden truncate text-sm font-semibold lg:inline">Personal Context Protocol</span>
         </Link>
-        <div className="flex items-center gap-2">
+        {user && <SessionSearch />}
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {links.map(({ href, label, icon: Icon, active }) => (
             <Link key={href} href={href} className={`hidden md:inline-flex ${ENTRY} ${active ? ACTIVE : ''}`} aria-current={active ? 'page' : undefined}>
               <Icon size={16} /> {label}
@@ -83,28 +76,7 @@ export function SiteNav() {
           <a className={`hidden lg:inline-flex ${ENTRY}`} href="https://github.com/Nesbitt-bot/personal-context-protocol" rel="noreferrer" target="_blank">
             <Code2 size={16} /> Source
           </a>
-          {user && (
-            <span className="hidden max-w-[12rem] truncate text-sm text-slate-500 dark:text-slate-400 xl:inline" title={user.method === 'break_glass' ? 'Break-glass admin token' : 'Signed in with Casdoor'}>
-              {user.display_name}
-            </span>
-          )}
-          <ThemeToggle />
-          {user ? (
-            <button
-              className="hidden rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 sm:inline-flex"
-              onClick={logout}
-              type="button"
-            >
-              Logout
-            </button>
-          ) : (
-            <Link
-              className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
-              href={`/login${pathname.startsWith('/login') || pathname === '/' ? '' : `?next=${encodeURIComponent(pathname)}`}`}
-            >
-              Login
-            </Link>
-          )}
+          <div className={user ? 'hidden sm:block' : ''}><ThemeToggle /></div>
           {user && (
             <div className="relative md:hidden" ref={menuRef}>
               <button
@@ -131,10 +103,12 @@ export function SiteNav() {
                       <KeyRound size={16} /> Tokens
                     </button>
                   )}
-                  <button className={`${MENU_ITEM} sm:hidden`} onClick={logout} type="button">Logout</button>
                 </div>
               )}
             </div>
+          )}
+          {user ? <AccountMenu user={user} logout={logout} /> : (
+            <Link className={ENTRY} href={`/login${pathname === '/' || pathname.startsWith('/login') ? '' : `?next=${encodeURIComponent(pathname)}`}`}>Login</Link>
           )}
         </div>
       </div>

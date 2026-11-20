@@ -613,3 +613,5 @@ LIMIT 50;
 distinguish source identity from normalized storage. No blob hash grants access.
 
 `message_sync_keys` has `(session_id, external_id)` as primary key and a unique `message_id` reference. This ledger preserves legacy message identity without mutating append-only message rows.
+
+`users.picture_url` is an optional HTTPS profile image from the verified identity token. Clients fall back to initials. OpenSearch is a derived session index, not the source of truth or an access-control store.

@@ -199,6 +199,7 @@ function schemaStatements(version) {
       last_login_at timestamptz,
       UNIQUE (oidc_issuer, oidc_sub)
     )`,
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS picture_url text',
     `CREATE TABLE IF NOT EXISTS identities (
       principal text PRIMARY KEY,
       user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -604,7 +605,7 @@ async function main() {
 
     await sql`
       INSERT INTO schema_migrations (version, checksum)
-      VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset'), ('022_session_presence', 'session_reporter_leases'), ('023_import_compaction_receipts', 'mirror_replay_fingerprints')
+      VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset'), ('022_session_presence', 'session_reporter_leases'), ('023_import_compaction_receipts', 'mirror_replay_fingerprints'), ('024_user_picture', 'oidc_profile_picture')
       ON CONFLICT (version) DO NOTHING
     `;
 

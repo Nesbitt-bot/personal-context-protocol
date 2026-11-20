@@ -37,6 +37,7 @@ export function uiAuthHeaders(): Record<string, string> {
 export interface SignedInUser {
   user_id: string;
   display_name: string;
+  picture_url?: string | null;
   is_admin: boolean;
   method: 'oidc' | 'break_glass';
 }
@@ -54,6 +55,7 @@ export async function fetchSignedInUser(): Promise<SignedInUser | null> {
 
 export async function signOut() {
   const headers = uiAuthHeaders();
+  const response = await fetch('/auth/logout', { method: 'POST', headers });
+  if (!response.ok) throw new Error('Unable to sign out. Reload the page and try again.');
   localStorage.removeItem(BREAK_GLASS_STORAGE_KEY);
-  await fetch('/auth/logout', { method: 'POST', headers }).catch(() => undefined);
 }

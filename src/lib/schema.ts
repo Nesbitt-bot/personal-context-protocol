@@ -32,6 +32,7 @@ export const users = pgTable('users', {
   oidcIssuer: text('oidc_issuer').notNull(),
   oidcSub: text('oidc_sub').notNull(),
   displayName: text('display_name').notNull(),
+  pictureUrl: text('picture_url'),
   email: text('email'),
   groupsJson: jsonb('groups_json').notNull().default([]),
   isAdmin: boolean('is_admin').notNull().default(false),

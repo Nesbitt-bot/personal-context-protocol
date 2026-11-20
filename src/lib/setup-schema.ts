@@ -505,6 +505,7 @@ export const SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS session_links_a_idx ON session_links(session_a)',
   'CREATE INDEX IF NOT EXISTS session_links_b_idx ON session_links(session_b)',
   ...IDENTITY_SCHEMA_STATEMENTS,
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS picture_url text',
   ...SERVICE_SCHEMA_STATEMENTS,
   ...PROJECT_SCHEMA_STATEMENTS,
   ...BROKER_SCHEMA_STATEMENTS,
@@ -697,7 +698,7 @@ async function applySchema() {
 
   await db.execute(sql`
     INSERT INTO schema_migrations (version, checksum)
-    VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset'), ('022_session_presence', 'session_reporter_leases'), ('023_import_compaction_receipts', 'mirror_replay_fingerprints')
+    VALUES ('021_priority_optional', 'tasks_priority_nullable_default_unset'), ('022_session_presence', 'session_reporter_leases'), ('023_import_compaction_receipts', 'mirror_replay_fingerprints'), ('024_user_picture', 'oidc_profile_picture')
     ON CONFLICT (version) DO NOTHING
   `);
 }

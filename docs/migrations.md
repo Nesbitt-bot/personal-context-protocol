@@ -247,3 +247,5 @@ No existing message or identity is rewritten. Blobs are backed up separately.
 ## 016 — legacy message sync identities
 
 `message_sync_keys` aliases external IDs to existing messages. The first ID-based replay does not update messages or change their ordinals. Both bootstrap paths register the additive table.
+
+Migration `024_user_picture` adds nullable `users.picture_url`; verified Casdoor logins refresh it. Existing accounts need not be backfilled.
