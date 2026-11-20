@@ -59,27 +59,27 @@ export function ImportPanel({ sessionId, onImported }: ImportPanelProps) {
   }
 
   return (
-    <section className="mt-3 shrink-0 rounded-md border border-slate-200 bg-slate-950 p-4 text-slate-100 shadow-sm dark:border-slate-800">
-      <p className="mb-3 text-xs leading-5 text-slate-400">
-        If an agent could not upload from its sandbox, paste its fallback block here — a <code className="text-slate-300">{'{ messages }'}</code> object, the agent&apos;s JSON, a <code className="text-slate-300">&lt;PCP_COMPACT&gt;</code> block, or a plain transcript. Already-recorded messages are skipped automatically.
+    <section className="mt-3 shrink-0 rounded-md border border-slate-200 bg-slate-50 p-4 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+      <p className="mb-3 text-xs leading-5 text-slate-600 dark:text-slate-400">
+        If an agent could not upload from its sandbox, paste its fallback block here — a <code className="text-slate-800 dark:text-slate-300">{'{ messages }'}</code> object, the agent&apos;s JSON, a <code className="text-slate-800 dark:text-slate-300">&lt;PCP_COMPACT&gt;</code> block, or a plain transcript. Already-recorded messages are skipped automatically.
       </p>
       <textarea
         aria-label="Fallback transcript"
-        className="h-36 w-full resize-y rounded-md border border-slate-700 bg-black/40 p-3 font-mono text-xs text-slate-100 outline-none focus:border-sky-500"
+        className="h-36 w-full resize-y rounded-md border border-slate-300 bg-white p-3 font-mono text-xs text-slate-900 placeholder:text-slate-500 outline-none focus:border-sky-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-sky-400"
         value={text}
         onChange={(event) => setText(event.target.value)}
         placeholder={'{\n  "messages": [\n    { "role": "user", "content": "..." },\n    { "role": "assistant", "content": "..." }\n  ]\n}'}
         spellCheck={false}
       />
-      {error && <p className="mt-2 rounded-md bg-red-950/50 px-3 py-2 text-xs text-red-200">{error}</p>}
+      {error && <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-800 dark:bg-red-950/50 dark:text-red-200">{error}</p>}
       {result && (
-        <p className="mt-2 inline-flex items-center gap-2 rounded-md bg-emerald-950/50 px-3 py-2 text-xs text-emerald-200">
+        <p className="mt-2 inline-flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
           <Check size={14} /> {result}
         </p>
       )}
       <div className="mt-3 flex justify-end">
         <button
-          className="inline-flex items-center gap-2 rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-md bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={submit}
           disabled={busy || !text.trim()}
           type="button"

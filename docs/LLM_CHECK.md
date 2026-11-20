@@ -537,3 +537,5 @@ Append what this round actually did below:
   document routes with atomic merging. Type checking and six disposable-DB
   integration checks passed. Browser verification covered modal focus and a
   file download followed by duplicate-free reimport through the file picker.
+
+- 2026-11-20 (v0.4.6): the fallback paste form used unconditional dark colors. Added light and dark variants to its surface, text, input, feedback and submit button.
