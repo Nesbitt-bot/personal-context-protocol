@@ -127,6 +127,7 @@ export const scopedPermissionsSchema = z.object({
   mint_tokens: z.boolean().optional(),
   rename_sessions: z.boolean().optional(),
   read_all: z.boolean().optional(),
+  manage_projects: z.boolean().optional(),
 });
 
 export const createScopedTokenSchema = z

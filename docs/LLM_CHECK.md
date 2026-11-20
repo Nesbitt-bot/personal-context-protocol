@@ -511,3 +511,21 @@ Append what this round actually did below:
   the parent grant closed. The temporary read-only observer was removed and
   private evidence retained. No Bilibili project files were changed; the
   original conversion is not claimed complete by this infrastructure check.
+
+## 2026-11-20 — Token permission validation and Spark UI integration (v0.4.4)
+
+- Root cause: scopedPermissionsSchema in src/lib/validations.ts omitted
+  manage_projects, so Zod stripped the selected UI value before persistence.
+- Added the boolean field without expanding legacy or non-global permissions.
+- Regression reproduced: three assertions failed before the fix; all 11
+  permission/schema checks passed afterward. The real database test creates
+  a token through the UI API, verifies its hash and permissions, writes a
+  project using it, revokes it, and confirms access is rejected.
+- Reviewed and included Spark commits 8d2dd34, 25c27cc, c463a16, and 7a840d1
+  for private session search and account navigation. They were local-only;
+  production still reported Jenkins revision 8b3f1f8 before this push.
+- Validation in an isolated worktree: typecheck, npm run build, and all
+  415 Vitest tests passed with a disposable tmpfs PostgreSQL database.
+- No production build files, containers, runtime configuration, or database
+  were modified for debugging. The requested push uses the normal GitHub
+  webhook; Jenkins owns testing and deployment. No test-only trailer.

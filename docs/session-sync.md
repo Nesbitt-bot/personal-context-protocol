@@ -22,8 +22,14 @@ between devices without changing its origin identity.
 In the OpenCode plugin dashboard, open **Session Manager** and set:
 
 - **PCP base URL** — the public PCP origin, for example `https://pcp.example.com`
-- **PCP scoped token** — a global token with `read_all`, `create_sessions`, and
-  `mint_tokens`
+- **PCP scoped token** — a global token with `read_all`, `create_sessions`,
+  `mint_tokens`, and `manage_projects` for project/task registration and
+  identity-based message merging.
+
+If **Manage projects** was selected but project registration returns `403`,
+check the deployed version. Before v0.4.4, token request validation discarded
+that checkbox value. Upgrade and create a replacement token; the fix does not
+expand permissions on existing tokens.
 
 The values are stored in `~/.config/opencode/pcp.json`. The token is never
 included in status output.

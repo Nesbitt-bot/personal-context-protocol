@@ -8,6 +8,15 @@ The [AstrBot relay](broker.md) preserves group speaker IDs in recalled
 history. Historical private context can be backfilled into its linked PCP session
 for OpenClaw recall across the owner's connected channels.
 
+Signed-in users can search session content from the navigation bar and open
+Profile, Settings, or Logout from the account menu. Search uses private
+OpenSearch and local embeddings; PostgreSQL checks visibility before results
+are returned. See [session search deployment](deployment-docker-compose.md).
+
+Global sync tokens need **Manage projects** for project/task registration.
+Version 0.4.4 fixes the token form permission being discarded by API validation;
+create a replacement token after upgrading.
+
 ---
 
 ## Quick Deploy

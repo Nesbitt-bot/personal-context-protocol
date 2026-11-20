@@ -586,6 +586,13 @@ tokens and the admin token are not accepted. `manage_projects` is a new flag
 with `scripts/pcp-operator.js scoped-token create --permission manage_projects`
 or in the token manager.
 
+The token creation API preserves an explicitly selected `manage_projects`
+permission on global tokens. Releases before v0.4.4 dropped this field during
+request validation even when the UI checkbox was selected. After upgrading,
+create a replacement global token with **Manage projects** enabled; existing
+tokens are not automatically granted additional permissions. Folder and
+session tokens still cannot manage projects.
+
 ### GET|POST `/manager/projects`
 
 `GET` lists projects with their workspaces. `POST` finds or creates a project
