@@ -137,7 +137,7 @@ unset JENKINS_PASSWORD
 ```
 
 The helper keeps the job's enabled/disabled state and backs up its previous
-XML under ignored `logs/`. Push authorized commits to Trance-0 main. Verify
+XML under ignored `logs/`. Push authorized commits to `Nesbitt-bot/personal-context-protocol` main. Verify
 that Jenkins reports **Started by GitHub push**, checks out that SHA, and
 returns the same commit and software version at
 http://localhost:3000/api/v1/health. The separate database check requires the

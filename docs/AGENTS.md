@@ -88,6 +88,12 @@ Example:
 
 ### Git discipline
 
+- **PCP is main-only for every agent and session.** This overrides the shared
+  template’s feature-branch/PR default. Work and commit directly on `main`;
+  do not create task branches or PRs unless the owner explicitly requests one.
+- When the owner requests testing and deployment, push `main` to the configured
+  Jenkins SCM remote and verify the webhook build and deployed health SHA.
+  A full deployment must not use the `PCP-Test-Only` trailer.
 - Commit locally first, don't push unless explicitly asked
 - Force-push requires explicit per-task approval
 - Check `git diff --cached --stat` before committing
