@@ -61,7 +61,7 @@ export function SiteNav() {
           </span>
           <span className="hidden truncate text-sm font-semibold lg:inline">Personal Context Protocol</span>
         </Link>
-        {user && <SessionSearch />}
+        {user && pathname !== '/search' && <div className="min-w-0 flex-1 md:max-w-sm"><SessionSearch /></div>}
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {links.map(({ href, label, icon: Icon, active }) => (
             <Link key={href} href={href} className={`hidden md:inline-flex ${ENTRY} ${active ? ACTIVE : ''}`} aria-current={active ? 'page' : undefined}>

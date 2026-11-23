@@ -5,7 +5,7 @@ This page lists only behavior that affects the current app. Roadmap items live i
 - Single admin token model.
 - No token revocation UI.
 - No UI token rotation flow.
-- Session search requires the private OpenSearch stack. The navbar returns up to 20 ranked sessions without pagination.
+- Search displays at most 20 results per section without pagination. Session search requires the private OpenSearch stack; project and task searches do not.
 - No import endpoints.
 - Minimal admin UI.
 
