@@ -1,10 +1,15 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { searchSessions, mergeRanks } from '../src/lib/session-search';
+import { keywordPattern } from '../src/lib/search-options';
 import { passages } from '../search/indexer';
 import { profilePicture } from '../src/lib/oidc';
 
 afterEach(() => vi.unstubAllGlobals());
 describe('private session search', () => {
+  it('marks literal keywords without treating punctuation as regex or HTML', () => {
+    const re = new RegExp(`(${keywordPattern('C++ [tag] c')})`, 'iu');
+    expect('<b>c++</b> [TAG]'.split(re)).toEqual(['<b>', 'c++', '</b> ', '[TAG]', '']);
+  });
   it('includes late transcript content and empty sessions', () => {
     const parts = passages({title:'Example',summary:'',messages:[{content:'字'.repeat(9000)+'TAIL'}]});
     expect(parts.at(-1)).toContain('TAIL');

@@ -6,7 +6,7 @@
  * name contains "test". Uses its own `<name>_projects` database (needs
  * CREATEDB), dropped and recreated each run so the upgrade path is real.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import postgres from 'postgres';
 import { execFileSync } from 'child_process';
@@ -102,6 +102,7 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     aliceBrowser = { session: b.sessionValue, csrf: b.csrfValue };
 
     routes = {
+      search: await import('../src/app/api/v1/search/route'),
       scopedTokens: await import('../src/app/api/v1/tokens/route'),
       mProjects: await import('../src/app/api/v1/manager/projects/route'),
       mResolve: await import('../src/app/api/v1/manager/projects/resolve/route'),
@@ -422,6 +423,43 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     expect(await mergeSessionMessages(sessionId,[{...turn,external_id:'legacy'}],'dev','test')).toMatchObject({appended:0, duplicates:1});
     expect(await append([{...turn,provider_timestamp:'2026-04-02T01:00:00.000Z'}])).toMatchObject({duplicates:0,messages:[{ordinal:2}]});
     expect((await raw`select id from messages where session_id=${sessionId}`).length).toBe(1);
+  });
+
+  it('searches only authorized scopes and reads excerpts from current visible rows', async () => {
+    await raw`insert into projects (id, canonical_key, display_name, owner_user_id) values
+      ('prj_search','name:sample','Example','usr_alice'),('prj_search_private','name:hidden','Cipher',null)`;
+    await raw`insert into project_aliases(alias_key,project_id) values ('name:cipher-tag','prj_search')`;
+    await raw`insert into tasks (id,title) values ('tsk_search','Cipher launch')`;
+    await raw`insert into sessions (id,title,owner_user_id) values ('ses_search','Notes','usr_alice')`;
+    await raw`insert into messages (id,session_id,ordinal,role,content,observed_at) values
+      ('msg_search','ses_search',1,'user',repeat('padding ',70)||'CIPHER transcript',now())`;
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ hits: { hits: [
+      { _id: 'ses_win_codex' }, { _id: 'ses_search' }, // deliberately ignore the upstream ACL filter
+    ] } }));
+    const search = (scope: string, browser = aliceBrowser, q = 'cipher') => call('search', 'POST', { browser, body: { scope, q, mode: 'keyword' } });
+    try {
+      const { status, body } = await search('all');
+      expect(status).toBe(200);
+      expect(body.projects).toEqual([{ id: 'prj_search', title: 'Example', snippet: 'name:cipher-tag' }]);
+      expect(body.tasks).toBeUndefined();
+      expect(body.results).toHaveLength(1);
+      expect(body.results[0]).toMatchObject({ id: 'ses_search', snippet: expect.stringMatching(/CIPHER transcript$/) });
+      expect(body.results[0].snippet.length).toBeLessThanOrEqual(240);
+      expect(upstream).toHaveBeenCalledTimes(1); // keyword mode doesn't call the embedder
+      upstream.mockClear();
+      expect((await search('tasks')).status).toBe(403);
+      expect((await search('tasks', adminBrowser)).body.tasks).toEqual([{ id: 'tsk_search', title: 'Cipher launch' }]);
+      expect((await search('projects', adminBrowser, '%')).body.projects).toEqual([]);
+      expect((await search('invalid')).status).toBe(400);
+      expect(upstream).not.toHaveBeenCalled();
+      await raw`update messages set content='redacted' where id='msg_search'`;
+      expect((await search('sessions')).body.results[0].snippet).toBeNull();
+      await raw`insert into compactions(id,session_id,summary) values ('cmp_search','ses_search','Cipher summary')`;
+      expect((await search('sessions')).body.results[0].snippet).toBe('Cipher summary');
+      upstream.mockRejectedValue(new Error('offline'));
+      expect((await search('all')).body).toMatchObject({ projects: [{ id: 'prj_search' }], sessionError: expect.any(String) });
+      expect((await search('sessions')).status).toBe(503);
+    } finally { upstream.mockRestore(); }
   });
 
 });

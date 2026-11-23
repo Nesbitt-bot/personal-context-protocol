@@ -539,3 +539,11 @@ Append what this round actually did below:
   file download followed by duplicate-free reimport through the file picker.
 
 - 2026-11-20 (v0.4.6): the fallback paste form used unconditional dark colors. Added light and dark variants to its surface, text, input, feedback and submit button.
+
+## 2026-11-23 — Scoped search results (v0.4.7)
+
+- Navigation and dashboard filter submission open a dedicated page. Project
+  tags and admin-only task names remain available if session indexing is down.
+- Verified the authenticated search API and browser navigation, highlighting,
+  filtering, refresh/back, and result links with disposable PostgreSQL 16 and
+  OpenSearch 3.6. No production index, credentials or deployment was changed.
