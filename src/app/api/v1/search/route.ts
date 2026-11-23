@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, inArray } from 'drizzle-orm';
-import { authenticateUi, authErrorResponse } from '@/lib/ui-auth';
+import { authenticateUi, authErrorResponse, requireAdmin } from '@/lib/ui-auth';
 import { boundedText } from '@/lib/bounded-body';
-import { db } from '@/lib/db';
-import { sessions } from '@/lib/schema';
-import { visibleSessionsFilter } from '@/lib/session-access';
-import { searchSessions } from '@/lib/session-search';
+import { searchProjectTags, searchTaskNames, searchSessionContent } from '@/lib/search-catalog';
+import { isSearchScope, type SearchResults } from '@/lib/search-options';
 
 export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
@@ -13,18 +10,28 @@ export async function POST(request: NextRequest) {
   if ('error' in auth) return authErrorResponse(auth);
   const body = await boundedText(request, 8192).then(text => JSON.parse(text)).catch(() => null);
   const q = typeof body?.q === 'string' ? body.q.trim() : '';
-  if (!q || q.length > 500) return NextResponse.json({ error: 'Enter a query between 1 and 500 characters.' }, { status: 400 });
+  const scope = body?.scope ?? 'sessions';
+  const mode = body?.mode ?? 'hybrid';
+  if (!q || q.includes('\0') || q.length > 500 || !isSearchScope(scope) || !['keyword', 'hybrid'].includes(mode)) {
+    return NextResponse.json({ error: 'Unable to search: enter 1–500 characters and choose a valid search scope and mode.' }, { status: 400 });
+  }
+  if (scope === 'tasks') {
+    const denied = requireAdmin(auth.actor, 'Unable to search task names');
+    if (denied) return authErrorResponse(denied);
+  }
   try {
-    const visible = visibleSessionsFilter(auth.actor);
-    const allowed = visible ? (await db.select({ id: sessions.id }).from(sessions).where(visible)).map(row => row.id) : undefined;
-    const { ids, semantic } = await searchSessions(q, allowed);
-    // Final authorization and display data both come from PostgreSQL, not a stale index.
-    const rows = ids.length ? await db.select({ id: sessions.id, title: sessions.title }).from(sessions)
-      .where(and(visible, inArray(sessions.id, ids))) : [];
-    const byId = new Map(rows.map(row => [row.id, row]));
-    const results = ids.flatMap(id => byId.get(id) ?? []).slice(0, 20);
-    return NextResponse.json({ results, semantic }, { headers: { 'Cache-Control': 'private, no-store' } });
+    const [projects, tasks, session] = await Promise.all([
+      scope === 'all' || scope === 'projects' ? searchProjectTags(q, auth.actor) : undefined,
+      (scope === 'all' || scope === 'tasks') && auth.actor.isAdmin ? searchTaskNames(q, auth.actor) : undefined,
+      scope === 'all' || scope === 'sessions' ? searchSessionContent(q, auth.actor, mode).catch(() => ({
+        sessionError: 'Unable to search sessions: the session index or database could not be queried.',
+      })) : undefined,
+    ]);
+    const data: SearchResults = { projects, tasks, ...session, canSearchTasks: auth.actor.isAdmin };
+    return NextResponse.json(data.sessionError && scope === 'sessions' ? { error: data.sessionError } : data, {
+      status: data.sessionError && scope === 'sessions' ? 503 : 200, headers: { 'Cache-Control': 'private, no-store' },
+    });
   } catch {
-    return NextResponse.json({ error: 'Session search is unavailable. Try again shortly.' }, { status: 503 });
+    return NextResponse.json({ error: 'Unable to search: the project or task database could not be queried.' }, { status: 503 });
   }
 }

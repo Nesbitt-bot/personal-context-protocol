@@ -167,7 +167,9 @@ upload queues contain private image source bytes and must remain mode 600.
 
 Session search is a human UI endpoint, not an agent tool. The app applies current
 PostgreSQL session visibility before ranking, then checks it again before returning
-IDs and current titles. The local OpenSearch index contains private transcripts;
+IDs, current titles and bounded excerpts from live PostgreSQL rows. Project tags
+use project visibility; task names are admin-only. Search terms appear in the
+results-page URL (including browser history and potentially proxy logs). The local OpenSearch index contains private transcripts;
 protect its host directory and backups like the database. Never publish the search
 or embedding service ports. Only the profile image URL is passed to the browser,
 with no referrer, and only when supplied by a verified identity token.
