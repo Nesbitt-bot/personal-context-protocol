@@ -915,6 +915,7 @@ claiming a session failed. Polling does not refresh any lease.
 
 `POST /api/v1/search` supports project tags, admin-only task names, and session
 content. Existing requests with only `q` still search sessions in hybrid mode.
+`POST /api/v1/search/suggestions` returns permission-scoped keyword completions with counts.
 See [scoped search](scoped-search.md) for authentication, query options, result
 sections, snippets, and degraded behavior.
 

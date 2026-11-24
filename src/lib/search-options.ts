@@ -8,7 +8,12 @@ export function isSearchScope(value: unknown): value is SearchScope {
   return searchScopes.some(scope => scope === value);
 }
 export interface SearchHit { id: string; title: string; snippet?: string | null }
+export type SearchCategory = Exclude<SearchScope, 'all'>;
+// A missing task count is unauthorized; null is an authorized but unavailable count.
+export type SearchCounts = Record<Exclude<SearchScope, 'tasks'>, number | null> & { tasks?: number | null };
 export interface SearchResults {
+  counts: SearchCounts;
+  categoryErrors?: Partial<Record<SearchCategory, string>>;
   projects?: SearchHit[];
   tasks?: SearchHit[];
   results?: SearchHit[]; // Existing session search response key.

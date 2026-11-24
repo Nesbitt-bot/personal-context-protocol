@@ -19,3 +19,18 @@ and message matches; `hybrid` also fuses local vector hits by reciprocal rank.
 visibility and supplies current titles and bounded excerpts; indexed transcript
 text and vectors are never returned. If session retrieval fails, an all-scope
 response includes `sessionError` alongside available project/task results.
+
+`counts` gives the full number of matching records per visible category and their
+sum (`all`), including when only one category's result rows were requested. These
+are totals, not the size of the displayed page. For hybrid sessions, matches
+include the deduplicated union of keyword matches and retrieved related sessions.
+An unavailable count is `null`, not zero; non-admin responses omit `counts.tasks`.
+
+`POST /api/v1/search/suggestions` accepts `q` and optional `scope` (default
+`all`) with the same authentication and CSRF checks. It completes the last
+word and returns up to six `{text, count}` items in `suggestions`. Suggestions
+come from PCP vocabulary and matching words in visible site content. Counts
+are keyword result counts for the **completed query** in the selected scope;
+embeddings are not run while typing. Use Tab/Shift+Tab or the arrow keys to
+browse, Enter to search, and Escape to dismiss. Enter without a highlighted
+suggestion searches the typed text.
