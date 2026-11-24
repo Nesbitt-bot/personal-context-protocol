@@ -6,6 +6,7 @@ The [AstrBot relay](docs/broker.md) preserves group speaker IDs in recalled
 history. Historical private context can be backfilled into its linked PCP session
 for OpenClaw recall across the owner's connected channels.
 
+Type a keyword prefix to see suggestions and match counts; Tab moves between suggestions and Enter searches.
 The navigation search opens `/search` with separate results for project tags,
 admin-only task names, and session content. Choose a scope or include related
 sessions using local embeddings. Matching words are highlighted in titles and

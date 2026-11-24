@@ -38,7 +38,8 @@ export function SearchWorkspace({ q, scope, mode }: { q: string; scope: SearchSc
         const response = await fetch('/api/v1/search', { method: 'POST', cache: 'no-store', signal: controller.signal,
           headers: { 'Content-Type': 'application/json', ...uiAuthHeaders() }, body: JSON.stringify({ q, scope, mode }) });
         const body = await response.json();
-        if (!response.ok) throw new Error(body.error || 'Unable to load search results.');
+        // A scoped 503 still contains usable sibling counts and retry details.
+        if (!response.ok && !(response.status === 503 && body.counts)) throw new Error(body.error || 'Unable to load search results.');
         if (!controller.signal.aborted) setData(body);
       } catch (err) {
         if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Unable to load search results.');
@@ -47,6 +48,7 @@ export function SearchWorkspace({ q, scope, mode }: { q: string; scope: SearchSc
     void load();
     return () => controller.abort();
   }, [q, scope, mode, valid, retry]);
+  const alert = error || Object.values(data?.categoryErrors ?? {}).join(' ');
   const pattern = (indexedWords = false) => new RegExp(`(${valid ? keywordPattern(q, indexedWords) : '(?!)'})`, 'iu');
   const linkClass = (active: boolean) => `block rounded-md px-3 py-2 text-sm ${active ? 'bg-sky-100 font-semibold text-sky-900 dark:bg-sky-950 dark:text-sky-200' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`;
   return <div className="mx-auto max-w-6xl space-y-5 px-4 py-8 sm:px-6">
@@ -55,8 +57,10 @@ export function SearchWorkspace({ q, scope, mode }: { q: string; scope: SearchSc
     <div className="grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)]">
       <aside className="space-y-4">
         <nav aria-label="Search scope"><h2 className="mb-2 text-sm font-semibold">Search in</h2>
-          {searchScopes.filter(s => s !== 'tasks' || data?.canSearchTasks !== false).map(s => <Link key={s} href={searchUrl(q, s, mode)}
-            aria-current={s === scope ? 'page' : undefined} className={linkClass(s === scope)}>{scopeLabels[s]}</Link>)}
+          {searchScopes.filter(s => s !== 'tasks' || data?.canSearchTasks === true).map(s => <Link key={s} href={searchUrl(q, s, mode)}
+            aria-current={s === scope ? 'page' : undefined} className={linkClass(s === scope)}><span className="flex items-center justify-between gap-2">
+              {scopeLabels[s]}{valid && data && <span className="ml-auto inline-flex min-w-6 shrink-0 justify-center rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium tabular-nums text-slate-700 dark:bg-slate-700 dark:text-slate-200">{data.counts[s] ?? 'Unavailable'}</span>}
+            </span></Link>)}
         </nav>
         {(scope === 'all' || scope === 'sessions') && <nav aria-label="Session matching"><h2 className="mb-2 text-sm font-semibold">Session matching</h2>
           {(['keyword', 'hybrid'] as const).map(m => <Link key={m} href={searchUrl(q, scope, m)} aria-current={m === mode ? 'true' : undefined}
@@ -66,7 +70,7 @@ export function SearchWorkspace({ q, scope, mode }: { q: string; scope: SearchSc
       <div className="min-w-0 space-y-4">
         {!valid ? <p role="status">{q ? 'Use at most 500 characters.' : 'Enter a keyword to search PCP.'}</p> : <>
           <p role="status" className="break-words text-sm text-slate-600 dark:text-slate-300">{!data && !error ? 'Searching…' : `Results for “${q}”`}</p>
-          {(error || data?.sessionError) && <p role="alert" className="rounded-md border p-3 text-sm">{error || data?.sessionError} <button className="underline" onClick={() => { setError(''); setData(null); setRetry(n => n + 1); }}>Try again</button></p>}
+          {alert && <p role="alert" className="rounded-md border p-3 text-sm">{alert} <button className="underline" onClick={() => { setError(''); setData(null); setRetry(n => n + 1); }}>Try again</button></p>}
           {data?.projects && <ResultSection section="projects" hits={data.projects} pattern={pattern()} />}
           {data?.tasks && <ResultSection section="tasks" hits={data.tasks} pattern={pattern()} />}
           {data?.results && <ResultSection section="sessions" hits={data.results} pattern={pattern(true)} />}

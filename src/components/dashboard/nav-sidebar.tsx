@@ -3,8 +3,9 @@
 import { useLights, PresenceLight } from '@/components/presence';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ChevronRight, Folder, FolderPlus, Inbox, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Archive, ChevronRight, Folder, FolderPlus, Inbox, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import { Session, Topic } from './types';
+import { SessionSearch } from '../session-search';
 import { ContextMenu, ContextMenuItem } from './context-menu';
 
 export const UNCATEGORIZED = '__none__';
@@ -280,10 +281,9 @@ export function NavSidebar({
         )}
       </div>
 
-      <form action="/search" className="mb-2 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-900">
-        <button type="submit" aria-label="Search all PCP" title="Search all PCP"><Search size={15} className="text-slate-400" /></button>
-        <input className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-400 dark:text-slate-100" name="q" required maxLength={500} value={query} onChange={(e) => onQueryChange(e.target.value)} aria-label="Filter session titles" placeholder="Filter session titles" />
-      </form>
+      <div className="mb-2">
+        <SessionSearch query={query} label="Filter session titles" onQueryChange={onQueryChange} />
+      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
