@@ -88,13 +88,12 @@ Example:
 
 ### Git discipline
 
-- **PCP is main-only for every agent and session.** This overrides the shared
-  template’s feature-branch/PR default. Work and commit directly on `main`;
-  do not create task branches or PRs unless the owner explicitly requests one.
-- When the owner requests testing and deployment, push `main` to the configured
-  Jenkins SCM remote and verify the webhook build and deployed health SHA.
+- Follow the canonical shared Git rule: by default, push verified changes to
+  `main`; if `main` is protected, use a PR instead.
+- When the owner requests testing and deployment, verify that the update to
+  `main` on the configured Jenkins SCM remote triggers the webhook build and
+  that the deployed health SHA matches the commit on `main` that triggered it.
   A full deployment must not use the `PCP-Test-Only` trailer.
-- Commit locally first, don't push unless explicitly asked
 - Force-push requires explicit per-task approval
 - Check `git diff --cached --stat` before committing
 - Never commit `.env` files or files with real secrets
@@ -227,9 +226,8 @@ ALTER TABLE messages ADD COLUMN metadata_json JSONB DEFAULT '{}';
 
 Before proceeding, if uncertain:
 
-1. "Should I push to GitHub or just commit locally?"
-2. "Is this scope correct, or should I focus on X first?"
-3. "Do you want me to run migrations locally to test?"
-4. "Should I write tests for this feature?"
+1. "Is this scope correct, or should I focus on X first?"
+2. "Do you want me to run migrations locally to test?"
+3. "Should I write tests for this feature?"
 
 When in doubt, ask. Better to clarify than to build the wrong thing.
