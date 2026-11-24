@@ -547,3 +547,12 @@ Append what this round actually did below:
 - Verified the authenticated search API and browser navigation, highlighting,
   filtering, refresh/back, and result links with disposable PostgreSQL 16 and
   OpenSearch 3.6. No production index, credentials or deployment was changed.
+
+## 2026-11-23 — Search suggestions and category counts (v0.4.8)
+
+- Verified the production build with disposable PostgreSQL and OpenSearch:
+  `ses` completed to `sessions`, and member suggestions excluded private words.
+  Chromium exercised Tab, Shift+Tab, Enter, Escape, raw search and scope changes.
+  In a 32-match fixture the task badge read 28 while the page showed 20 tasks.
+- Typecheck, production build, and all 437 Vitest tests (including database
+  suites) passed. No migration or search index rebuild is needed.

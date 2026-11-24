@@ -103,6 +103,7 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
 
     routes = {
       search: await import('../src/app/api/v1/search/route'),
+      suggest: await import('../src/app/api/v1/search/suggestions/route'),
       scopedTokens: await import('../src/app/api/v1/tokens/route'),
       mProjects: await import('../src/app/api/v1/manager/projects/route'),
       mResolve: await import('../src/app/api/v1/manager/projects/resolve/route'),
@@ -433,23 +434,34 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
     await raw`insert into sessions (id,title,owner_user_id) values ('ses_search','Notes','usr_alice')`;
     await raw`insert into messages (id,session_id,ordinal,role,content,observed_at) values
       ('msg_search','ses_search',1,'user',repeat('padding ',70)||'CIPHER transcript',now())`;
-    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ hits: { hits: [
-      { _id: 'ses_win_codex' }, { _id: 'ses_search' }, // deliberately ignore the upstream ACL filter
-    ] } }));
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const req = JSON.parse(String(init?.body));
+      const allowed = req.query.bool.filter[0].terms.sid as string[];
+      const matches = ['ses_win_codex', 'ses_search', 'ses_deleted'].filter(id => allowed.includes(id));
+      // Deliberately include an extra inaccessible ranked hit; hydration must recheck it.
+      return Response.json({ hits: { total: {value: matches.length, relation: 'eq'}, hits: req.size ?
+        [...new Set(['ses_win_codex', ...matches])].map(_id => ({_id})) : [] } });
+    });
     const search = (scope: string, browser = aliceBrowser, q = 'cipher') => call('search', 'POST', { browser, body: { scope, q, mode: 'keyword' } });
     try {
       const { status, body } = await search('all');
       expect(status).toBe(200);
       expect(body.projects).toEqual([{ id: 'prj_search', title: 'Example', snippet: 'name:cipher-tag' }]);
       expect(body.tasks).toBeUndefined();
+      expect(body.counts).toEqual({projects:1,sessions:1,all:2});
       expect(body.results).toHaveLength(1);
       expect(body.results[0]).toMatchObject({ id: 'ses_search', snippet: expect.stringMatching(/CIPHER transcript$/) });
       expect(body.results[0].snippet.length).toBeLessThanOrEqual(240);
       expect(upstream).toHaveBeenCalledTimes(1); // keyword mode doesn't call the embedder
       upstream.mockClear();
       expect((await search('tasks')).status).toBe(403);
-      expect((await search('tasks', adminBrowser)).body.tasks).toEqual([{ id: 'tsk_search', title: 'Cipher launch' }]);
+      expect(upstream).not.toHaveBeenCalled();
+      const admin = (await search('tasks', adminBrowser)).body;
+      expect(admin.tasks).toEqual([{ id: 'tsk_search', title: 'Cipher launch' }]);
+      expect(admin.counts).toEqual({projects:2,tasks:1,sessions:2,all:5});
+      expect(admin.results).toBeUndefined();
       expect((await search('projects', adminBrowser, '%')).body.projects).toEqual([]);
+      upstream.mockClear();
       expect((await search('invalid')).status).toBe(400);
       expect(upstream).not.toHaveBeenCalled();
       await raw`update messages set content='redacted' where id='msg_search'`;
@@ -458,7 +470,103 @@ describe.skipIf(!enabled)('projects, workspaces and sync conflicts (database, up
       expect((await search('sessions')).body.results[0].snippet).toBe('Cipher summary');
       upstream.mockRejectedValue(new Error('offline'));
       expect((await search('all')).body).toMatchObject({ projects: [{ id: 'prj_search' }], sessionError: expect.any(String) });
-      expect((await search('sessions')).status).toBe(503);
+      for (const scope of ['all', 'projects', 'sessions']) {
+        const offline = await search(scope);
+        expect(offline.status).toBe(scope === 'sessions' ? 503 : 200);
+        expect(offline.body.counts).toEqual({projects:1,sessions:null,all:null});
+        expect(offline.body.results).toBeUndefined();
+      }
+    } finally { upstream.mockRestore(); }
+  });
+
+  it('counts every match while returning only selected pages, including for a raw q request', async () => {
+    const q = 'many-matches';
+    await raw`insert into projects (id,canonical_key,display_name,owner_user_id)
+      select 'prj_many_'||i, 'many-matches:'||i, 'Many-Matches', 'usr_alice' from generate_series(1,23) i`;
+    await raw`insert into project_aliases (alias_key, project_id) values ('many-matches:a','prj_many_1'), ('many-matches:b','prj_many_1')`;
+    await raw`insert into tasks (id,title) select 'tsk_many_'||i, 'Many-Matches' from generate_series(1,27) i`;
+    await raw`insert into sessions (id,title,owner_user_id) select 'ses_many_'||i, 'Many-Matches', 'usr_alice' from generate_series(1,38) i`;
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      if (String(url).endsWith('/api/embed')) return new Response('', {status:503});
+      const req = JSON.parse(String(init?.body));
+      const matches = req.query.bool.filter[0].terms.sid.filter((id: string) => id.startsWith('ses_many_'));
+      return Response.json({hits:{total:{value:matches.length,relation:'eq'},hits:matches.slice(0,req.size).map((_id: string) => ({_id}))}});
+    });
+    try {
+      for (const scope of ['all', 'projects', 'tasks', 'sessions', undefined]) {
+        const { status, body } = await call('search', 'POST', {browser:adminBrowser, body:scope ? {q,scope,mode:'keyword'} : {q}});
+        expect(status).toBe(200);
+        expect(body.counts).toEqual({projects:23,tasks:27,sessions:38,all:88});
+        for (const [category, key] of [['projects','projects'],['tasks','tasks'],['sessions','results']]) {
+          if (scope === 'all' || (scope ?? 'sessions') === category) expect(body[key]).toHaveLength(20);
+          else expect(body[key]).toBeUndefined();
+        }
+      }
+    } finally { upstream.mockRestore(); }
+  });
+
+  it('keeps healthy counts when a catalog category fails, and distinguishes zero from unavailable', async () => {
+    const catalog = await import('../src/lib/search-catalog');
+    const failure = vi.spyOn(catalog, 'searchProjectTags').mockRejectedValue(new Error('offline'));
+    const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({hits:{hits:[],total:{value:0,relation:'eq'}}}));
+    try {
+      for (const scope of ['tasks', 'projects']) {
+        const {status,body} = await call('search', 'POST', {browser:adminBrowser,body:{q:'no-such-record',scope,mode:'keyword'}});
+        expect(status).toBe(scope === 'projects' ? 503 : 200);
+        expect(body.counts).toEqual({projects:null,tasks:0,sessions:0,all:null});
+        expect(body.categoryErrors).toEqual({projects:expect.any(String)});
+      }
+    } finally { failure.mockRestore(); upstream.mockRestore(); }
+  });
+
+  it('applies the same literal match predicates to a raw query and a SQL expression', async () => {
+    const {sql} = await import('drizzle-orm');
+    const {db} = await import('../src/lib/db');
+    const {projects,tasks} = await import('../src/lib/schema');
+    const {projectTagMatch,taskNameMatch} = await import('../src/lib/search-catalog');
+    const q = String.raw`50%_\off`;
+    for (const [id, label] of [['literal', q], ['decoy', String.raw`50xx\off`]]) {
+      await raw`insert into projects(id,canonical_key,display_name) values (${`prj_${id}`},${`key:${id}`},'Example')`;
+      await raw`insert into project_aliases(alias_key,project_id) values (${label},${`prj_${id}`})`;
+      await raw`insert into tasks(id,title) values (${`tsk_${id}`},${label})`;
+    }
+    for (const candidate of [q, sql`lower(${q}::text)`]) {
+      expect(await db.select({id:projects.id}).from(projects).where(projectTagMatch(candidate))).toEqual([{id:'prj_literal'}]);
+      expect(await db.select({id:tasks.id}).from(tasks).where(taskNameMatch(candidate))).toEqual([{id:'tsk_literal'}]);
+    }
+  });
+
+  it('completes live words and counts records, without suggesting private or stale text', async () => {
+    await raw`insert into projects(id,canonical_key,display_name,owner_user_id) values
+      ('prj_sug','name:nebulous','Nebulous','usr_alice'), ('prj_sug_private','name:nebhidden','Nebhidden',null)`;
+    await raw`insert into project_aliases(alias_key,project_id) values ('name:nebula','prj_sug')`;
+    await raw`insert into tasks(id,title) values ('tsk_sug','Nebulous'), ('tsk_sug_private','Nebclassified')`;
+    await raw`insert into sessions(id,title,owner_user_id) values
+      ('ses_sug','Notes','usr_alice'), ('ses_sug_private','Nebconfidential',null)`;
+    await raw`insert into messages(id,session_id,ordinal,role,content,observed_at) values
+      ('msg_sug','ses_sug',1,'user','Nebulous nebula Nebulous',now())`;
+    const upstream = vi.spyOn(globalThis,'fetch').mockImplementation(async (_url, init) => {
+      const req = JSON.parse(String(init?.body));
+      if (req.aggs) {
+        const buckets = req.aggs.matches.filters.filters.map((f: {bool: {must: {multi_match: {query: string}}[]}}) =>
+          ({ doc_count: ['nebulous','nebula'].includes(f.bool.must[0].multi_match.query) ? 1 : 0 }));
+        return Response.json({ aggregations: { matches: { buckets } } });
+      }
+      // Even a stale/misbehaving index returning another owner's ID must not supply words.
+      return Response.json({ hits: { hits: [{_id:'ses_sug'},{_id:'ses_sug_private'}] } });
+    });
+    const suggest = (scope: string, browser = aliceBrowser, q = 'neb') => call('suggest','POST',{ browser, body:{q,scope} });
+    try {
+      expect((await suggest('all')).body.suggestions).toEqual([{text:'nebula',count:2},{text:'nebulous',count:2}]);
+      expect((await suggest('tasks')).status).toBe(403);
+      upstream.mockClear();
+      expect((await suggest('tasks',adminBrowser)).body.suggestions).toEqual([{text:'nebclassified',count:1},{text:'nebulous',count:1}]);
+      expect((await suggest('projects',aliceBrowser,'nothing neb')).body.suggestions).toEqual([]);
+      expect((await suggest('all',aliceBrowser,'hello.*')).body.suggestions).toEqual([]);
+      expect((await call('suggest','POST',{ body:{q:'neb'} })).status).toBe(401);
+      expect(upstream).not.toHaveBeenCalled();
+      await raw`update messages set content='redacted' where id='msg_sug'`;
+      expect((await suggest('sessions')).body.suggestions).toEqual([]);
     } finally { upstream.mockRestore(); }
   });
 
